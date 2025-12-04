@@ -9,8 +9,6 @@ else
     conda create -n "${ENV_NAME}" python==3.10 -y
 fi
 conda activate "${ENV_NAME}"
-conda install -c nvidia cuda-toolkit=12.4 -y
-pip install huggingface-hub
 
 # Set paths and configs
 benchmark_dir="/root/Documents/MedVision"

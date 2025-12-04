@@ -10,7 +10,6 @@ else
     conda create -n "${ENV_NAME}" python==3.11 -y
 fi
 conda activate "${ENV_NAME}"
-conda install -c nvidia cuda-toolkit=12.4 -y
 
 
 # Set paths
@@ -164,20 +163,20 @@ save_processed_img_to_disk=true
 # prepared_ds_dir="" 
 # ------------------------------------------------------------------------------
 
-# # Offload dataset processing from training to a separate run to avoid timeout issues
-# python -m  medvision_bm.sft.train__SFT-CoT-TL__qwen2_5_vl \
-# --skip_process_dataset ${skip_process_dataset} \
-# --process_dataset_only true \
-# --save_processed_img_to_disk ${save_processed_img_to_disk} \
-# --base_model_hf ${base_model_hf} \
-# --data_dir ${data_dir} \
-# --tasks_list_json_path_TL ${tasks_list_json_path_TL} \
-# --num_workers_concat_datasets ${num_workers_concat_datasets} \
-# --num_workers_format_dataset ${num_workers_format_dataset} \
-# --train_sample_limit ${train_sample_limit} \
-# --val_sample_limit ${val_sample_limit} \
-# --train_sample_limit_task_TL ${train_sample_limit_task_TL} \
-# --val_sample_limit_task_TL ${val_sample_limit_task_TL} \
+# Offload dataset processing from training to a separate run to avoid timeout issues
+python -m  medvision_bm.sft.train__SFT-CoT-TL__qwen2_5_vl \
+--skip_process_dataset ${skip_process_dataset} \
+--process_dataset_only true \
+--save_processed_img_to_disk ${save_processed_img_to_disk} \
+--base_model_hf ${base_model_hf} \
+--data_dir ${data_dir} \
+--tasks_list_json_path_TL ${tasks_list_json_path_TL} \
+--num_workers_concat_datasets ${num_workers_concat_datasets} \
+--num_workers_format_dataset ${num_workers_format_dataset} \
+--train_sample_limit ${train_sample_limit} \
+--val_sample_limit ${val_sample_limit} \
+--train_sample_limit_task_TL ${train_sample_limit_task_TL} \
+--val_sample_limit_task_TL ${val_sample_limit_task_TL} \
 
 # Skip dataset processing and directly load from disk for training
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
