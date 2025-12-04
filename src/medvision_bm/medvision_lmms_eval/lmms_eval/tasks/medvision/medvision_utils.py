@@ -626,7 +626,7 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
     def doc_to_text_TumorLesionSize_CoT(doc, lmms_eval_specific_kwargs=None):
         """Convert document to text."""
         from medvision_bm.sft.sft_prompts import (
-            COT_INSTRUCT_TL,
+            COT_INSTRUCT_TL_NORM,
             FORMAT_PROMPT_TL_REASONING,
         )
 
@@ -695,6 +695,10 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
         # -------------
@@ -705,11 +709,12 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
             f"Given the input medical image: {image_description}, "
             f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
             f"Additional information:\n"
+            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_TL_REASONING}\n"
             f"Reasoning steps:\n"
-            f"{COT_INSTRUCT_TL}\n"
+            f"{COT_INSTRUCT_TL_NORM}\n"
             f"Follow the reasoning steps to get the final answer in the required format."
         )
         return question
