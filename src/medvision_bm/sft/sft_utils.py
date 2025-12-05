@@ -171,12 +171,12 @@ def _get_prompt_distance(biometrics_name, p1, p2, metric_unit):
 
 def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
     """Convert document to text."""
+    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
+
     # Early assertions
     assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
         img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
-    format_prompt = "The answer should be a single decimal number without any units or additional text."
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -297,7 +297,7 @@ def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
         f"Additional information:\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
-        f"{format_prompt}"
+        f"{FORMAT_PROMPT_1_DECIMAL_NUMBER}"
     )
     return question
 
@@ -378,15 +378,12 @@ def _format_data_AngleDistanceTask_CoT():
 
 def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
     """Convert document to text."""
+    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
+
     # Early assertions
     assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
         img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
-    format_prompt_tl = (
-        "The answer should be two decimal numbers separated by a comma without any units or additional text. "
-        "The first is the major axis length, and the second is the minor axis length."
-    )
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -472,7 +469,7 @@ def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
         f"Additional information:\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
-        f"{format_prompt_tl}"
+        f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
     )
     return question, label_name
 
@@ -830,6 +827,8 @@ def _format_data_TumorLesionTask_CoT(
 
 def _doc_to_text_DetectionTask(doc):
     """Convert document to text."""
+    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_BOX_COORDINATES
+
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
@@ -854,16 +853,13 @@ def _doc_to_text_DetectionTask(doc):
     # Get image info
     image_description = task_info["image_description"]
 
-    # Format prompt for box coordinates
-    format_prompt_BoxCoordinates = "Return the coordinates as [x1, y1, x2, y2] where (x1, y1) is the lower-left corner and (x2, y2) is the upper-right corner, with coordinates normalized to [0, 1]."
-
     # Question
     question = (
         f"Task:\n"
         f"Given the input medical image: {image_description}, "
         f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
         f"Format requirement:\n"
-        f"{format_prompt_BoxCoordinates}"
+        f"{FORMAT_PROMPT_BOX_COORDINATES}"
     )
     return question
 

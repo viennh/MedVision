@@ -33,18 +33,15 @@ def doc_to_visual(doc, lmms_eval_specific_kwargs=None):
     slice_idx = doc["slice_idx"]
 
     # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get(
-        "reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
     if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(
-            img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
     else:
         _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
     if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) /
-                             (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
+        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
     else:
         img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
     # Convert to PIL Image in grayscale mode
@@ -71,8 +68,12 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
         # Get image info
         image_description = task_info["image_description"]
         # Question
-        format_prompt = FORMAT_PROMPT_BOX_COORDINATES
-        question = f"Task:\n" f"Given the input medical image: {image_description}, " f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n" f"Format requirement:\n" f"{format_prompt}"
+        question = (
+            f"Task:\n" f"Given the input medical image: {image_description}, " 
+            f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n" 
+            f"Format requirement:\n" 
+            f"{FORMAT_PROMPT_BOX_COORDINATES}"
+        )
         return question
 
     return doc_to_text_BoxCoordinate
@@ -80,45 +81,36 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
 
 def _process_img_qwen25vl(img_2d_raw, lmms_eval_specific_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "Qwen/Qwen2.5-VL-32B-Instruct")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "Qwen/Qwen2.5-VL-32B-Instruct")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor([img_PIL])
     image_grid_thw = processed_visual["image_grid_thw"][0]
     patch_size = img_processor.patch_size
-    img_shape_resized_hw = (
-        image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    img_shape_resized_hw = (image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
 def _process_img_lingshu(img_2d_raw, lmms_eval_specific_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "lingshu-medical-mllm/Lingshu-32B")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "lingshu-medical-mllm/Lingshu-32B")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor([img_PIL])
     image_grid_thw = processed_visual["image_grid_thw"][0]
     patch_size = img_processor.patch_size
-    img_shape_resized_hw = (
-        image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    img_shape_resized_hw = (image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
 def _process_img_medgemma(img_2d_raw, lmms_eval_specific_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "google/medgemma-4b-it")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "google/medgemma-4b-it")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
-    processed_visual = img_processor.preprocess(
-        images=[img_PIL], return_tensors="pt")
+    processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
@@ -130,17 +122,13 @@ def _process_img_meddr(img_2d_raw, lmms_eval_specific_kwargs):
     from src.model.internvl_chat import InternVLChatModel
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "Sunanhe/MedDr_0401")
-    model = InternVLChatModel.from_pretrained(
-        sample_model_hf, low_cpu_mem_usage=True).eval()
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "Sunanhe/MedDr_0401")
+    model = InternVLChatModel.from_pretrained(sample_model_hf, low_cpu_mem_usage=True).eval()
     image_size = model.config.force_image_size or model.config.vision_config.image_size
     pad2square = model.config.pad2square
-    image_processor = build_transform(
-        is_train=False, input_size=image_size, pad2square=pad2square)
+    image_processor = build_transform(is_train=False, input_size=image_size, pad2square=pad2square)
     img_shape_resized_hw = image_processor(img_PIL).unsqueeze(0).shape
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
@@ -148,8 +136,7 @@ def _process_img_llavaonevision(img_2d_raw, lmms_eval_specific_kwargs):
     from transformers.image_processing_utils import select_best_resolution
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "llava-hf/llava-onevision-qwen2-72b-ov-hf")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "llava-hf/llava-onevision-qwen2-72b-ov-hf")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
 
     # NOTE:
@@ -157,10 +144,8 @@ def _process_img_llavaonevision(img_2d_raw, lmms_eval_specific_kwargs):
     # The image processor (LlavaOnevisionImageProcessor) first selects the best resolution for the input image,
     # then resizes the image to the selected resolution, and pads the image and extract patches.
     # Finally, a resized version of the image (with same size as a patch) is added to the list of patches.
-    img_shape_resized_hw = select_best_resolution(
-        img_PIL.size, img_processor.image_grid_pinpoints)
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    img_shape_resized_hw = select_best_resolution(img_PIL.size, img_processor.image_grid_pinpoints)
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
@@ -169,16 +154,13 @@ def _process_img_llavamed(img_2d_raw, lmms_eval_specific_kwargs):
     from llava.model.builder import load_pretrained_model
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "microsoft/llava-med-v1.5-mistral-7b")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "microsoft/llava-med-v1.5-mistral-7b")
     model_name = get_model_name_from_path(sample_model_hf)
-    _, model, image_processor, _ = load_pretrained_model(
-        sample_model_hf, None, model_name)
+    _, model, image_processor, _ = load_pretrained_model(sample_model_hf, None, model_name)
 
     image_tensor = process_images([img_PIL], image_processor, model.config)[0]
     img_shape_resized_hw = image_tensor.shape[-2:]  # (height, width)
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
@@ -249,8 +231,7 @@ def _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs):
             images_list = make_nested_list_of_images(images)
 
             if self.do_convert_rgb:
-                images_list = [
-                    [convert_to_rgb(image) for image in images] for images in images_list]
+                images_list = [[convert_to_rgb(image) for image in images] for images in images_list]
 
             batch_resized_images_shape = []
 
@@ -270,8 +251,7 @@ def _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs):
                     # convert images to channels first format for faster processing
                     # LAST is slower for `pad` and not supported by `split_to_tiles`
                     data_format = ChannelDimension.FIRST
-                    image = to_channel_dimension_format(
-                        image, data_format, input_channel_dim=input_data_format)
+                    image = to_channel_dimension_format(image, data_format, input_channel_dim=input_data_format)
 
                     # do_resize=False is not supported, validated
                     resized_image, _ = self.resize(
@@ -293,37 +273,30 @@ def _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs):
     # then resizes the image to the selected resolution, and pads the image and extract patches.
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "meta-llama/Llama-3.2-11B-Vision-Instruct")
 
     # Create custom image processor with the loaded config
-    custom_img_processor = custom_MllamaImageProcessor.from_pretrained(
-        sample_model_hf)
+    custom_img_processor = custom_MllamaImageProcessor.from_pretrained(sample_model_hf)
 
     # Use the custom method to calculate resized image shape
-    batch_resized_shapes = custom_img_processor.cal_resized_image_shape(images=[
-                                                                        img_PIL])
+    batch_resized_shapes = custom_img_processor.cal_resized_image_shape(images=[img_PIL])
 
     # Extract the shape for the single image (first batch, first image)
     # Get (height, width) from shape
     img_shape_resized_hw = batch_resized_shapes[0][0][-2:]
 
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
 def _process_img_internvl3(img_2d_raw, lmms_eval_specific_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "OpenGVLab/InternVL3-38B")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "OpenGVLab/InternVL3-38B")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
-    processed_visual = img_processor.preprocess(
-        images=[img_PIL], return_tensors="pt")
+    processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
@@ -334,22 +307,18 @@ def _process_img_huatuogpt_vision(img_2d_raw, lmms_eval_specific_kwargs):
     from llava.model.language_model.llava_qwen2 import LlavaQwen2ForCausalLM
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "FreedomIntelligence/HuatuoGPT-Vision-34B")
-    model, _ = LlavaQwen2ForCausalLM.from_pretrained(
-        sample_model_hf, init_vision_encoder_from_ckpt=True, output_loading_info=True, torch_dtype=torch.bfloat16)
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "FreedomIntelligence/HuatuoGPT-Vision-34B")
+    model, _ = LlavaQwen2ForCausalLM.from_pretrained(sample_model_hf, init_vision_encoder_from_ckpt=True, output_loading_info=True, torch_dtype=torch.bfloat16)
     vision_tower = model.get_vision_tower()
     if not vision_tower.is_loaded:
         vision_tower.load_model()
-        vision_tower.vision_tower = vision_tower.vision_tower.from_pretrained(
-            sample_model_hf)
+        vision_tower.vision_tower = vision_tower.vision_tower.from_pretrained(sample_model_hf)
     vision_tower.to(dtype=torch.bfloat16)
     image_processor = vision_tower.image_processor
     processed_visual = image_processor.preprocess(img_PIL, return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
     return img_shape_resized_hw
 
 
@@ -369,22 +338,17 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
     )
 
     def prepare_model_healthgpt_L14(lmms_eval_specific_kwargs):
-        base_model_hf = lmms_eval_specific_kwargs.get(
-            "base_model_hf", "microsoft/phi-4")
-        vision_model_hf = lmms_eval_specific_kwargs.get(
-            "vision_model_hf", "openai/clip-vit-large-patch14-336")
+        base_model_hf = lmms_eval_specific_kwargs.get("base_model_hf", "microsoft/phi-4")
+        vision_model_hf = lmms_eval_specific_kwargs.get("vision_model_hf", "openai/clip-vit-large-patch14-336")
         dtype = lmms_eval_specific_kwargs.get("dtype", "FP16")
         hlora_r = lmms_eval_specific_kwargs.get("hlora_r", 32)
         hlora_alpha = lmms_eval_specific_kwargs.get("hlora_alpha", 64)
         hlora_dropout = lmms_eval_specific_kwargs.get("hlora_dropout", 0)
         hlora_nums = lmms_eval_specific_kwargs.get("hlora_nums", 4)
-        instruct_template = lmms_eval_specific_kwargs.get(
-            "instruct_template", "phi4_instruct")
+        instruct_template = lmms_eval_specific_kwargs.get("instruct_template", "phi4_instruct")
 
-        hlora_weights_local = os.environ.get(
-            "HEALTHGPT-L14-HLORA-WEIGHTS-FILE")
-        assert hlora_weights_local is not None and os.path.exists(
-            hlora_weights_local), f"hlora_weights_local, {hlora_weights_local}, does not exist."
+        hlora_weights_local = os.environ.get("HEALTHGPT-L14-HLORA-WEIGHTS-FILE")
+        assert hlora_weights_local is not None and os.path.exists(hlora_weights_local), f"hlora_weights_local, {hlora_weights_local}, does not exist."
 
         if dtype == "BF16":
             model_dtype = torch.bfloat16
@@ -400,8 +364,7 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
             "torch_dtype": model_dtype,
         }
 
-        model = LlavaPhiForCausalLM.from_pretrained(
-            pretrained_model_name_or_path=base_model_hf, **load_config)
+        model = LlavaPhiForCausalLM.from_pretrained(pretrained_model_name_or_path=base_model_hf, **load_config)
 
         lora_config = LoraConfig(
             r=hlora_r,
@@ -426,12 +389,9 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
         return model
 
     def process_img_healthgpt(image, model):
-        assert isinstance(
-            image, Image.Image), "Input image must be a PIL Image."
-        image = expand2square(image, tuple(
-            int(x * 255) for x in model.get_vision_tower().image_processor.image_mean))
-        processed_visual = model.get_vision_tower(
-        ).image_processor.preprocess(image, return_tensors="pt")
+        assert isinstance(image, Image.Image), "Input image must be a PIL Image."
+        image = expand2square(image, tuple(int(x * 255) for x in model.get_vision_tower().image_processor.image_mean))
+        processed_visual = model.get_vision_tower().image_processor.preprocess(image, return_tensors="pt")
         return processed_visual
 
     model = prepare_model_healthgpt_L14(lmms_eval_specific_kwargs)
@@ -439,60 +399,50 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
     processed_visual = process_img_healthgpt(img_PIL, model)
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
 
     return img_shape_resized_hw
 
 
 def _process_img_gemma3(img_2d_raw, lmms_eval_specific_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get(
-        "sample_model_hf", "google/gemma-3-27b-it")
+    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "google/gemma-3-27b-it")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
-    processed_visual = img_processor.preprocess(
-        images=[img_PIL], return_tensors="pt")
+    processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
-    print(
-        f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {pv_shape}")
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {pv_shape}")
     return img_shape_resized_hw
 
 
 def get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs):
     # Supported models
-    supported_models = ["qwen2_5_vl", "medgemma", "meddr", "llava_onevision", "llava_med",
-                        "llama_3_2_vision", "internvl3", "huatuogpt_vision", "healthgpt_l14", "gemma3", "lingshu"]
+    supported_models = ["qwen2_5_vl", "medgemma", "meddr", "llava_onevision", "llava_med", "llama_3_2_vision", "internvl3", "huatuogpt_vision", "healthgpt_l14", "gemma3", "lingshu"]
     if model_name not in supported_models:
-        raise ValueError(
-            f"Model {model_name} is not supported for tumor/lesion size estimation task.\n You need to add model-specific implementation in this function: doc_to_text_TumorLesionSize().")
+        raise ValueError(f"Model {model_name} is not supported for tumor/lesion size estimation task.\n You need to add model-specific implementation in this function: doc_to_text_TumorLesionSize().")
 
     # Get reshaped image size so that we can adjust the pixel size dynamically
     if model_name == "qwen2_5_vl":
         # NOTE: Qwen2.5-VL resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
-        img_shape_resized_hw = _process_img_qwen25vl(
-            img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_qwen25vl(img_2d_raw, lmms_eval_specific_kwargs)
     elif model_name == "lingshu":
         # NOTE: Lingshu resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
-        img_shape_resized_hw = _process_img_lingshu(
-            img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_lingshu(img_2d_raw, lmms_eval_specific_kwargs)
     elif model_name == "llama_3_2_vision":
         # NOTE: Llama-3.2-Vision dynamically resize the image to a shape that can fit in patches of size [560, 560].
         # Preprocessor config: https://huggingface.co/meta-llama/Llama-3.2-11B-Vision-Instruct/blob/main/preprocessor_config.json
         # Image processor - MllamaImageProcessor: https://github.com/huggingface/transformers/blob/main/src/transformers/models/mllama/image_processing_mllama.py#L536
-        img_shape_resized_hw = _process_img_llama_3_2_vision(
-            img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs)
     elif model_name == "llava_onevision":
         # NOTE: Llava-OneVision dynamically resize the image to a shape that can fit in patches of size [384,384]
         # NOTE: The current probing method only work for single image input, as padding is enabled for multiple image inputs
         # Preprocessor config: https://huggingface.co/llava-hf/llava-onevision-qwen2-72b-ov-hf/blob/main/preprocessor_config.json
         # Image processor - LlavaOnevisionImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/llava_onevision/image_processing_llava_onevision.py#L108
-        img_shape_resized_hw = _process_img_llavaonevision(
-            img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_llavaonevision(img_2d_raw, lmms_eval_specific_kwargs)
     elif model_name == "gemma3":
         # NOTE: HealthGPT resize images to a fixed size [896, 896]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/google/gemma-3-27b-it/blob/main/preprocessor_config.json
@@ -559,14 +509,11 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         slice_idx = doc["slice_idx"]
 
         # Load 2D slice from NIfTI file, with optional resizing
-        reshape_image_hw = lmms_eval_specific_kwargs.get(
-            "reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
         if reshape_image_hw is not None:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
         else:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
         img_shape_hw = img_2d_raw.shape
 
@@ -574,8 +521,7 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         biometric_profile = doc["biometric_profile"]
         metric_unit = biometric_profile["metric_unit"]
         if isinstance(metric_unit, list):
-            assert len(
-                metric_unit) == 1, "metric_unit list should have only one element."
+            assert len(metric_unit) == 1, "metric_unit list should have only one element."
             metric_unit = metric_unit[0]
         elif isinstance(metric_unit, str):
             if metric_unit == "mm":
@@ -583,17 +529,14 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
             elif metric_unit == "cm":
                 metric_unit = "centimeters"
         else:
-            raise ValueError(
-                f"Unsupported metric_unit type: {type(metric_unit)}")
+            raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        model_name = lmms_eval_specific_kwargs.get(
-            "model") if lmms_eval_specific_kwargs is not None else None
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
         assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
-        img_shape_resized_hw = get_resized_img_shape(
-            model_name, img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
@@ -619,7 +562,6 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         return question
 
     return doc_to_text_TumorLesionSize
-
 
 
 def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
@@ -652,14 +594,11 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         slice_idx = doc["slice_idx"]
 
         # Load 2D slice from NIfTI file, with optional resizing
-        reshape_image_hw = lmms_eval_specific_kwargs.get(
-            "reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
         if reshape_image_hw is not None:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
         else:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
         img_shape_hw = img_2d_raw.shape
 
@@ -667,8 +606,7 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         biometric_profile = doc["biometric_profile"]
         metric_unit = biometric_profile["metric_unit"]
         if isinstance(metric_unit, list):
-            assert len(
-                metric_unit) == 1, "metric_unit list should have only one element."
+            assert len(metric_unit) == 1, "metric_unit list should have only one element."
             metric_unit = metric_unit[0]
         elif isinstance(metric_unit, str):
             if metric_unit == "mm":
@@ -676,17 +614,14 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
             elif metric_unit == "cm":
                 metric_unit = "centimeters"
         else:
-            raise ValueError(
-                f"Unsupported metric_unit type: {type(metric_unit)}")
+            raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        model_name = lmms_eval_specific_kwargs.get(
-            "model") if lmms_eval_specific_kwargs is not None else None
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
         assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
-        img_shape_resized_hw = get_resized_img_shape(
-            model_name, img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
@@ -747,25 +682,20 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         slice_idx = doc["slice_idx"]
 
         # Load 2D slice from NIfTI file, with optional resizing
-        reshape_image_hw = lmms_eval_specific_kwargs.get(
-            "reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
         if reshape_image_hw is not None:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
         else:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
         img_shape_hw = img_2d_raw.shape
 
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        model_name = lmms_eval_specific_kwargs.get(
-            "model") if lmms_eval_specific_kwargs is not None else None
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
         assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
-        img_shape_resized_hw = get_resized_img_shape(
-            model_name, img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
@@ -780,7 +710,12 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
 
         # Question
         question = (
-            f"Task:\n" f"Given the input medical image: {image_description}, " f"estimate the physical size of the {label_name}.\n" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_MASK_SIZE}"
+            f"Task:\n" f"Given the input medical image: {image_description}, "
+            f"estimate the physical size of the {label_name}.\n"
+            f"Additional information:\n"
+            f"{pixel_size_text}\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_MASK_SIZE}"
         )
         return question
 
@@ -828,25 +763,20 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
         slice_idx = doc["slice_idx"]
 
         # Load 2D slice from NIfTI file, with optional resizing
-        reshape_image_hw = lmms_eval_specific_kwargs.get(
-            "reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
         if reshape_image_hw is not None:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
         else:
-            pixel_size_hw, img_2d_raw = _load_nifti_2d(
-                img_path, slice_dim, slice_idx)
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
         img_shape_hw = img_2d_raw.shape
 
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        model_name = lmms_eval_specific_kwargs.get(
-            "model") if lmms_eval_specific_kwargs is not None else None
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
         assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
-        img_shape_resized_hw = get_resized_img_shape(
-            model_name, img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
@@ -870,8 +800,7 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             p1_name = lms_map[lms[0]]
             p2_name = lms_map[lms[1]]
             biometrics_name = line_dict["name"]
-            task_prompt = _get_biometric_prompt_distance(
-                biometrics_name, p1_name, p2_name, metric_unit)
+            task_prompt = _get_biometric_prompt_distance(biometrics_name, p1_name, p2_name, metric_unit)
         if metric_type == "angle":
             angles_map = task_info[metric_map_name]
             angle_dict = angles_map[metric_key]
@@ -894,10 +823,15 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             line2_p1_name = line2_lms_map[line2_lms[0]]
             line2_p2_name = line2_lms_map[line2_lms[1]]
             biometrics_name = angle_dict["name"]
-            task_prompt = _get_biometric_prompt_angle(
-                biometrics_name, line1_p1_name, line1_p2_name, line2_p1_name, line2_p2_name, metric_unit)
+            task_prompt = _get_biometric_prompt_angle(biometrics_name, line1_p1_name, line1_p2_name, line2_p1_name, line2_p2_name, metric_unit)
 
-        question = f"Task:\n" f"Given the input medical image: {image_description}, " f"{task_prompt}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
+        question = (
+            f"Task:\n" f"Given the input medical image: {image_description}, " 
+            f"{task_prompt}" f"Additional information:\n" 
+            f"{pixel_size_text}\n" 
+            f"Format requirement:\n" 
+            f"{FORMAT_PROMPT_BIOMETRICS}"
+        )
         return question
 
     return doc_to_text_BiometricsFromLandmarks
@@ -931,11 +865,9 @@ def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
 
     # FIXME: debug if this function accept lmms_eval_specific_kwargs
     # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get(
-        "reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
     if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(
-            img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
         img_size = img_2d.shape
     else:
         img_size = doc.get("image_size_2d", None)
@@ -983,8 +915,7 @@ def process_results_BoxCoordinate(doc, results):
     try:
         # Split the results string by comma and convert to float32
         prd_parts = pred.strip().split(",")
-        pred_metrics = np.array([np.float32(part.strip())
-                                for part in prd_parts])
+        pred_metrics = np.array([np.float32(part.strip()) for part in prd_parts])
         if len(pred_metrics) != 4:
             mean_absolute_error = np.nan
             mean_relative_error = np.nan
@@ -1014,8 +945,7 @@ def process_results_TumorLesionSize(doc, results):
     try:
         # Split the results string by comma and convert to float32
         prd_parts = pred.strip().split(",")
-        pred_metrics = np.array([np.float32(part.strip())
-                                for part in prd_parts])
+        pred_metrics = np.array([np.float32(part.strip()) for part in prd_parts])
         if len(pred_metrics) != 2:
             mean_absolute_error = np.nan
             mean_relative_error = np.nan
@@ -1044,8 +974,7 @@ def process_results_MaskSize(doc, results):
     try:
         # Convert the result string to float32
         prd_parts = pred.strip().split(",")
-        pred_metrics = np.array([np.float32(part.strip())
-                                for part in prd_parts])
+        pred_metrics = np.array([np.float32(part.strip()) for part in prd_parts])
         if pred_metrics < 0 or len(pred_metrics) != 1:
             absolute_error = np.nan
             relative_error = np.nan
@@ -1073,8 +1002,7 @@ def process_results_BiometricsFromLandmarks(doc, results):
     try:
         # Convert the result string to float32
         prd_parts = pred.strip().split(",")
-        pred_metrics = np.array([np.float32(part.strip())
-                                for part in prd_parts])
+        pred_metrics = np.array([np.float32(part.strip()) for part in prd_parts])
         if pred_metrics < 0 or len(pred_metrics) != 1:
             absolute_error = np.nan
             relative_error = np.nan
@@ -1198,15 +1126,13 @@ def _load_nifti_2d(nii_path, slice_dim, slice_idx, new_shape_hw=None):
     if new_shape_hw is not None:
         original_shape_hw = image_2d.shape
         # Calculate zoom factors for each dimension
-        zoom_factors = (
-            new_shape_hw[0] / original_shape_hw[0], new_shape_hw[1] / original_shape_hw[1])
+        zoom_factors = (new_shape_hw[0] / original_shape_hw[0], new_shape_hw[1] / original_shape_hw[1])
         # Use scipy.ndimage.zoom for resizing
         # order=1 for bilinear interpolation
         image_2d = zoom(image_2d, zoom_factors, order=1)
 
         # Update pixel size based on zoom factors
-        pixel_size_hw = (
-            pixel_size_hw[0] / zoom_factors[0], pixel_size_hw[1] / zoom_factors[1])
+        pixel_size_hw = (pixel_size_hw[0] / zoom_factors[0], pixel_size_hw[1] / zoom_factors[1])
 
     return (pixel_size_hw, image_2d)
 

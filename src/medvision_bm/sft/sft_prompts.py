@@ -102,7 +102,7 @@ FORMAT_PROMPT_BOX_COORDINATES = (
 )
 
 FORMAT_PROMPT_MASK_SIZE = (
-    "The answer should be 1 decimal number without any units or additional text."
+    "The answer should be a single decimal number without any units or additional text."
 )
 
 FORMAT_PROMPT_TUMOR_LESION_SIZE = (
@@ -111,6 +111,10 @@ FORMAT_PROMPT_TUMOR_LESION_SIZE = (
 )
 
 FORMAT_PROMPT_BIOMETRICS = (
+    "The answer should be a single decimal number without any units or additional text."
+)
+
+FORMAT_PROMPT_1_DECIMAL_NUMBER = (
     "The answer should be a single decimal number without any units or additional text."
 )
 # ======================================================================================================
