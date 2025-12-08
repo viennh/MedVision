@@ -1,10 +1,17 @@
-![MedVision](fig/medvision-logo.png)
+<div align="center">
 
-# About
+<img src="fig/medvision-logo.png" alt="MedVision Logo" /><br>
 
-This is the official codebase `medvision_bm` of the **MedVision** project. 
+# MedVision: Dataset and Benchmark for Quantitative Medical Image Analysis
 
-🌏 [**Project**](https://medvision-vlm.github.io) 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) 🤗 [**SFT Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) 📖 [**arXiv**](https://arxiv.org/abs/2511.18676)
+| 🌏 [**Project**](https://medvision-vlm.github.io) | 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) | 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) | 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) | 🤗 [**SFT Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) | 📖 [**arXiv**](https://arxiv.org/abs/2511.18676) |
+
+🔎 Benchmarking VLMs for detection, tumor/lesion size estimation, and angle/distance measurement from medical images 📏
+
+💿 30.8M annotated samples | multi-modality | multi-anatomy | 3D/2D medical image 💿
+
+</div>
+
 
 ```
 @misc{yao2025medvisiondatasetbenchmarkquantitative,
@@ -36,22 +43,15 @@ This is the official codebase `medvision_bm` of the **MedVision** project.
 
 <br/>
 
-# 🛠️ Install `medvision_bm`
+# 🌟 Quick Start
 
 ```bash
-pip install "git+https://github.com/YongchengYAO/MedVision.git"
+git clone https://github.com/YongchengYAO/MedVision.git MedVision
+cd MedVision
+pip install .
 ```
 
-<br/>
-
-# 🔧 Install `medvision_ds` (Optional)
-
-`medvision_ds` is the dataset codebase. It can be installed from `medvision_bm`:
-
-```bash
-# Replace <local-data-folder>
-python -m medvision_bm.benchmark.install_medvision_ds --data_dir <local-data-folder>  
-```
+The benchmarking codebase `medvision_bm` will be installed.
 
 <br/>
 
@@ -74,9 +74,10 @@ docker run -it --rm \
 ```bash
 # In the container
 git clone https://github.com/YongchengYAO/MedVision.git /root/Documents/MedVision
+cd /root/Documents/MedVision
 ```
 
-Next:
+Next (in the container):
 
 - Check the conda env name and activate: `conda env list`, `conda activate <env>`
 
@@ -90,7 +91,9 @@ Next:
     python -m medvision_bm.sft.env_setup --data_dir ${data_dir}
     ```
 
-[File structure](https://github.com/YongchengYAO/MedVision/tree/master/docs/file-structure.md): imaging data, benchmark results, and model checkpoints are automatically saved
+> [!TIP]
+> Treat the `MedVision` folder as the working directory.
+> [File structure](https://github.com/YongchengYAO/MedVision/tree/master/docs/file-structure.md): imaging data, benchmark results, and model checkpoints are automatically saved
 
 <br/>
 
@@ -152,9 +155,9 @@ Next:
   ```
   ├── MedVision
   	├── completed_tasks 
-  		├── completed_tasks_MedVision-AD.json         # <== tasks status tracker
+  		├── completed_tasks_MedVision-AD.json           # <== tasks status tracker
   		├── ...
-  	├── Results                                     # <== benchmark results
+  	├── Results                                         # <== benchmark results
   		├── MedVision-AD
   			├── ...
   			├── summary_AD_task.txt                     # <== [step 3] summary
@@ -164,8 +167,8 @@ Next:
   					├── *.jsonl                             # <== [step 2] parsed model outputs
   					├── *.json                              # <== [step 2] parsed summary file
   					├── summary_*                           # <== [step 3] mean metrics, values
-  				├── *.jsonl                               # <== [step 1] model outputs
-  				├── *.json                                # <== [step 1] summary file
+  				├── *.jsonl                                 # <== [step 1] model outputs
+  				├── *.json                                  # <== [step 1] summary file
   			├── ...
   			├── summary_detection_task.txt              # <== [step 3] summary
   		├── MedVision-TL
@@ -209,12 +212,11 @@ Something about the **MedVision** dataset:
         - e.g., detection tasks for the `BraTS24` dataset is defined in the `benchmark_plan` in `medvision_ds/datasets/BraTS24/preprocess_detection.py`
       - `slice`: [`Sagittal`, `Coronal`, `Axial`]
       - `split`: [`Train`, `Test`]
-  
-- Any combination of [`data-config` x `split`] will incur the downloading and processing of the whole `dataset`
 
 Since it takes some time for data downloading and processing, you can just download datasets from tasks list (example [here](https://github.com/YongchengYAO/MedVision/tree/master/tasks_list)) or configs list (example [here](https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/info)) in advance.
 
-⚠️ You need to set API token for these datasets (see [detailed instructions](https://huggingface.co/datasets/YongchengYAO/MedVision#datasets)): FeTA24, SKM-TEA, and ToothFairy2
+> [!NOTE]
+> ⚠️ You need to set API token for these datasets (see [detailed instructions](https://huggingface.co/datasets/YongchengYAO/MedVision#datasets)): FeTA24, SKM-TEA, and ToothFairy2
 
 ```bash
 # CLI command:
@@ -234,6 +236,17 @@ or
 ```bash
 # NOTE: replace <config-list-csv>, <data-folder>
 python -m medvision_bm.benchmark.download_datasets --configs_csv <config-list-csv> --data_dir <data-folder>
+```
+
+<br/>
+
+# 🔧 Install `medvision_ds` (Optional)
+
+`medvision_ds` is the dataset codebase. It can be installed from `medvision_bm`:
+
+```bash
+# Replace <local-data-folder>
+python -m medvision_bm.benchmark.install_medvision_ds --data_dir <local-data-folder>  
 ```
 
 <br/>
