@@ -45,7 +45,7 @@ def main() -> None:
     run_pip_install(req_path)
 
     # Install the vendored lmms_eval package
-    print(f"\n[Info] Installing vendored lmms_eval package...")
+    print("\n[Info] Installing vendored lmms_eval package...")
     opt_deps = args.lmms_eval_opt_deps
     if opt_deps is not None:
         install_vendored_lmms_eval(proj_dependency=opt_deps)
@@ -53,7 +53,7 @@ def main() -> None:
         install_vendored_lmms_eval()
 
     # Install dataset codebase: medvision_ds
-    print(f"\n[Info] Installing medvision_ds package...")
+    print("\n[Info] Installing medvision_ds package...")
     data_dir = args.data_dir
     os.makedirs(data_dir, exist_ok=True)
     install_medvision_ds(data_dir)

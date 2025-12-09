@@ -4,6 +4,7 @@ import os
 
 def str2bool(v):
     import argparse
+
     if isinstance(v, bool):
         return v
     if v.lower() in ("yes", "y", "true", "t", "1"):
@@ -17,13 +18,11 @@ def str2bool(v):
 def set_cuda_num_processes(minimum_gpu=1):
     cuda_visible = os.getenv("CUDA_VISIBLE_DEVICES", None)
     if cuda_visible is None:
-        print(
-            f"No CUDA_VISIBLE_DEVICES found. Using minimum GPU: {minimum_gpu}")
+        print(f"No CUDA_VISIBLE_DEVICES found. Using minimum GPU: {minimum_gpu}")
         num_processes = minimum_gpu
         return num_processes
     else:
-        num_processes = max(
-            1, len([d for d in cuda_visible.split(",") if d.strip()]))
+        num_processes = max(1, len([d for d in cuda_visible.split(",") if d.strip()]))
         print(
             f"Using CUDA_VISIBLE_DEVICES={cuda_visible}; num_processes={num_processes}"
         )

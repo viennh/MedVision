@@ -21,7 +21,7 @@ def main() -> None:
     args = parse_args()
 
     # Install dataset codebase: medvision_ds
-    print(f"\n[Info] Installing medvision_ds package...")
+    print("\n[Info] Installing medvision_ds package...")
     data_dir = args.data_dir
     os.makedirs(data_dir, exist_ok=True)
     install_medvision_ds(data_dir)

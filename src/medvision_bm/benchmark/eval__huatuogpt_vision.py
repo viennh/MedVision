@@ -1,13 +1,19 @@
 import argparse
 import os
 import subprocess
-import sys
 
 from medvision_bm.utils import (
-    clone_github_repo_with_fallback, ensure_hf_hub_installed,
-    install_flash_attention_torch_and_deps_py311_v2, install_medvision_ds,
-    install_vendored_lmms_eval, load_tasks, load_tasks_status,
-    set_cuda_num_processes, setup_env_hf_medvision_ds, update_task_status)
+    clone_github_repo_with_fallback,
+    ensure_hf_hub_installed,
+    install_flash_attention_torch_and_deps_py311_v2,
+    install_medvision_ds,
+    install_vendored_lmms_eval,
+    load_tasks,
+    load_tasks_status,
+    set_cuda_num_processes,
+    setup_env_hf_medvision_ds,
+    update_task_status,
+)
 
 
 def install_huatuogpt_vision_dependencies_post(dir_third_party: str):
@@ -191,7 +197,7 @@ def main():
             return
     else:
         print(
-            f"\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
+            "\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
         )
     install_huatuogpt_vision_dependencies_post(dir_third_party)
     # ------

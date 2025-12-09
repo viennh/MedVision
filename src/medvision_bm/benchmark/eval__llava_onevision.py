@@ -2,13 +2,19 @@ import argparse
 import os
 import subprocess
 
-from medvision_bm.utils import (ensure_hf_hub_installed, install_medvision_ds,
-                                install_torch_cu124,
-                                install_vendored_lmms_eval, install_vllm,
-                                load_tasks, load_tasks_status,
-                                set_cuda_num_processes,
-                                setup_env_hf_medvision_ds, setup_env_vllm,
-                                update_task_status)
+from medvision_bm.utils import (
+    ensure_hf_hub_installed,
+    install_medvision_ds,
+    install_torch_cu124,
+    install_vendored_lmms_eval,
+    install_vllm,
+    load_tasks,
+    load_tasks_status,
+    set_cuda_num_processes,
+    setup_env_hf_medvision_ds,
+    setup_env_vllm,
+    update_task_status,
+)
 
 
 def run_evaluation_for_task_vllm_proxy(
@@ -158,7 +164,7 @@ def main():
             return
     else:
         print(
-            f"\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
+            "\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
         )
         setup_env_vllm(data_dir)
     # ------

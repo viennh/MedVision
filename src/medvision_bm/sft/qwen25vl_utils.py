@@ -18,8 +18,10 @@ def make_collate_fn_Qwen25VL(proc):
 
             elif "image_file_png" in example:
                 from PIL import Image
-                pil_image = [Image.open(f).convert("RGB")
-                             for f in example["image_file_png"]]
+
+                pil_image = [
+                    Image.open(f).convert("RGB") for f in example["image_file_png"]
+                ]
                 images.append(pil_image)
 
             elif "image_file" in example:
@@ -28,7 +30,8 @@ def make_collate_fn_Qwen25VL(proc):
 
             else:
                 raise ValueError(
-                    "No image found in the example. Please provide 'processed_images', 'image_file_png', or 'image_file'.")
+                    "No image found in the example. Please provide 'processed_images', 'image_file_png', or 'image_file'."
+                )
             # ------------------------------
 
             texts.append(
@@ -37,15 +40,12 @@ def make_collate_fn_Qwen25VL(proc):
                 ).strip()
             )
 
-        batch = proc(text=texts, images=images,
-                     return_tensors="pt", padding=True)
+        batch = proc(text=texts, images=images, return_tensors="pt", padding=True)
 
         labels = batch["input_ids"].clone()
         image_token_id = proc.tokenizer.convert_tokens_to_ids(proc.image_token)
-        image_begin_token_id = [
-            proc.tokenizer.convert_tokens_to_ids("<|im_start|>")]
-        image_end_token_id = [
-            proc.tokenizer.convert_tokens_to_ids("<|im_end|>")]
+        image_begin_token_id = [proc.tokenizer.convert_tokens_to_ids("<|im_start|>")]
+        image_end_token_id = [proc.tokenizer.convert_tokens_to_ids("<|im_end|>")]
 
         labels[labels == proc.tokenizer.pad_token_id] = -100
         labels[labels == image_begin_token_id] = -100
@@ -54,4 +54,5 @@ def make_collate_fn_Qwen25VL(proc):
 
         batch["labels"] = labels
         return batch
+
     return _collate_fn_local

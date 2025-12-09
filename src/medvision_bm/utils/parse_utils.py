@@ -229,7 +229,7 @@ def cal_metrics_detection_task(results):
             precision = cal_Precision(pred_metrics, target_metrics)
             recall = cal_Recall(pred_metrics, target_metrics)
             success = True
-    except:
+    except Exception:
         # Exception during parsing: treat as failed prediction
         # Return 0 for overlap metrics to penalize failures in averages
         mean_absolute_error = np.nan
@@ -299,7 +299,7 @@ def cal_metrics(results, task_type):
                 mean_relative_error = np.mean(absolute_error / (target_metrics + 1e-15))
 
             success = True
-    except:
+    except Exception:
         mean_absolute_error = np.nan
         mean_relative_error = np.nan
         IoU = np.nan

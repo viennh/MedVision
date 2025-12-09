@@ -229,9 +229,7 @@ def calculate_summary_metrics_per_anatomy_detection_task(grouped_data):
             _update_metric_counters_detection_task(metrics_dict, counters)
 
         # Calculate and store final metrics
-        task_metrics = _calculate_final_metrics_detection_task(
-            counters, count_total
-        )
+        task_metrics = _calculate_final_metrics_detection_task(counters, count_total)
         summary_metrics[parent_class] = task_metrics
 
     return summary_metrics
@@ -355,9 +353,7 @@ def calculate_summary_metrics_per_anatomy_detection_task_for_randomModel(
             _update_metric_counters_detection_task(metrics_dict, counters)
 
         # Calculate and store final metrics
-        task_metrics = _calculate_final_metrics_detection_task(
-            counters, count_total
-        )
+        task_metrics = _calculate_final_metrics_detection_task(counters, count_total)
         summary_metrics[parent_class] = task_metrics
 
     return summary_metrics

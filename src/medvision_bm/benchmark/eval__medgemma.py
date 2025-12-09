@@ -1,11 +1,16 @@
 import argparse
-import os
 import subprocess
 
-from medvision_bm.utils import (ensure_hf_hub_installed, install_medvision_ds,
-                                install_vendored_lmms_eval, load_tasks,
-                                load_tasks_status, set_cuda_num_processes,
-                                setup_env_hf_medvision_ds, update_task_status)
+from medvision_bm.utils import (
+    ensure_hf_hub_installed,
+    install_medvision_ds,
+    install_vendored_lmms_eval,
+    load_tasks,
+    load_tasks_status,
+    set_cuda_num_processes,
+    setup_env_hf_medvision_ds,
+    update_task_status,
+)
 
 
 def run_evaluation_for_task(
@@ -150,7 +155,7 @@ def main():
             return
     else:
         print(
-            f"\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
+            "\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
         )
     # ------
 
