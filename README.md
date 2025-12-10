@@ -29,17 +29,8 @@
 
 # 🔥 News
 
+- [Dec 10, 2025] Add preprint, training code, docker images, released models, new tasks/models guide
 - [Oct 8, 2025] 🚀 Release **MedVision** dataset v1.0.0
-
-<br/>
-
-# 📜 TODO
-
-- [x] Add preprint and project page
-- [x] Release training code 
-- [x] Release docker images
-- [ ] New tasks guide
-- [ ] New models guide
 
 <br/>
 
@@ -93,6 +84,7 @@ Next (in the container):
 
 > [!TIP]
 > Treat the `MedVision` folder as the working directory.
+>
 > [File structure](https://github.com/YongchengYAO/MedVision/tree/master/docs/file-structure.md): imaging data, benchmark results, and model checkpoints are automatically saved
 
 <br/>
@@ -102,7 +94,20 @@ Next (in the container):
 - **[Usage]** 
 
   1. The scripts in `script/benchmark-*/eval__*` should be sufficient for dependencies installation, data processing, and benchmarking
-  2. After evaluating all models in step 1, parse model outputs and calculate metrics (e.g., MRE, MAE, IoU, Success Rate):
+  
+     > ⚠️
+     >
+     > Set these variables:
+     >
+     > - `benchmark_dir`: the working directory
+     > - `model_hf_id`: Huggingface ID (<user>/<model>) of the tested model
+     > - `model_name`: user-defined identifier for the tested model, used as folder name in `Results/MedVision-*/`
+     > - resource-constrained training configs, such as
+     >   - `batch_size_per_gpu`
+     >   - `CUDA_VISIBLE_DEVICES=0,1` 
+
+
+  1. After evaluating all models in step 1, parse model outputs and calculate metrics (e.g., MRE, MAE, IoU, Success Rate):
 
   ```bash
   # CLI command: 
@@ -164,11 +169,11 @@ Next (in the container):
   		├── MedVision-detect
   			├── Qwen2.5-VL-32B-Instruct
   				├── parsed                               
-  					├── *.jsonl                             # <== [step 2] parsed model outputs
-  					├── *.json                              # <== [step 2] parsed summary file
-  					├── summary_*                           # <== [step 3] mean metrics, values
-  				├── *.jsonl                                 # <== [step 1] model outputs
-  				├── *.json                                  # <== [step 1] summary file
+  					├── *.jsonl                           # <== [step 2] parsed model outputs
+  					├── *.json                            # <== [step 2] parsed summary file
+  					├── summary_*                         # <== [step 3] mean metrics, values
+  				├── *.jsonl                               # <== [step 1] model outputs
+  				├── *.json                                # <== [step 1] summary file
   			├── ...
   			├── summary_detection_task.txt              # <== [step 3] summary
   		├── MedVision-TL
@@ -178,17 +183,37 @@ Next (in the container):
 
 - **[Debug]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
 
-
 <br/>
 
 # 🎯 Training: SFT
 
 - **[Usage]** The scripts in `script/sft-*/train__SFT__*` should be sufficient for dependencies installation, data processing, and training.
+
+  > ⚠️
+  >
+  > Set these variables in the script:
+  >
+  > - `benchmark_dir`: the working directory
+  > - `base_model_hf`: Huggingface ID (<user>/<model>) of the base model
+  > - `run_name`: an identifier for the current training
+  > - `merged_model_hf`: Huggingface model name (<model>) of the merged model
+  > - resource-constrained training configs, such as
+  >   - `per_device_train_batch_size`
+  >   - `gradient_accumulation_steps`
+  >   - `CUDA_VISIBLE_DEVICES=0,1,2,3` and `--num_processes=4`
+
+
 - **[Debug]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
 
-- **[Tutorial]** [Supervised Fine-Tuning (SFT) for VLMs on Medical Image Data](https://github.com/YongchengYAO/MedVision/tree/master/docs/SFT_Tutorial.md), [discussion channel](https://discuss.huggingface.co/t/supervised-fine-tuning-sft-for-vlms-on-medical-image-data/170805#p-246436-supervised-fine-tuning-sft-for-vlms-on-medical-image-data-1)
+- **[Tutorial]** [Supervised Fine-Tuning (SFT) for VLMs on Medical Image Data](https://huggingface.co/blog/YongchengYAO/medvision-sft-guide)
 
 - **[SFT Model Checkpoints]** [details](https://github.com/YongchengYAO/MedVision/tree/master/docs/SFT_model_checkpoints.md)
+
+<br/>
+
+# 📚 New Tasks/Models Guide
+
+[New tasks guide](https://github.com/YongchengYAO/MedVision/blob/master/docs/New-Tasks-Guide.md) | [New models guide](https://github.com/YongchengYAO/MedVision/blob/master/docs/New-Models-Guide.md) 
 
 <br/>
 
