@@ -10,7 +10,6 @@ else
     conda create -n "${ENV_NAME}" python==3.11 -y
 fi
 conda activate "${ENV_NAME}"
-conda install -c nvidia cuda-toolkit=12.4 -y
 
 
 # Set paths

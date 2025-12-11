@@ -212,7 +212,7 @@ def _calculate_final_metrics_AD_task(counters, count_total):
         for k in range(1, 11):
             # Sum counts from bucket 0 to bucket k-1 (inclusive)
             cumulative_count = sum(counters[f"count_{key}_thresholds"][0:k])
-            task_metrics[f"M{key}<{k/10:.1f}"] = (
+            task_metrics[f"M{key}<{k / 10:.1f}"] = (
                 cumulative_count / count_total if count_total > 0 else 0.0
             )
 
@@ -379,7 +379,7 @@ def process_jsonl_file(
                 metric_key = biometric_profile.get("metric_key")
                 assert (
                     metric_key is not None
-                ), f"metric_key is None in line {line_idx+1} of {jsonl_path}"
+                ), f"metric_key is None in line {line_idx + 1} of {jsonl_path}"
 
                 # Construct label: dataset_metricType_metricKey
                 # Example: "FeTA24_distance_BPD" or "Ceph-Biometrics-400_angle_SNA"
@@ -478,18 +478,14 @@ def process_parsed_file_in_model_folder(
 
     # Save raw values JSON file (targets and predictions for each sample)
     # Output: parsed/summary_AD_values.json
-    output_path = os.path.join(
-        parsed_files_dir, SUMMARY_FILENAME_AD_VALUES
-    )
+    output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_AD_VALUES)
     with open(output_path, "w") as f:
         json.dump(convert_numpy_to_python(all_data), f, indent=2)
     print(f"Saved target and model-predicted values to {output_path}")
 
     # Save aggregated metrics JSON file (metrics per label)
     # Output: parsed/summary_AD_metrics.json
-    output_path = os.path.join(
-        parsed_files_dir, SUMMARY_FILENAME_AD_METRICS
-    )
+    output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_AD_METRICS)
     with open(output_path, "w") as f:
         json.dump(convert_numpy_to_python(summary_metrics), f, indent=2)
     print(f"Saved summary metrics to {output_path}")
@@ -512,7 +508,7 @@ def print_model_summaries(task_dir, skip_model_wo_parsed_files=False):
 
     Input:
         - Reads from {model_dir}/parsed/summary_AD_metrics.json for each model
-    
+
     Output:
         - Prints formatted tables to console
         - Saves summary to {task_dir}/summary_AD_task.txt
@@ -543,9 +539,7 @@ def print_model_summaries(task_dir, skip_model_wo_parsed_files=False):
             print(f"\nSkipping model directory (no parsed folder): {model_dir}")
             continue
 
-        metrics_file = os.path.join(
-            parsed_dir, SUMMARY_FILENAME_AD_METRICS
-        )
+        metrics_file = os.path.join(parsed_dir, SUMMARY_FILENAME_AD_METRICS)
 
         with open(metrics_file, "r") as f:
             metrics = json.load(f)

@@ -262,7 +262,7 @@ def main():
             return
     else:
         print(
-            f"\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
+            "\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
         )
     model_configs = install_healthgpt_dependencies_post(dir_third_party, model_name)
     install_flash_attention_torch_and_deps_py311_v2()

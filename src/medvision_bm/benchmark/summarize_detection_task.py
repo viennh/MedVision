@@ -646,7 +646,7 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
     model_dirs = [d for d in model_dirs if os.path.basename(d) != "random_detection"]
 
     # Print configuration info once at the beginning
-    print(f"\nConfigurations in medvision_bm/utils/configs.py:")
+    print("\nConfigurations in medvision_bm/utils/configs.py:")
     print(f"  TUMOR_LESION_GROUP_KEYS: {TUMOR_LESION_GROUP_KEYS}")
     print(f"  EXCLUDED_KEYS: {EXCLUDED_KEYS}")
     print(f"  MINIMUM_GROUP_SIZE: {MINIMUM_GROUP_SIZE}\n")

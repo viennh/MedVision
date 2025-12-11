@@ -53,11 +53,13 @@ def main():
     # Setup environment for medvision_ds
     setup_env_hf_medvision_ds(
         args.data_dir,
-        force_install_code=True, # Always force install code to ensure latest version
+        force_install_code=True,  # Always force install code to ensure latest version
         force_download_data=args.force_download_data,
     )
 
-    print(f"env var MedVision_FORCE_DOWNLOAD_DATA: {os.environ.get('MedVision_FORCE_DOWNLOAD_DATA')}")
+    print(
+        f"env var MedVision_FORCE_DOWNLOAD_DATA: {os.environ.get('MedVision_FORCE_DOWNLOAD_DATA')}"
+    )
 
     if args.configs_csv:
         with open(args.configs_csv, "r") as f:

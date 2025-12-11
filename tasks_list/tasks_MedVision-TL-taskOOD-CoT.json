@@ -1,0 +1,9 @@
+{
+    "BraTS24_TumorLesionSize_Task02_Axial-CoT": 94,
+    "BraTS24_TumorLesionSize_Task03_Axial-CoT": 99,
+    "BraTS24_TumorLesionSize_Task07_Axial-CoT": 81,
+    "BraTS24_TumorLesionSize_Task08_Axial-CoT": 90,
+    "HNTSMRG24_TumorLesionSize_Task03_Axial-CoT": 40,
+    "HNTSMRG24_TumorLesionSize_Task04_Axial-CoT": 73,
+    "MSD_TumorLesionSize_Task01_Axial-CoT": 67
+}

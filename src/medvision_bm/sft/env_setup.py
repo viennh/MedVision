@@ -3,7 +3,10 @@ import subprocess
 import sys
 
 from medvision_bm.utils import (
-    install_flash_attention_torch_and_deps_py311_v2, install_medvision_ds, run_pip_install)
+    install_flash_attention_torch_and_deps_py311_v2,
+    install_medvision_ds,
+    run_pip_install,
+)
 
 
 def install_basic_packages():
@@ -50,8 +53,7 @@ def install_basic_packages():
 
 
 def install_transformers(version="4.54.0"):
-    subprocess.run(
-        f"pip install transformers=={version}", shell=True, check=True)
+    subprocess.run(f"pip install transformers=={version}", shell=True, check=True)
 
 
 def install_sft_dependencies(data_dir=None, requirement=None):
@@ -70,12 +72,10 @@ def install_sft_dependencies(data_dir=None, requirement=None):
 
 def parser_args():
     parser = argparse.ArgumentParser(
-        description="Install all dependencies for SFT on MedVision datasets.")
+        description="Install all dependencies for SFT on MedVision datasets."
+    )
     parser.add_argument(
-        "--data_dir",
-        type=str,
-        required=True,
-        help="Data directory path"
+        "--data_dir", type=str, required=True, help="Data directory path"
     )
     parser.add_argument(
         "-r",
@@ -90,5 +90,4 @@ def parser_args():
 if __name__ == "__main__":
     args = parser_args()
 
-    install_sft_dependencies(data_dir=args.data_dir,
-                             requirement=args.requirement)
+    install_sft_dependencies(data_dir=args.data_dir, requirement=args.requirement)

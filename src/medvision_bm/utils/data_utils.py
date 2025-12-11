@@ -2,8 +2,7 @@ from datasets import load_dataset
 
 
 def tasks_to_configs(tasks, split):
-    assert split.lower() in [
-        "train", "test"], "Split must be 'train' or 'test'"
+    assert split.lower() in ["train", "test"], "Split must be 'train' or 'test'"
     if split.lower() == "train":
         split = "Train"
     else:
@@ -17,7 +16,7 @@ def tasks_to_configs(tasks, split):
 
     # [Fix legacy naming issue] Replace "BoxCoordinate" with "BoxSize" in config names
     #   - the dataset uses "BoxSize" instead of "BoxCoordinate"
-    #   - the tasks are named with "BoxCoordinate" 
+    #   - the tasks are named with "BoxCoordinate"
     # [Note] Why we did not change the task name?
     #   - Using "BoxSize" in task names is reserved for mask size estimation tasks.
     configs = [config.replace("BoxCoordinate", "BoxSize") for config in configs]

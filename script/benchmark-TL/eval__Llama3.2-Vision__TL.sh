@@ -9,7 +9,6 @@ else
     conda create -n "${ENV_NAME}" python==3.11 -y
 fi
 conda activate "${ENV_NAME}"
-pip install huggingface-hub
 
 # Set paths and configs
 benchmark_dir="/root/Documents/MedVision"

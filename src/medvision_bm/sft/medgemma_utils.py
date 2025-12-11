@@ -18,8 +18,10 @@ def make_collate_fn_MedGemma(proc):
 
             elif "image_file_png" in example:
                 from PIL import Image
-                pil_image = [Image.open(f).convert("RGB")
-                             for f in example["image_file_png"]]
+
+                pil_image = [
+                    Image.open(f).convert("RGB") for f in example["image_file_png"]
+                ]
                 images.append(pil_image)
 
             elif "image_file" in example:
@@ -28,7 +30,8 @@ def make_collate_fn_MedGemma(proc):
 
             else:
                 raise ValueError(
-                    "No image found in the example. Please provide 'processed_images', 'image_file_png', or 'image_file'.")
+                    "No image found in the example. Please provide 'processed_images', 'image_file_png', or 'image_file'."
+                )
             # ------------------------------
 
             texts.append(
@@ -38,8 +41,7 @@ def make_collate_fn_MedGemma(proc):
             )
 
         # Tokenize the texts and process the images
-        batch = proc(text=texts, images=images,
-                     return_tensors="pt", padding=True)
+        batch = proc(text=texts, images=images, return_tensors="pt", padding=True)
 
         # The labels are the input_ids, with the padding and image tokens masked in
         # the loss computation

@@ -212,7 +212,7 @@ def main():
             return
     else:
         print(
-            f"\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
+            "\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
         )
     # ------
 

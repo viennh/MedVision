@@ -3,13 +3,19 @@ import os
 import subprocess
 import sys
 
-from medvision_bm.utils import (ensure_hf_hub_installed, install_medvision_ds,
-                                install_torch_cu124,
-                                install_vendored_lmms_eval, install_vllm,
-                                load_tasks, load_tasks_status,
-                                set_cuda_num_processes,
-                                setup_env_hf_medvision_ds, setup_env_vllm,
-                                update_task_status)
+from medvision_bm.utils import (
+    ensure_hf_hub_installed,
+    install_medvision_ds,
+    install_torch_cu124,
+    install_vendored_lmms_eval,
+    install_vllm,
+    load_tasks,
+    load_tasks_status,
+    set_cuda_num_processes,
+    setup_env_hf_medvision_ds,
+    setup_env_vllm,
+    update_task_status,
+)
 
 
 def install_transformers_accelerate_for_qwen25vl():
@@ -168,7 +174,7 @@ def main():
         ensure_hf_hub_installed()
         install_vendored_lmms_eval(proj_dependency="qwen2_5_vl")
         install_medvision_ds(data_dir)
-        install_torch_cu124() 
+        install_torch_cu124()
         # NOTE: vllm version may need to be adjusted based on compatibility of model and transformers version
         install_vllm(data_dir, version="0.10.0")
         # NOTE: Reinstall packages to overwrite potentially incompatible versions
@@ -180,7 +186,7 @@ def main():
             return
     else:
         print(
-            f"\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
+            "\n[Warning] Skipping environment setup as per argument --skip_env_setup. This should only be used for debugging.\n"
         )
         setup_env_vllm(data_dir)
     # ------

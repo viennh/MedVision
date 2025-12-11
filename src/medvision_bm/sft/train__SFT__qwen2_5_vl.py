@@ -2,7 +2,7 @@
 Tutorial:
     - medgemma finetuning: https://github.com/Google-Health/medgemma/blob/main/notebooks/fine_tune_with_hugging_face.ipynb
     - other visual SFT: https://huggingface.co/docs/trl/main/en/training_vlm_sft
-                        https://github.com/huggingface/trl/blob/main/docs/source/sft_trainer.md 
+                        https://github.com/huggingface/trl/blob/main/docs/source/sft_trainer.md
 
 Trainer (and thus SFTTrainer) supports multi-GPU training.
 If you run your script with `python script.py` it will default to using DP as the strategy, which may be slower than expected.
@@ -11,6 +11,7 @@ To use DDP (which is generally recommended, see here for more info) you must lau
 or
 > accelerate launch script.py
 """
+
 import datetime
 import gc
 import os
@@ -22,13 +23,17 @@ from transformers import AutoProcessor
 from transformers.trainer_utils import get_last_checkpoint
 
 from medvision_bm.sft.qwen25vl_utils import make_collate_fn_Qwen25VL
-from medvision_bm.sft.sft_utils import (_format_data_AngleDistanceTask,
-                                    _format_data_DetectionTask,
-                                    _format_data_TumorLesionTask, merge_models,
-                                    parse_sample_limits,
-                                    parse_validate_args_multiTask,
-                                    prepare_dataset, prepare_trainer,
-                                    train_resume_from_checkpoint)
+from medvision_bm.sft.sft_utils import (
+    _format_data_AngleDistanceTask,
+    _format_data_DetectionTask,
+    _format_data_TumorLesionTask,
+    merge_models,
+    parse_sample_limits,
+    parse_validate_args_multiTask,
+    prepare_dataset,
+    prepare_trainer,
+    train_resume_from_checkpoint,
+)
 from medvision_bm.utils import setup_env_hf_medvision_ds
 from medvision_bm.utils.configs import SEED
 
@@ -36,6 +41,7 @@ pg_kwargs = InitProcessGroupKwargs(timeout=datetime.timedelta(hours=1))
 
 try:
     from accelerate import PartialState
+
     _PS = PartialState()
     _IS_MAIN = _PS.is_main_process
 
@@ -72,8 +78,15 @@ def main(
 
     if not kwargs.get("merge_only"):
         # Parse sample limits
-        train_limit_AD, val_limit_AD, train_limit_detect, val_limit_detect, train_limit_TL, val_limit_TL, train_limit_total = parse_sample_limits(
-            **kwargs)
+        (
+            train_limit_AD,
+            val_limit_AD,
+            train_limit_detect,
+            val_limit_detect,
+            train_limit_TL,
+            val_limit_TL,
+            train_limit_total,
+        ) = parse_sample_limits(**kwargs)
 
         # Prepare the dataset cache directory
         # NOTE:
@@ -85,7 +98,7 @@ def main(
         # Print a clear runtime warning on the main process so users notice this requirement
         if is_main_process():
             print(
-                f"\n[WARNING] The prepared dataset directory name must uniquely include the model identifier and sample limits.\n"
+                "\n[WARNING] The prepared dataset directory name must uniquely include the model identifier and sample limits.\n"
                 "Dataset preparation depends on model-specific image processing (e.g., resize scale and pixel dimensions).\n"
                 "Reusing a dataset prepared with different settings or a different model may lead to incorrect results."
             )
@@ -94,20 +107,27 @@ def main(
             prepared_ds_dir = kwargs.get("prepared_ds_dir")
             if is_main_process():
                 print(
-                    f"[Info] Using user-specified prepared dataset directory: {prepared_ds_dir}\n")
+                    f"[Info] Using user-specified prepared dataset directory: {prepared_ds_dir}\n"
+                )
         else:
             prepared_ds_dir = os.path.join(
-                data_dir, f"tmp_prepared_ds__Qwen2_5VL__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}")
+                data_dir,
+                f"tmp_prepared_ds__Qwen2_5VL__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
+            )
             if is_main_process():
                 print(
-                    f"[Info] Using default prepared dataset directory: {prepared_ds_dir}\n")
+                    f"[Info] Using default prepared dataset directory: {prepared_ds_dir}\n"
+                )
 
         # Prepare the dataset on the main process ONLY
         if is_main_process():
             if not kwargs.get("skip_process_dataset"):
-                assert base_model_hf is not None, "[Error] base_model_hf must be provided for processing dataset for Qwen2.5VL fine-tuning."
+                assert (
+                    base_model_hf is not None
+                ), "[Error] base_model_hf must be provided for processing dataset for Qwen2.5VL fine-tuning."
                 img_processor = AutoProcessor.from_pretrained(
-                    base_model_hf).image_processor
+                    base_model_hf
+                ).image_processor
 
                 train_ds_list = []
                 val_ds_list = []
@@ -115,21 +135,23 @@ def main(
                 if kwargs.get("tasks_list_json_path_AD") is not None:
                     # Prepare datasets for AD task
                     dataset_AD = prepare_dataset(
-                        tasks_list_json_path=kwargs.get(
-                            "tasks_list_json_path_AD"),
+                        tasks_list_json_path=kwargs.get("tasks_list_json_path_AD"),
                         limit_train_sample=train_limit_AD,
                         limit_val_sample=val_limit_AD,
                         mapping_func=_format_data_AngleDistanceTask,
                         num_workers_concat_datasets=kwargs.get(
-                            "num_workers_concat_datasets"),
+                            "num_workers_concat_datasets"
+                        ),
                         num_workers_format_dataset=kwargs.get(
-                            "num_workers_format_dataset"),
+                            "num_workers_format_dataset"
+                        ),
                         # MedVision dataset specific, used to extract dataset name from AD task configs
                         tag_ds="BiometricsFromLandmarks",
                         img_processor=img_processor,
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
-                            "save_processed_img_to_disk"),
+                            "save_processed_img_to_disk"
+                        ),
                     )
                     train_ds_list.append(dataset_AD["train"])
                     val_ds_list.append(dataset_AD["validation"])
@@ -137,21 +159,23 @@ def main(
                 if kwargs.get("tasks_list_json_path_detect") is not None:
                     # Prepare datasets for Detection task
                     dataset_detect = prepare_dataset(
-                        tasks_list_json_path=kwargs.get(
-                            "tasks_list_json_path_detect"),
+                        tasks_list_json_path=kwargs.get("tasks_list_json_path_detect"),
                         limit_train_sample=train_limit_detect,
                         limit_val_sample=val_limit_detect,
                         mapping_func=_format_data_DetectionTask,
                         num_workers_concat_datasets=kwargs.get(
-                            "num_workers_concat_datasets"),
+                            "num_workers_concat_datasets"
+                        ),
                         num_workers_format_dataset=kwargs.get(
-                            "num_workers_format_dataset"),
+                            "num_workers_format_dataset"
+                        ),
                         # MedVision dataset specific, used to extract dataset name from detection task configs
                         tag_ds="BoxSize",
                         img_processor=img_processor,
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
-                            "save_processed_img_to_disk"),
+                            "save_processed_img_to_disk"
+                        ),
                     )
                     train_ds_list.append(dataset_detect["train"])
                     val_ds_list.append(dataset_detect["validation"])
@@ -159,21 +183,23 @@ def main(
                 if kwargs.get("tasks_list_json_path_TL") is not None:
                     # Prepare datasets for Tumor Lesion Size task
                     dataset_TL = prepare_dataset(
-                        tasks_list_json_path=kwargs.get(
-                            "tasks_list_json_path_TL"),
+                        tasks_list_json_path=kwargs.get("tasks_list_json_path_TL"),
                         limit_train_sample=train_limit_TL,
                         limit_val_sample=val_limit_TL,
                         mapping_func=_format_data_TumorLesionTask,
                         num_workers_concat_datasets=kwargs.get(
-                            "num_workers_concat_datasets"),
+                            "num_workers_concat_datasets"
+                        ),
                         num_workers_format_dataset=kwargs.get(
-                            "num_workers_format_dataset"),
+                            "num_workers_format_dataset"
+                        ),
                         # MedVision dataset specific, used to extract dataset name from TL task configs
                         tag_ds="TumorLesionSize",
                         img_processor=img_processor,
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
-                            "save_processed_img_to_disk"),
+                            "save_processed_img_to_disk"
+                        ),
                     )
                     train_ds_list.append(dataset_TL["train"])
                     val_ds_list.append(dataset_TL["validation"])
@@ -185,12 +211,14 @@ def main(
 
                 # Limit the total number of samples if specified
                 dataset["train"] = (
-                    dataset["train"].shuffle(seed=SEED).select(
-                        range(kwargs.get("train_sample_limit")))
+                    dataset["train"]
+                    .shuffle(seed=SEED)
+                    .select(range(kwargs.get("train_sample_limit")))
                 )
                 dataset["validation"] = (
-                    dataset["validation"].shuffle(seed=SEED).select(
-                        range(kwargs.get("val_sample_limit")))
+                    dataset["validation"]
+                    .shuffle(seed=SEED)
+                    .select(range(kwargs.get("val_sample_limit")))
                 )
 
                 # Save the prepared dataset to disk for other processes to load
@@ -204,7 +232,8 @@ def main(
         if kwargs.get("process_dataset_only"):
             if is_main_process():
                 print(
-                    f"Data processing completed. Prepared dataset saved at '{prepared_ds_dir}'.")
+                    f"Data processing completed. Prepared dataset saved at '{prepared_ds_dir}'."
+                )
             return
 
         # All processes load the prepared dataset
@@ -217,12 +246,9 @@ def main(
             lora_checkpoint_dir=lora_checkpoint_dir,
             data=dataset,
             make_collate_fn=make_collate_fn_Qwen25VL,
-            per_device_train_batch_size=kwargs.get(
-                "per_device_train_batch_size"),
-            per_device_eval_batch_size=kwargs.get(
-                "per_device_eval_batch_size"),
-            gradient_accumulation_steps=kwargs.get(
-                "gradient_accumulation_steps"),
+            per_device_train_batch_size=kwargs.get("per_device_train_batch_size"),
+            per_device_eval_batch_size=kwargs.get("per_device_eval_batch_size"),
+            gradient_accumulation_steps=kwargs.get("gradient_accumulation_steps"),
             use_flash_attention_2=kwargs.get("use_flash_attention_2"),
             num_train_epochs=kwargs.get("epoch"),
             save_steps=kwargs.get("save_steps"),
