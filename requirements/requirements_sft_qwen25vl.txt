@@ -147,9 +147,9 @@ tensorboard-data-server==0.7.2
 texttable==1.7.0
 tifffile==2025.10.16
 tokenizers==0.21.4
-torch==2.6.0+cu124
-torchaudio==2.6.0+cu124
-torchvision==0.21.0+cu124
+torch==2.6.0
+torchaudio==2.6.0
+torchvision==0.21.0
 tqdm==4.67.1
 transformers==4.54.0
 triton==3.2.0
