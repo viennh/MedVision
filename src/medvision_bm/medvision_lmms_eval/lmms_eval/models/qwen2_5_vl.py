@@ -7,6 +7,13 @@ import decord
 import numpy as np
 import torch
 from accelerate import Accelerator, DistributedType
+from lmms_eval import utils
+from lmms_eval.api.instance import Instance
+from lmms_eval.api.model import lmms
+from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.reasoning_model_utils import (
+    parse_reasoning_model_answer,
+)
 from loguru import logger as eval_logger
 from PIL import Image
 from tqdm import tqdm
@@ -14,14 +21,6 @@ from transformers import (
     AutoProcessor,
     AutoTokenizer,
     Qwen2_5_VLForConditionalGeneration,
-)
-
-from lmms_eval import utils
-from lmms_eval.api.instance import Instance
-from lmms_eval.api.model import lmms
-from lmms_eval.api.registry import register_model
-from lmms_eval.models.model_utils.reasoning_model_utils import (
-    parse_reasoning_model_answer,
 )
 
 try:
@@ -352,4 +351,4 @@ class Qwen2_5_VL(lmms):
         return res
 
     def generate_until_multi_round(self, requests) -> List[str]:
-        raise NotImplementedError("TODO: Implement multi-round generation")
+        raise NotImplementedError("Multi-round generation is not implemented for Qwen2.5_VL")

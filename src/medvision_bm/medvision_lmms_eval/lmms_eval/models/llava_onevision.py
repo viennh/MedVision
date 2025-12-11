@@ -1,8 +1,6 @@
 import copy
 import json
 import logging
-import math
-import re
 import warnings
 from datetime import timedelta
 from typing import List, Optional, Tuple, Union
@@ -10,19 +8,17 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import PIL
 import torch
-import transformers
 from accelerate import Accelerator, DistributedType, InitProcessGroupKwargs
 from accelerate.state import AcceleratorState
 from decord import VideoReader, cpu
-from packaging import version
-from tqdm import tqdm
-from transformers import AutoConfig
-
 from lmms_eval import utils
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
 from lmms_eval.models.model_utils.load_video import read_video_pyav
+from packaging import version
+from tqdm import tqdm
+from transformers import AutoConfig
 
 # Suppress warnings
 warnings.filterwarnings("ignore")

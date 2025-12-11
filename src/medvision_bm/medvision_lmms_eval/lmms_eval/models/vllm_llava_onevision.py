@@ -1,24 +1,19 @@
-import asyncio
 import base64
 import json
 import os
-import time
 from concurrent.futures import ThreadPoolExecutor
-from copy import deepcopy
 from io import BytesIO
-from multiprocessing import cpu_count
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from accelerate import Accelerator, DistributedType
 from decord import VideoReader, cpu
-from loguru import logger as eval_logger
-from PIL import Image
-from tqdm import tqdm
-
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from loguru import logger as eval_logger
+from PIL import Image
+from tqdm import tqdm
 
 NUM_SECONDS_TO_SLEEP = 5
 
@@ -66,7 +61,7 @@ class VLLM_Llava_OneVision(lmms):
         **kwargs: Additional arguments passed to the VLLM LLM constructor.
             - NOTE: model specific arguments can be passed here without the need to add more arguments to this class (see example below)
             - String arguments that look like JSON dictionaries will be automatically parsed.
-        
+
 
     Python Example 1: (example of passing model specific arguments)
     # ---------------------
@@ -137,7 +132,7 @@ class VLLM_Llava_OneVision(lmms):
     # NOTE: No need to pass the chat template file if it is already defined in the model tokenizer.
     # The chat method automatically applies the model's chat template to format the prompt
     # - vllm chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
-    
+
     """
 
     def __init__(
@@ -295,11 +290,11 @@ class VLLM_Llava_OneVision(lmms):
 
             sampling_params = SamplingParams(**params)
 
-            # NOTE: 
+            # NOTE:
             # The chat method automatically applies the model's chat template to format the prompt
             # - vllm chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
             # The logic here is similar to the vllm implementation as shown here (https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat)
-            # - vllm implementation: https://github.com/vllm-project/vllm/blob/d97841078b6e0dde8da36d5a2b8e8857a2c37944/vllm/entrypoints/chat_utils.py#L829 
+            # - vllm implementation: https://github.com/vllm-project/vllm/blob/d97841078b6e0dde8da36d5a2b8e8857a2c37944/vllm/entrypoints/chat_utils.py#L829
             if self.chat_template is not None:
                 if os.path.isfile(self.chat_template):
                     with open(self.chat_template, "r") as f:
@@ -319,8 +314,7 @@ class VLLM_Llava_OneVision(lmms):
         return res
 
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
-        # TODO
-        assert False, "GPT4V not support"
+        raise NotImplementedError("loglikelihood is not implemented yet.")
 
     def generate_until_multi_round(self, requests) -> List[str]:
-        raise NotImplementedError("TODO: Implement multi-round generation")
+        raise NotImplementedError("generate_until_multi_round is not implemented yet.")

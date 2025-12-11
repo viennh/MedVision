@@ -1,26 +1,18 @@
-import os
 import base64
-from io import BytesIO
 import concurrent.futures
 from functools import partial
-from PIL import Image
-from tqdm import tqdm
+from io import BytesIO
 from typing import List, Optional, Tuple, Union
 
+import torch
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
 from lmms_eval.utils import eval_logger
-
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
+from PIL import Image
 from qwen_vl_utils import process_vision_info
-
-from accelerate import Accelerator, FullyShardedDataParallelPlugin
-from accelerate.utils import DistributedType, wait_for_everyone
-from accelerate import PartialState
-
-import torch
-from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
+from tqdm import tqdm
+from transformers import AutoProcessor, Qwen2_5_VLForConditionalGeneration
 
 
 @register_model("lingshu")
@@ -94,7 +86,7 @@ class Lingshu(lmms):
             device_map=device_map,
         )
         self._processor = AutoProcessor.from_pretrained(self.model_hf)
-        self._processor.tokenizer.padding_side = "left" 
+        self._processor.tokenizer.padding_side = "left"
 
         self._device = torch.device(device)
         self.device_map = device_map
@@ -274,7 +266,7 @@ class Lingshu(lmms):
         return res
 
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
-        raise NotImplementedError("Loglikelihood is not implemented for MedGemma")
+        raise NotImplementedError("Loglikelihood is not implemented for Lingshu")
 
     def generate_until_multi_round(self, requests) -> List[str]:
-        raise NotImplementedError("Multi-round generation is not implemented for MedGemma")
+        raise NotImplementedError("Multi-round generation is not implemented for Lingshu")

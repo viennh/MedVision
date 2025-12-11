@@ -1,18 +1,18 @@
-import os, sys
-import torch
-from PIL import Image
-from tqdm import tqdm
-from loguru import logger as eval_logger
+import os
+import sys
 from typing import List, Optional, Tuple
 
+import torch
 import transformers
+from loguru import logger as eval_logger
+from PIL import Image
+from tqdm import tqdm
 from transformers.utils import logging
 
 logging.set_verbosity_info()
 
 import tokenizers
 from accelerate import Accelerator, DistributedType
-
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
@@ -22,16 +22,28 @@ dir_healthgpt = os.environ.get("HEALTHGPT_DIR")
 dir_demo = os.path.join(dir_healthgpt, "llava", "demo")
 sys.path.append(dir_healthgpt)
 sys.path.append(dir_demo)
-from llava.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
 from llava import conversation as conversation_lib
-from llava.peft import LoraConfig, get_peft_model
-from llava.model import *
+from llava.constants import (
+    DEFAULT_IM_END_TOKEN,
+    DEFAULT_IM_START_TOKEN,
+    DEFAULT_IMAGE_TOKEN,
+    IGNORE_INDEX,
+    IMAGE_TOKEN_INDEX,
+)
 from llava.mm_utils import tokenizer_image_token
-from llava.model.language_model.llava_phi3 import LlavaPhiForCausalLM, LlavaPhiConfig
+from llava.model import *
+from llava.model.language_model.llava_phi3 import LlavaPhiForCausalLM
+from llava.peft import LoraConfig, get_peft_model
 from packaging import version
 
 IS_TOKENIZER_GREATER_THAN_0_14 = version.parse(tokenizers.__version__) >= version.parse("0.14")
-from utils import find_all_linear_names, add_special_tokens_and_resize_model, load_weights, expand2square, com_vision_args
+from utils import (
+    add_special_tokens_and_resize_model,
+    com_vision_args,
+    expand2square,
+    find_all_linear_names,
+    load_weights,
+)
 
 
 @register_model("healthgpt_xl32")

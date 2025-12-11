@@ -1,24 +1,33 @@
 import os
-import torch
-from PIL import Image
-from tqdm import tqdm
-from loguru import logger as eval_logger
 from typing import List, Optional, Tuple
 
-from transformers import set_seed, logging
+import torch
+from loguru import logger as eval_logger
+from PIL import Image
+from tqdm import tqdm
+from transformers import logging, set_seed
+
 logging.set_verbosity_error()
 
 from accelerate import Accelerator, DistributedType
-
+from llava.constants import (
+    DEFAULT_IM_END_TOKEN,
+    DEFAULT_IM_START_TOKEN,
+    DEFAULT_IMAGE_TOKEN,
+    IMAGE_TOKEN_INDEX,
+)
+from llava.conversation import SeparatorStyle, conv_templates
+from llava.mm_utils import (
+    KeywordsStoppingCriteria,
+    get_model_name_from_path,
+    process_images,
+    tokenizer_image_token,
+)
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
-
-from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
-from llava.conversation import conv_templates, SeparatorStyle
-from llava.model.builder import load_pretrained_model
-from llava.utils import disable_torch_init
-from llava.mm_utils import tokenizer_image_token, get_model_name_from_path, KeywordsStoppingCriteria, process_images
 
 
 @register_model("llava_med")

@@ -1,20 +1,24 @@
 import warnings
-import torch
-import PIL
-import numpy
-from tqdm import tqdm
-from torchvision.transforms.functional import to_pil_image
-from loguru import logger as eval_logger
-from typing import List, Tuple, Optional, Union
-from accelerate import Accelerator, DistributedType
-from transformers import AutoProcessor, Llama4ForConditionalGeneration, BitsAndBytesConfig
-from lmms_eval.api.instance import Instance
-from lmms_eval.api.model import lmms
-from lmms_eval.api.registry import register_model
+from typing import List, Optional, Tuple, Union
 
+import numpy
+import PIL
+import torch
 
 # suppress dynamo errors to fall back to eager if FakeTensor device‐prop mismatch
 import torch._dynamo
+from accelerate import Accelerator, DistributedType
+from lmms_eval.api.instance import Instance
+from lmms_eval.api.model import lmms
+from lmms_eval.api.registry import register_model
+from loguru import logger as eval_logger
+from torchvision.transforms.functional import to_pil_image
+from tqdm import tqdm
+from transformers import (
+    AutoProcessor,
+    BitsAndBytesConfig,
+    Llama4ForConditionalGeneration,
+)
 
 torch._dynamo.config.suppress_errors = True
 warnings.filterwarnings("ignore")

@@ -1,14 +1,14 @@
 import os
 import sys
-import torch
-from PIL import Image
-from tqdm import tqdm
-from loguru import logger as eval_logger
 from typing import List, Optional, Tuple
 
+import torch
 from accelerate import Accelerator, DistributedType
-
+from loguru import logger as eval_logger
+from PIL import Image
+from tqdm import tqdm
 from transformers import LlamaTokenizer, logging
+
 logging.set_verbosity_error()
 
 from lmms_eval.api.instance import Instance
@@ -18,10 +18,10 @@ from lmms_eval.api.registry import register_model
 # NOTE: This is a workaround for the issue with the import of the MedDr module
 dir_meddr = os.environ.get("MedDr_DIR")
 sys.path.append(dir_meddr)
-from src.model.internvl_chat import InternVLChatModel
 from src.dataset.transforms import build_transform
+from src.model.internvl_chat import InternVLChatModel
 
-IMG_CONTEXT_TOKEN='<IMG_CONTEXT>'
+IMG_CONTEXT_TOKEN = "<IMG_CONTEXT>"
 
 
 @register_model("meddr")
@@ -183,11 +183,5 @@ class MedDr(lmms):
         )
         image = self._image_processor(pil_img).unsqueeze(0).to(self._device).to(self.model_dtype)
         with torch.no_grad():
-            response = self._model.chat(
-                tokenizer=self._tokenizer,
-                pixel_values=image,
-                question=question,
-                generation_config=generation_config,
-                print_out=False
-            )
+            response = self._model.chat(tokenizer=self._tokenizer, pixel_values=image, question=question, generation_config=generation_config, print_out=False)
         return response

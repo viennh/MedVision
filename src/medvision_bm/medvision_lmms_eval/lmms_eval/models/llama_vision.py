@@ -7,14 +7,12 @@ import torch
 from accelerate import Accelerator, DistributedType
 from accelerate.state import AcceleratorState
 from decord import VideoReader, cpu
-from torchvision.transforms.functional import to_pil_image
-from tqdm import tqdm
-from transformers import AutoConfig, AutoProcessor, MllamaForConditionalGeneration
-
-from lmms_eval import utils
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from torchvision.transforms.functional import to_pil_image
+from tqdm import tqdm
+from transformers import AutoProcessor, MllamaForConditionalGeneration
 
 warnings.filterwarnings("ignore")
 
@@ -215,4 +213,4 @@ class LlamaVision(lmms):
         return res
 
     def generate_until_multi_round(self, requests) -> List[str]:
-        raise NotImplementedError("TODO: Implement multi-round generation for LLaVAHF")
+        raise NotImplementedError("Multi-round generation is not implemented for Llama-Vision")

@@ -1,19 +1,22 @@
 import logging
+import math
+from datetime import timedelta
 from typing import List, Tuple
 
 import numpy as np
 import torch
 import torchvision.transforms as T
 from accelerate import Accelerator, DistributedType
+from accelerate.state import AcceleratorState
+from accelerate.utils import InitProcessGroupKwargs
 from decord import VideoReader, cpu
+from lmms_eval.api.instance import Instance
+from lmms_eval.api.model import lmms
+from lmms_eval.api.registry import register_model
 from PIL import Image
 from torchvision.transforms.functional import InterpolationMode
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
-
-from lmms_eval.api.instance import Instance
-from lmms_eval.api.model import lmms
-from lmms_eval.api.registry import register_model
 
 eval_logger = logging.getLogger("eval_logger")
 
@@ -117,13 +120,6 @@ def load_video(video_path, bound=None, input_size=448, max_num=1, num_segments=3
         pixel_values_list.append(pixel_values)
     pixel_values = torch.cat(pixel_values_list)
     return pixel_values, num_patches_list
-
-
-import math
-from datetime import timedelta
-
-from accelerate.state import AcceleratorState
-from accelerate.utils import InitProcessGroupKwargs
 
 
 # The reason for writing the code this way is to avoid errors that occur during multi-GPU inference due to tensors not being on the same device. By ensuring that the first and last layers of the large language model (LLM) are on the same device, we prevent such errors.

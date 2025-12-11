@@ -1,15 +1,15 @@
-import torch
-from PIL import Image
-from tqdm import tqdm
-from loguru import logger as eval_logger
 from typing import List, Optional, Tuple
-from torchvision import transforms
-from transformers import OFATokenizer, OFAModel
-from accelerate import Accelerator, DistributedType
 
+import torch
+from accelerate import Accelerator, DistributedType
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from loguru import logger as eval_logger
+from PIL import Image
+from torchvision import transforms
+from tqdm import tqdm
+from transformers import OFAModel, OFATokenizer
 
 
 @register_model("biomedgpt")

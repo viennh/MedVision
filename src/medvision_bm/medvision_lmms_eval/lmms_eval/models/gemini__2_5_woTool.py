@@ -1,17 +1,16 @@
-import json
-import backoff
 import ast
-from PIL import Image
-from tqdm import tqdm
-from typing import List, Optional, Tuple, Dict, Any, Union
+import json
+from typing import Dict, List, Optional, Tuple, Union
 
+import backoff
+from google import genai
+from google.genai import types
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
-
-from google import genai
-from google.genai import types
-from pydantic import BaseModel, Field, create_model
+from PIL import Image
+from pydantic import Field, create_model
+from tqdm import tqdm
 
 
 @register_model("gemini__2_5_woTool")
@@ -184,7 +183,7 @@ class Gemini__2_5_woTool(lmms):
         return res
 
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
-        raise NotImplementedError("Loglikelihood is not implemented for BiomedGPT")
+        raise NotImplementedError("Loglikelihood is not implemented for Gemini 2.5")
 
     def generate_until_multi_round(self, requests) -> List[str]:
-        raise NotImplementedError("Multi-round generation is not implemented for BiomedGPT")
+        raise NotImplementedError("Multi-round generation is not implemented for Gemini 2.5")

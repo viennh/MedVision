@@ -1,11 +1,10 @@
 import os
 import sys
-import torch
-from tqdm import tqdm
 from typing import List, Optional, Tuple
 
+import torch
 from accelerate import Accelerator
-
+from tqdm import tqdm
 from transformers import logging
 
 logging.set_verbosity_error()
@@ -110,7 +109,7 @@ class HuatuoGPT_Vision(lmms):
         return res
 
     def loglikelihood(self, requests: List[Instance]) -> List[Tuple[float, bool]]:
-        raise NotImplementedError("Loglikelihood is not implemented for BiomedGPT")
+        raise NotImplementedError("Loglikelihood is not implemented for HuatuoGPT-Vision")
 
     def generate_until_multi_round(self, requests) -> List[str]:
-        raise NotImplementedError("Multi-round generation is not implemented for BiomedGPT")
+        raise NotImplementedError("Multi-round generation is not implemented for HuatuoGPT-Vision")

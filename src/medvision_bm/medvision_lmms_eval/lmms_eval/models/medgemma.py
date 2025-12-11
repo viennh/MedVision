@@ -1,23 +1,21 @@
-import os
 import concurrent.futures
 from functools import partial
-from PIL import Image
-from tqdm import tqdm
 from typing import List, Optional, Tuple, Union
 
+import torch
+from accelerate import Accelerator, FullyShardedDataParallelPlugin, PartialState
+from accelerate.utils import DistributedType, wait_for_everyone
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
 from lmms_eval.utils import eval_logger
-
-from transformers import AutoProcessor, AutoModelForImageTextToText, pipeline
-
-from accelerate import Accelerator, FullyShardedDataParallelPlugin
-from accelerate.utils import DistributedType, wait_for_everyone
-from accelerate import PartialState
-
-import torch
-from torch.distributed.fsdp.fully_sharded_data_parallel import FullOptimStateDictConfig, FullStateDictConfig
+from PIL import Image
+from torch.distributed.fsdp.fully_sharded_data_parallel import (
+    FullOptimStateDictConfig,
+    FullStateDictConfig,
+)
+from tqdm import tqdm
+from transformers import AutoModelForImageTextToText, AutoProcessor, pipeline
 
 
 @register_model("medgemma")
