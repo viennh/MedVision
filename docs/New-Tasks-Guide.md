@@ -1,0 +1,119 @@
+# Adding New Tasks to MedVision
+
+**Concept:** Adding new tasks means defining datasets, mapping functions that convert data into prompts and targets, post-processing functions for parsing outputs, and metric calculation functions.
+
+## Codebase Architecture
+
+```
+├── src
+	├── medvision_bm 
+		├── medvision_lmms_eval
+			├── lmms_eval
+				├── tasks # [1]
+					├── BraTS24 # [2]
+						├── utils.py # [3]
+						├── BraTS24_BoxCoordinate_base.yaml # [4]
+						├── BraTS24_BoxCoordinate_Task01_Axial.yaml # [5]
+						├── BraTS24_TumorLesionSize_base.yaml # [6]
+						├── BraTS24_TumorLesionSize_Task01_Axial.yaml # [7]
+						├── BraTS24_MaskSize_base.yaml # [8]
+						├── BraTS24_MaskSize_Task01_Axial.yaml # [9]
+					├── Ceph-Biometrics-400
+						├── Ceph-Biometrics-400_BiometricsFromLandmarks_base.yaml # [10]
+						├── Ceph-Biometrics-400_BiometricsFromLandmarks_Angle_Task01_Sagittal.yaml # [11]
+					├── <other datasets>
+					├── medvision 
+						├── medvision_utils.py # [12]
+```
+
+- [1] Tasks folder (datasets folder)
+
+- [2] Dataset folder (example: BraTS24)
+
+- [3] Utility functions shared for all tasks of the same dataset, 
+
+- [4,6,8,10] Template for detection tasks, served as the base of tasks that use same dataset and task type
+
+  Example of a detection task template:
+
+  ```yaml
+  tag: MedVision-BoxCoordinate,BraTS24
+  dataset_path: YongchengYAO/MedVision
+  dataset_kwargs:
+    token: True
+    trust_remote_code: True
+  test_split: test
+  fewshot_split: test
+  num_fewshot: 0
+  output_type: generate_until
+  doc_to_visual: !function utils.doc_to_visual
+  doc_to_text: !function utils.doc_to_text_BoxCoordinate
+  doc_to_target: !function utils.doc_to_target_BoxCoordinate
+  process_results: !function utils.process_results_BoxCoordinate
+  metric_list:
+  - metric: avgMAE
+    aggregation: !function utils.aggregate_results_avgMAE
+    higher_is_better: false
+  - metric: avgMRE
+    aggregation: !function utils.aggregate_results_avgMRE
+    higher_is_better: false
+  - metric: SuccessRate
+    aggregation: !function utils.aggregate_results_SuccessRate
+    higher_is_better: true
+  ```
+
+  > [!NOTE]
+  >
+  > “doc” is the sample returned from a configuration of MedVision
+
+  - `dataset_path`: HF dataset ID
+  - there functions are defined in `utils.py` in the same dataset folder
+    - `doc_to_visual`:  get the image input
+    - `doc_to_text`: construct text prompt
+    - `doc_to_target`: construct target string
+    - `process_results`: compute per-sample metrics
+    - `aggregation`:  compute average metrics
+
+- [5,7,9,11] Task definition: set task and dataset names
+
+  Example of a detection task:
+
+  ```yaml
+  include: BraTS24_BoxCoordinate_base.yaml
+  task: BraTS24_BoxCoordinate_Task01_Axial 
+  dataset_name: BraTS24_BoxSize_Task01_Axial_Test
+  ```
+
+- [12] A central place for all utilities
+
+## Keys
+
+1. Keep the naming conventions:
+
+   - task template should be `<dataset>_<task_type>_base.yaml`
+   - task should be `<dataset>_<task_type>_<task_num>_<slice><other_tag>.yaml`
+   - Use fixed `<task_type>` labels:
+     - `BoxCoordinate` for detection tasks
+     - `TumorLesionSize` for tumor/lesion size estimation (measurement) tasks
+     - `BiometricsFromLandmarks` for angle/distance measurement tasks
+     - **[New/Preview]** `MaskSize` for area estimation tasks
+
+2. **Add new tasks** in a new dataset folder and folllow the file structure:
+
+   ```
+   ├── src
+   	├── medvision_bm 
+   		├── medvision_lmms_eval
+   			├── lmms_eval
+   				├── tasks
+   					├── <new-dataset>
+   						├── utils.py
+   						├── <new-dataset>_BoxCoordinate_base.yaml
+   						├── <new-dataset>_BoxCoordinate_Task01_Axial.yaml
+   ```
+
+3. Add new functions to `medvision_utils.py ` and import in  `utils.py`
+
+## Reference
+
+- [New tasks guide](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/task_guide.md) from `EvolvingLMMs-Lab/lmms-eval `
