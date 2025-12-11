@@ -21,6 +21,11 @@ from PIL import Image
 from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
+from medvision_bm.sft.sft_prompts import (
+    _get_prompt_angle,
+    _get_prompt_distance,
+    fill_in_template,
+)
 from medvision_bm.utils import str2bool
 from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE, SEED
 
@@ -46,6 +51,7 @@ def safe_print(*args, force=False, **kwargs):
 
 def broadcast_int_from_main(value, src=0):
     import torch.distributed as dist
+
     """
     Broadcast an integer value from the source (main) process to all other processes.
 
@@ -134,56 +140,23 @@ def _doc_to_visual(doc):
     return [pil_img]
 
 
-def _get_prompt_angle(biometrics_name, l1p1, l1p2, l2p1, l2p2, metric_unit):
-    """Prepare prompt for angle estimate VQA. Inputs are names."""
-    if biometrics_name is not None and biometrics_name != "":
-        return (
-            f"estimate the angle of {biometrics_name} in {metric_unit}, "
-            f"which is the angle between 2 lines: "
-            f"(line 1) the line connecting {l1p1} and {l1p2}, "
-            f"(line 2) the line connecting {l2p1} and {l2p2}.\n"
-        )
-    else:
-        return (
-            f"estimate the angle between 2 lines in {metric_unit}: "
-            f"(line 1) the line connecting {l1p1} and {l1p2}, "
-            f"(line 2) the line connecting {l2p1} and {l2p2}.\n"
-        )
-
-
-def _get_prompt_distance(biometrics_name, p1, p2, metric_unit):
-    """Prepare prompt for distance estimate VQA. Inputs are names."""
-    metric_unit = metric_unit.strip().replace("mm", "millimeters")
-    if biometrics_name is not None and biometrics_name != "":
-        return (
-            f"estimate the distance of {biometrics_name} in {metric_unit}, "
-            f"which is the distance between 2 landmark points: "
-            f"(landmark 1) {p1}, "
-            f"(landmark 2) {p2}.\n"
-        )
-    else:
-        return (
-            f"estimate the distance between 2 landmark points in {metric_unit}: "
-            f"(landmark 1) {p1}, "
-            f"(landmark 2) {p2}.\n"
-        )
-
-
 def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
 
     # Early assertions
-    assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
-        img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
     if dataset_module is None:
-        raise ValueError(
-            f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
     preprocess_biometry_module = importlib.import_module(
         f"medvision_ds.datasets.{dataset_module}.preprocess_biometry"
     )
@@ -224,7 +197,9 @@ def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
         image_grid_thw = processed_visual["image_grid_thw"][0]
         patch_size = img_processor.patch_size
         img_shape_resized = (
-            image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
+            image_grid_thw[1] * patch_size,
+            image_grid_thw[2] * patch_size,
+        )
         # ===== End of Qwen2.5VL specific processing ======
     elif reshape_size is not None:
         # NOTE: For all models that have a fixed reshape size
@@ -302,24 +277,211 @@ def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
     return question
 
 
+def _doc_to_text_AngleDistanceTask_CoT(doc, img_processor=None, reshape_size=None):
+    """Convert document to text."""
+    from medvision_bm.sft.sft_prompts import (
+        COT_INSTRUCT_ANGLE,
+        COT_INSTRUCT_DISTANCE,
+        FORMAT_PROMPT_AD_REASONING,
+    )
+
+    # Early assertions
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
+    assert not (
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+
+    # Import the dataset-specific module from medvision_ds.datasets
+    dataset_name = doc["dataset_name"]
+    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
+    if dataset_module is None:
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+    preprocess_biometry_module = importlib.import_module(
+        f"medvision_ds.datasets.{dataset_module}.preprocess_biometry"
+    )
+
+    # Get task info
+    taskID = doc["taskID"]
+    bm_plan = preprocess_biometry_module.benchmark_plan
+    task_info = bm_plan["tasks"][int(taskID) - 1]
+
+    # Get biometrics profile for this case
+    biometric_profile = doc["biometric_profile"]
+    metric_type = biometric_profile["metric_type"]
+    metric_map_name = biometric_profile["metric_map_name"]
+    metric_key = biometric_profile["metric_key"]
+    metric_unit = biometric_profile["metric_unit"]
+
+    # Get 2D image info
+    image_description = task_info["image_description"]
+
+    # Read NIfTI image
+    img_path = doc["image_file"]
+    slice_dim = doc["slice_dim"]
+    slice_idx = doc["slice_idx"]
+    pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    img_shape = img_2d_raw.shape
+
+    # -------------
+    # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
+    # -------------
+    if img_processor is not None:
+        # ====== Qwen2.5VL specific processing ======
+        # FIXME: This block only works for Qwen2.5VL
+        # TODO: Generalize to other models; reuse code if possible
+        # ---
+        # Get reshaped image size so that we can adjust the pixel size dynamically
+        img_PIL = Image.fromarray(img_2d_raw)
+        processed_visual = img_processor([img_PIL])
+        image_grid_thw = processed_visual["image_grid_thw"][0]
+        patch_size = img_processor.patch_size
+        img_shape_resized = (
+            image_grid_thw[1] * patch_size,
+            image_grid_thw[2] * patch_size,
+        )
+        # ===== End of Qwen2.5VL specific processing ======
+    elif reshape_size is not None:
+        # NOTE: For all models that have a fixed reshape size
+        assert len(reshape_size) == 2, "reshape_size should be of length 2"
+        img_shape_resized = reshape_size
+    # -------------
+
+    # Adjust pixel size based on the resize ratio
+    original_height, original_width = img_shape
+    pixel_height, pixel_width = pixel_size_hw
+    resized_img_h, resized_img_w = img_shape_resized
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
+    adjusted_pixel_height = pixel_height / resize_ratio_h
+    adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
+    # Include pixel size information in question text
+    pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
+
+    # Question
+    if metric_type == "distance":
+        # CoT instruction - reasoning step description
+        cot_instruction = COT_INSTRUCT_DISTANCE
+        # Task prompt - task description
+        lines_map = task_info[metric_map_name]
+        line_dict = lines_map[metric_key]
+        lms_map_name = line_dict["element_map_name"]
+        lms_map = task_info[lms_map_name]
+        lms = line_dict[
+            "element_keys"
+        ]  # list of 2 strings -- names of points (landmarks)
+        p1_name = lms_map[lms[0]]
+        p2_name = lms_map[lms[1]]
+        biometrics_name = line_dict["name"]
+        task_prompt = _get_prompt_distance(
+            biometrics_name, p1_name, p2_name, metric_unit
+        )
+    if metric_type == "angle":
+        # CoT instruction - reasoning step description
+        cot_instruction = COT_INSTRUCT_ANGLE
+        # Task prompt - task description
+        angles_map = task_info[metric_map_name]
+        angle_dict = angles_map[metric_key]
+        lines_map_name = angle_dict["element_map_name"]
+        # list of 2 strings -- names of lines
+        line_keys = angle_dict["element_keys"]
+        lines_map = task_info[lines_map_name]
+        line1_dict = lines_map[line_keys[0]]
+        line1_lms = line1_dict[
+            "element_keys"
+        ]  # list of 2 strings -- names of points (landmarks)
+        line1_lms_map_name = line1_dict["element_map_name"]
+        line1_lms_map = task_info[line1_lms_map_name]
+        line1_p1_name = line1_lms_map[line1_lms[0]]
+        line1_p2_name = line1_lms_map[line1_lms[1]]
+        line2_dict = lines_map[line_keys[1]]
+        line2_lms = line2_dict[
+            "element_keys"
+        ]  # list of 2 strings -- names of points (landmarks)
+        line2_lms_map_name = line2_dict["element_map_name"]
+        line2_lms_map = task_info[line2_lms_map_name]
+        line2_p1_name = line2_lms_map[line2_lms[0]]
+        line2_p2_name = line2_lms_map[line2_lms[1]]
+        biometrics_name = angle_dict["name"]
+        task_prompt = _get_prompt_angle(
+            biometrics_name,
+            line1_p1_name,
+            line1_p2_name,
+            line2_p1_name,
+            line2_p2_name,
+            metric_unit,
+        )
+
+    # Question
+    question = (
+        f"Task:\n"
+        f"Given the input medical image: {image_description}, "
+        f"{task_prompt}"
+        f"Additional information:\n"
+        f"{image_size_text}\n"
+        f"{pixel_size_text}\n"
+        f"Format requirement:\n"
+        f"{FORMAT_PROMPT_AD_REASONING}\n"
+        f"Reasoning steps:\n"
+        f"{cot_instruction}\n"
+        f"Follow the reasoning steps to get the final answer in the required format."
+    )
+
+    values_dict = {}
+
+    return question, values_dict
+
+
 def _doc_to_target_AngleDistanceTask(doc):
     """Get ground truth biometrics."""
     biometric_profile = doc["biometric_profile"]
     return biometric_profile["metric_value"]
 
 
+def _doc_to_target_AngleDistanceTask_CoT(doc, values_dict):
+    from medvision_bm.sft.sft_prompts import (
+        COT_TEMPLATE_ANGLE,
+        COT_TEMPLATE_DISTANCE,
+    )
+
+    biometric_profile = doc["biometric_profile"]
+    metric_type = biometric_profile["metric_type"]
+    if metric_type == "angle":
+        cot_template = COT_TEMPLATE_ANGLE
+    elif metric_type == "distance":
+        cot_template = COT_TEMPLATE_DISTANCE
+    else:
+        raise ValueError(f"Unsupported metric_type: {metric_type}")
+
+    # Prepare values to fill in the CoT template
+    target_outputs_cot = fill_in_template(cot_template, values_dict)
+
+    return target_outputs_cot
+
+
 # NOTE: This is specific to the MedVision dataset
 def _format_data_AngleDistanceTask(
-    example, img_processor=None, reshape_size=None, process_img=False, save_processed_img_to_disk=False,
+    example,
+    img_processor=None,
+    reshape_size=None,
+    process_img=False,
+    save_processed_img_to_disk=False,
 ):
     # Early assertions
-    assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
-        img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     target_str = str(_doc_to_target_AngleDistanceTask(example))
-    prompt = _doc_to_text_AngleDistanceTask(
-        example, img_processor, reshape_size)
+    prompt = _doc_to_text_AngleDistanceTask(example, img_processor, reshape_size)
 
     example["messages"] = [
         {
@@ -369,11 +531,72 @@ def _format_data_AngleDistanceTask(
     return example
 
 
-def _format_data_AngleDistanceTask_CoT():
-    raise NotImplementedError(
-        "CoT formatting for AngleDistanceTask is not implemented yet. "
-        "Please use the non-CoT version for now."
+def _format_data_AngleDistanceTask_CoT(
+    example,
+    img_processor=None,
+    reshape_size=None,
+    process_img=False,
+    save_processed_img_to_disk=False,
+):
+    # Early assertions
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
+    assert not (
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(
+        example, img_processor, reshape_size
     )
+    target_str = _doc_to_target_AngleDistanceTask_CoT(example, values_dict)
+
+    example["messages"] = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                },
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+            ],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": target_str,
+                },
+            ],
+        },
+    ]
+
+    # [Not recommended] Save processed images to dataset, making the cached dataset very large
+    if process_img:
+        example["processed_images"] = _doc_to_visual(example)
+
+    # [Recommended] Save processed images to PNG files on disk
+    if save_processed_img_to_disk:
+        # Process image: read from nii.gz file and extract 2D slice
+        pil_img = _doc_to_visual(example)[0]
+
+        # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
+        img_path = example["image_file"]
+        slice_dim = example["slice_dim"]
+        slice_idx = example["slice_idx"]
+        png_basename = Path(img_path).name.split(".", 1)[0]
+        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
+        png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
+        png_path = os.path.join(png_dir, png_filename)
+        os.makedirs(png_dir, exist_ok=True)
+        pil_img.save(png_path)
+        example["image_file_png"] = [png_path]
+
+    return example
 
 
 def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
@@ -381,16 +604,18 @@ def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
 
     # Early assertions
-    assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
-        img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
     if dataset_module is None:
-        raise ValueError(
-            f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
     preprocess_biometry = importlib.import_module(
         f"medvision_ds.datasets.{dataset_module}.preprocess_biometry"
     )
@@ -422,8 +647,7 @@ def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
     biometric_profile = doc["biometric_profile"]
     metric_unit = biometric_profile["metric_unit"]
     if isinstance(metric_unit, list):
-        assert len(
-            metric_unit) == 1, "metric_unit list should have only one element."
+        assert len(metric_unit) == 1, "metric_unit list should have only one element."
         metric_unit = metric_unit[0]
     elif isinstance(metric_unit, str):
         if metric_unit == "mm":
@@ -445,7 +669,9 @@ def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
         image_grid_thw = processed_visual["image_grid_thw"][0]
         patch_size = img_processor.patch_size
         img_shape_resized = (
-            image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
+            image_grid_thw[1] * patch_size,
+            image_grid_thw[2] * patch_size,
+        )
     elif reshape_size is not None:
         assert len(reshape_size) == 2, "reshape_size should be of length 2"
         img_shape_resized = reshape_size
@@ -527,8 +753,7 @@ def _get_TL_landmarks_coords(example):
 
     landmark_coords = {}
     for p_name in ("P1", "P2", "P3", "P4"):
-        coor_2d = _extract_3dCoor_to_2dCoor(
-            lm_slice["landmarks"][0][p_name], slice_dim)
+        coor_2d = _extract_3dCoor_to_2dCoor(lm_slice["landmarks"][0][p_name], slice_dim)
         key = f"landmark_{p_name}"
         landmark_coords[key] = coor_2d
     return landmark_coords
@@ -537,9 +762,12 @@ def _get_TL_landmarks_coords(example):
 def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None):
     """Convert document to text."""
     # Early assertions
-    assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
-        img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_TL_NORM,
@@ -550,8 +778,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
     if dataset_module is None:
-        raise ValueError(
-            f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
     preprocess_biometry = importlib.import_module(
         f"medvision_ds.datasets.{dataset_module}.preprocess_biometry"
     )
@@ -583,8 +810,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
     biometric_profile = doc["biometric_profile"]
     metric_unit = biometric_profile["metric_unit"]
     if isinstance(metric_unit, list):
-        assert len(
-            metric_unit) == 1, "metric_unit list should have only one element."
+        assert len(metric_unit) == 1, "metric_unit list should have only one element."
         metric_unit = metric_unit[0]
     elif isinstance(metric_unit, str):
         if metric_unit == "mm":
@@ -606,7 +832,9 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
         image_grid_thw = processed_visual["image_grid_thw"][0]
         patch_size = img_processor.patch_size
         img_shape_resized = (
-            image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
+            image_grid_thw[1] * patch_size,
+            image_grid_thw[2] * patch_size,
+        )
     elif reshape_size is not None:
         assert len(reshape_size) == 2, "reshape_size should be of length 2"
         img_shape_resized = reshape_size
@@ -645,18 +873,18 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
     # Gather values to fill in the CoT template
     # NOTE: The keys must be in the COT_TEMPLATE_TL_NORM from medvision_bm.sft.sft_prompts
     landmarks_coords = _get_TL_landmarks_coords(doc)
-    # Caveat: 
+    # Caveat:
     # 1. x is the width direction, y is the height direction
     # 2. use relative coordinates
     # 3. recalculate the major and minor axis lengths based on adjusted pixel size and resized image size; marginal error may exist compared to the original values due to rounding errors
-    x1_major = landmarks_coords["landmark_P1"][1]/original_width
-    y1_major = landmarks_coords["landmark_P1"][0]/original_height
-    x2_major = landmarks_coords["landmark_P2"][1]/original_width
-    y2_major = landmarks_coords["landmark_P2"][0]/original_height
-    x1_minor = landmarks_coords["landmark_P3"][1]/original_width
-    y1_minor = landmarks_coords["landmark_P3"][0]/original_height
-    x2_minor = landmarks_coords["landmark_P4"][1]/original_width
-    y2_minor = landmarks_coords["landmark_P4"][0]/original_height
+    x1_major = landmarks_coords["landmark_P1"][1] / original_width
+    y1_major = landmarks_coords["landmark_P1"][0] / original_height
+    x2_major = landmarks_coords["landmark_P2"][1] / original_width
+    y2_major = landmarks_coords["landmark_P2"][0] / original_height
+    x1_minor = landmarks_coords["landmark_P3"][1] / original_width
+    y1_minor = landmarks_coords["landmark_P3"][0] / original_height
+    x2_minor = landmarks_coords["landmark_P4"][1] / original_width
+    y2_minor = landmarks_coords["landmark_P4"][0] / original_height
     major_axis_length = math.sqrt(
         ((x2_major - x1_major) * resized_img_w * adjusted_pixel_width) ** 2
         + ((y2_major - y1_major) * resized_img_h * adjusted_pixel_height) ** 2
@@ -673,16 +901,16 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
         "<pixel_width>": f"{adjusted_pixel_width:.3f}",
         "<pixel_height>": f"{adjusted_pixel_height:.3f}",
         "<metric_unit>": metric_unit,
-        "<x1_major>": f'{x1_major:.3f}',
-        "<y1_major>": f'{y1_major:.3f}',
-        "<x2_major>": f'{x2_major:.3f}',
-        "<y2_major>": f'{y2_major:.3f}',
-        "<x1_minor>": f'{x1_minor:.3f}',
-        "<y1_minor>": f'{y1_minor:.3f}',
-        "<x2_minor>": f'{x2_minor:.3f}',
-        "<y2_minor>": f'{y2_minor:.3f}',
-        "<major_axis_length>": f'{major_axis_length:.3f}',
-        "<minor_axis_length>": f'{minor_axis_length:.3f}',
+        "<x1_major>": f"{x1_major:.3f}",
+        "<y1_major>": f"{y1_major:.3f}",
+        "<x2_major>": f"{x2_major:.3f}",
+        "<y2_major>": f"{y2_major:.3f}",
+        "<x1_minor>": f"{x1_minor:.3f}",
+        "<y1_minor>": f"{y1_minor:.3f}",
+        "<x2_minor>": f"{x2_minor:.3f}",
+        "<y2_minor>": f"{y2_minor:.3f}",
+        "<major_axis_length>": f"{major_axis_length:.3f}",
+        "<minor_axis_length>": f"{minor_axis_length:.3f}",
     }
     return question, values_dict
 
@@ -698,7 +926,7 @@ def _doc_to_target_TumorLesionTask(doc):
 
 def _doc_to_target_TumorLesionTask_CoT(values_dict):
     """Get ground truth biometrics."""
-    from medvision_bm.sft.sft_prompts import COT_TEMPLATE_TL_NORM, fill_in_template
+    from medvision_bm.sft.sft_prompts import COT_TEMPLATE_TL_NORM
 
     # Prepare values to fill in the CoT template
     target_outputs_cot = fill_in_template(COT_TEMPLATE_TL_NORM, values_dict)
@@ -708,12 +936,15 @@ def _doc_to_target_TumorLesionTask_CoT(values_dict):
 
 # NOTE: This is dataset-specific formatting function
 def _format_data_TumorLesionTask(
-    example, img_processor=None, reshape_size=None, process_img=False, save_processed_img_to_disk=False,
+    example,
+    img_processor=None,
+    reshape_size=None,
+    process_img=False,
+    save_processed_img_to_disk=False,
 ):
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
-    prompt, _ = _doc_to_text_TumorLesionTask(
-        example, img_processor, reshape_size)
+    prompt, _ = _doc_to_text_TumorLesionTask(example, img_processor, reshape_size)
 
     example["messages"] = [
         {
@@ -765,7 +996,11 @@ def _format_data_TumorLesionTask(
 
 # NOTE: This is dataset-specific formatting function
 def _format_data_TumorLesionTask_CoT(
-    example, img_processor=None, reshape_size=None, process_img=False, save_processed_img_to_disk=False,
+    example,
+    img_processor=None,
+    reshape_size=None,
+    process_img=False,
+    save_processed_img_to_disk=False,
 ):
     """
     Format data for TumorLesionTask with CoT reasoning.
@@ -774,7 +1009,8 @@ def _format_data_TumorLesionTask_CoT(
     2. Returns a target string that includes reasoning steps.
     """
     prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(
-        example, img_processor, reshape_size)
+        example, img_processor, reshape_size
+    )
     target_str = _doc_to_target_TumorLesionTask_CoT(values_dict)
 
     example["messages"] = [
@@ -833,8 +1069,7 @@ def _doc_to_text_DetectionTask(doc):
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
     if dataset_module is None:
-        raise ValueError(
-            f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
     preprocess_detection = importlib.import_module(
         f"medvision_ds.datasets.{dataset_module}.preprocess_detection"
     )
@@ -905,7 +1140,13 @@ def _doc_to_target_DetectionTask(doc):
 
 # NOTE: This is dataset-specific formatting function
 # NOTE: img_processor and reshape_size are not used for detection task, but kept for API consistency
-def _format_data_DetectionTask(example, img_processor=None, reshape_size=None, process_img=False, save_processed_img_to_disk=False):
+def _format_data_DetectionTask(
+    example,
+    img_processor=None,
+    reshape_size=None,
+    process_img=False,
+    save_processed_img_to_disk=False,
+):
     target_coords = _doc_to_target_DetectionTask(example)
     coord_str = f"{target_coords[0]:.3f}, {target_coords[1]:.3f}, {target_coords[2]:.3f}, {target_coords[3]:.3f}"
 
@@ -1070,14 +1311,14 @@ def safe_concat_align_dict_keys(datasets_list, dict_cols=None, fill_value=None):
             example[col] = {k: d[k] for k in key_union[col]}
         return example
 
-    normalized = [ds.map(pad_dict_keys, desc="Normalizing dict columns")
-                  for ds in datasets_list]
+    normalized = [
+        ds.map(pad_dict_keys, desc="Normalizing dict columns") for ds in datasets_list
+    ]
     return normalized
 
 
 def safe_concatenate_datasets(datasets_list):
-    datasets_list = safe_concat_align_top_keys(
-        datasets_list, fill_value=None)
+    datasets_list = safe_concat_align_top_keys(datasets_list, fill_value=None)
     datasets_list = safe_concat_align_dict_keys(
         datasets_list, dict_cols=None, fill_value=None
     )
@@ -1096,10 +1337,14 @@ def load_split_limit_dataset(
     # - limit_val_sample must be greater than 0 to ensure validation set is not empty.
     # - limit_train_sample can be <0 (no limit) or >0 (limited training set).
     assert limit_val_sample > 0, "\n [Error] limit_val_sample must be greater than 0."
-    assert limit_train_sample != 0, "\n [Error] limit_train_sample cannot be 0. Use <0 for no limit or >0 for limited training set."
+    assert (
+        limit_train_sample != 0
+    ), "\n [Error] limit_train_sample cannot be 0. Use <0 for no limit or >0 for limited training set."
 
     # Early assertions
-    assert tag_ds is not None, "\n [Error] tag_ds (i.e., the string in tasks names: <dataset_name>_<tag_ds>) must be provided."
+    assert (
+        tag_ds is not None
+    ), "\n [Error] tag_ds (i.e., the string in tasks names: <dataset_name>_<tag_ds>) must be provided."
 
     print(f"\n[Info] Starting dataset preparation from {tasks_list_json_path}")
 
@@ -1112,12 +1357,13 @@ def load_split_limit_dataset(
 
     # Reduce parallelism to avoid memory issues - use fewer workers
     available_cpus = get_cgroup_limited_cpus()
-    concat_workers = min(num_workers_concat_datasets,
-                         available_cpus, len(tasks))
+    concat_workers = min(num_workers_concat_datasets, available_cpus, len(tasks))
 
     # NOTE: Force single-threaded loading for new datasets to avoid conflicts, otherwise errors may occur.
     data_dir = os.environ.get("MedVision_DATA_DIR")
-    assert data_dir is not None, "\n [Error] MedVision_DATA_DIR environment variable must be set."
+    assert (
+        data_dir is not None
+    ), "\n [Error] MedVision_DATA_DIR environment variable must be set."
     # Read the .downloaded_datasets.json file in data_dir
     with open(os.path.join(data_dir, ".downloaded_datasets.json"), "r") as f:
         downloaded_datasets = list(json.load(f).keys())
@@ -1151,8 +1397,7 @@ def load_split_limit_dataset(
             try:
                 ds = future.result(timeout=120)  # 2 minute timeout per task
                 datasets_list.append(ds)
-                print(
-                    f"✓ Completed {task} ({len(datasets_list)}/{len(tasks)})")
+                print(f"✓ Completed {task} ({len(datasets_list)}/{len(tasks)})")
 
                 # Monitor memory usage
                 memory_percent = psutil.virtual_memory().percent
@@ -1186,7 +1431,8 @@ def load_split_limit_dataset(
 
     # Split the dataset into training and validation sets
     print(
-        f"\n[Info] Splitting dataset into training (size: {len(combined_dataset) - limit_val_sample}) and validation (size: {limit_val_sample}) sets")
+        f"\n[Info] Splitting dataset into training (size: {len(combined_dataset) - limit_val_sample}) and validation (size: {limit_val_sample}) sets"
+    )
     dataset = combined_dataset.train_test_split(
         train_size=len(combined_dataset) - limit_val_sample,
         test_size=limit_val_sample,
@@ -1201,18 +1447,22 @@ def load_split_limit_dataset(
             f"\n[Info][Warning] Limiting training samples to {limit_train_sample} (original: {len(dataset['train'])})"
         )
         dataset["train"] = (
-            dataset["train"].shuffle(seed=SEED).select(
-                range(limit_train_sample))
+            dataset["train"].shuffle(seed=SEED).select(range(limit_train_sample))
         )
     return dataset
 
 
-def format_dataset(dataset, mapping_func, mapping_func_args, num_workers_format_dataset):
+def format_dataset(
+    dataset, mapping_func, mapping_func_args, num_workers_format_dataset
+):
     img_processor = mapping_func_args.get("img_processor")
     reshape_size = mapping_func_args.get("reshape_size")
-    assert img_processor is not None or reshape_size is not None, "\n [Error] Either img_processor or reshape_size must be provided."
+    assert (
+        img_processor is not None or reshape_size is not None
+    ), "\n [Error] Either img_processor or reshape_size must be provided."
     assert not (
-        img_processor is not None and reshape_size is not None), "\n [Error] Provide only one of img_processor or reshape_size, not both."
+        img_processor is not None and reshape_size is not None
+    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     # Format the dataset with parallelism
     # Use conservative parallelism for formatting to avoid OOM
@@ -1276,12 +1526,11 @@ def prepare_dataset(
         dataset=dataset,
         mapping_func=mapping_func,
         mapping_func_args=mapping_func_args,
-        num_workers_format_dataset=num_workers_format_dataset
+        num_workers_format_dataset=num_workers_format_dataset,
     )
 
     # Clean dataset to keep only necessary keys
-    keys_to_keep = ["messages", "labels",
-                    "image_file", "slice_dim", "slice_idx"]
+    keys_to_keep = ["messages", "labels", "image_file", "slice_dim", "slice_idx"]
     if process_img:
         keys_to_keep.append("processed_images")
     if save_processed_img_to_disk:
@@ -1301,7 +1550,8 @@ def recompute_total_max_steps(trainer):
     # Prefer accelerate's world size; fallback to Trainer args/env
     state = PartialState()
     world_size = getattr(state, "num_processes", None) or getattr(
-        args, "world_size", None)
+        args, "world_size", None
+    )
     if not world_size or world_size < 1:
         world_size = int(os.environ.get("WORLD_SIZE", "1"))
 
@@ -1313,18 +1563,15 @@ def recompute_total_max_steps(trainer):
             dataset_n = len(trainer.train_dataset)  # global length
             if dataset_n is None:
                 raise TypeError
-            effective_bsz = max(
-                1, per_device_bsz * world_size * grad_accum)
+            effective_bsz = max(1, per_device_bsz * world_size * grad_accum)
             if getattr(args, "dataloader_drop_last", False):
                 steps_per_epoch = max(1, dataset_n // effective_bsz)
             else:
-                steps_per_epoch = max(
-                    1, math.ceil(dataset_n / effective_bsz))
+                steps_per_epoch = max(1, math.ceil(dataset_n / effective_bsz))
         except Exception:
             # Fallback if dataset is unsized (e.g., IterableDataset)
             train_dl = trainer.get_train_dataloader()
-            steps_per_epoch = max(
-                1, math.ceil(len(train_dl) / grad_accum))
+            steps_per_epoch = max(1, math.ceil(len(train_dl) / grad_accum))
 
         new_max_steps = steps_per_epoch * epoch
 
@@ -1335,8 +1582,7 @@ def recompute_total_max_steps(trainer):
         print(f"[Resume] gradient_accumulation_steps: {grad_accum}")
         print(f"[Resume] num_train_epochs: {epoch}")
         print(f"[Resume] steps_per_epoch (computed): {steps_per_epoch}")
-        print(
-            f"[Resume] Recomputed new_max_steps (epochs based): {new_max_steps}")
+        print(f"[Resume] Recomputed new_max_steps (epochs based): {new_max_steps}")
 
     # Share the computed value to all processes so every worker uses the exact same max_steps.
     # This prevents mismatched training horizons, inconsistent checkpointing, or hangs in collective ops.
@@ -1395,8 +1641,7 @@ def prepare_trainer(
     )
 
     # Load the model with the specified configuration
-    model = AutoModelForImageTextToText.from_pretrained(
-        base_model_hf, **model_kwargs)
+    model = AutoModelForImageTextToText.from_pretrained(base_model_hf, **model_kwargs)
 
     # Initialize processor
     processor = AutoProcessor.from_pretrained(base_model_hf)
@@ -1524,8 +1769,7 @@ def merge_models(
             raise ValueError(
                 "[Error] merged_model_hf must be specified when push_to_hub is True."
             )
-        print(
-            f"[Info] Pushing merged model to Hugging Face Hub: {merged_model_hf}")
+        print(f"[Info] Pushing merged model to Hugging Face Hub: {merged_model_hf}")
         merged_model.push_to_hub(
             merged_model_hf,
             private=True,
@@ -1549,9 +1793,7 @@ def train_resume_from_checkpoint(trainer, last_checkpoint):
 
     # recompute_total_max_steps already broadcasts the integer so every process
     # receives the same `new_max_steps` value in its local variable.
-    new_max_steps = recompute_total_max_steps(
-        trainer
-    )
+    new_max_steps = recompute_total_max_steps(trainer)
 
     # --- load previous trainer_state.json directly (avoid non-existent _load_state) ---
     trainer_state_path = os.path.join(last_checkpoint, "trainer_state.json")
@@ -1583,7 +1825,8 @@ def train_resume_from_checkpoint(trainer, last_checkpoint):
 
     except Exception as e:
         raise RuntimeError(
-            f"[Resume] Failed to read trainer_state.json ({e}); cannot resume training.")
+            f"[Resume] Failed to read trainer_state.json ({e}); cannot resume training."
+        )
     # -------------------------------------------------------------------------------
 
     # Apply the new_max_steps and is_finished flag on every process for consistency.
@@ -1607,10 +1850,10 @@ def train_resume_from_checkpoint(trainer, last_checkpoint):
         else:
             print("[Resume] Extending training horizon.")
 
+        print(f"[Resume] Applied new_max_steps={new_max_steps} on all processes.")
         print(
-            f"[Resume] Applied new_max_steps={new_max_steps} on all processes.")
-        print(
-            f"[Resume] Marked is_finished={trainer.state.is_finished} on all processes.")
+            f"[Resume] Marked is_finished={trainer.state.is_finished} on all processes."
+        )
 
     safe_print("Resuming training...")
     trainer.train(resume_from_checkpoint=last_checkpoint)
@@ -1618,8 +1861,8 @@ def train_resume_from_checkpoint(trainer, last_checkpoint):
 
 def parse_args_multiTask():
     """
-    Add this block to add sample limit fallbacks: when task-specific limit is not set (default to -1), fallback to use 
-    the --val_sample_limit_per_task (default to 100) and --train_sample_limit_per_task (default to -1 meaning no limit). 
+    Add this block to add sample limit fallbacks: when task-specific limit is not set (default to -1), fallback to use
+    the --val_sample_limit_per_task (default to 100) and --train_sample_limit_per_task (default to -1 meaning no limit).
 
     # Get command-line arguments
     args = parse_args_Qwen25VL_multiTask()
@@ -1655,9 +1898,7 @@ def parse_args_multiTask():
     train_limit_total = kwargs.get("train_sample_limit")
     """
 
-    parser = argparse.ArgumentParser(
-        description="SFT on the MedVision dataset"
-    )
+    parser = argparse.ArgumentParser(description="SFT on the MedVision dataset")
     parser.add_argument(
         "--run_name",
         type=str,
@@ -2007,13 +2248,11 @@ def parse_sample_limits(**kwargs):
         val_limit_AD = 0
     # Detection task
     if kwargs.get("train_sample_limit_task_Detection") > 0:
-        train_limit_detect = kwargs.get(
-            "train_sample_limit_task_Detection")
+        train_limit_detect = kwargs.get("train_sample_limit_task_Detection")
     else:
         train_limit_detect = kwargs.get("train_sample_limit_per_task")
     if kwargs.get("val_sample_limit_task_Detection") > 0:
-        val_limit_detect = kwargs.get(
-            "val_sample_limit_task_Detection")
+        val_limit_detect = kwargs.get("val_sample_limit_task_Detection")
     else:
         val_limit_detect = kwargs.get("val_sample_limit_per_task")
     if kwargs.get("tasks_list_json_path_detect") is None:
@@ -2034,7 +2273,12 @@ def parse_sample_limits(**kwargs):
     # Total sample limit across all tasks
     train_limit_total = kwargs.get("train_sample_limit")
 
-    return (train_limit_AD, val_limit_AD,
-            train_limit_detect, val_limit_detect,
-            train_limit_TL, val_limit_TL,
-            train_limit_total)
+    return (
+        train_limit_AD,
+        val_limit_AD,
+        train_limit_detect,
+        val_limit_detect,
+        train_limit_TL,
+        val_limit_TL,
+        train_limit_total,
+    )
