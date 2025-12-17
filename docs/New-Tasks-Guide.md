@@ -67,7 +67,7 @@
   > “doc” is the sample returned from a configuration of MedVision
 
   - `dataset_path`: HF dataset ID
-  - there functions are defined in `utils.py` in the same dataset folder
+  - these functions are defined in `utils.py` 
     - `doc_to_visual`:  get the image input
     - `doc_to_text`: construct text prompt
     - `doc_to_target`: construct target string
