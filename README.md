@@ -3,7 +3,7 @@
 
 # MedVision: Dataset and Benchmark for Quantitative Medical Image Analysis
 
-| 🌏 [**Project**](https://medvision-vlm.github.io) | 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) | 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) | 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) | 🤗 [**SFT Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) | 📖 [**arXiv**](https://arxiv.org/abs/2511.18676) |
+| 🌏 [**Project**](https://medvision-vlm.github.io) | 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) | 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) | 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) | 🤗 [**Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) | 📖 [**arXiv**](https://arxiv.org/abs/2511.18676) |
 
 🔎 Benchmarking VLMs for detection, tumor/lesion size estimation, and angle/distance measurement from medical images 📏
 
@@ -35,13 +35,21 @@
 
 # 🌟 Quick Start
 
+For benchmarking and model post-training in this project, install `medvision_bm` and use the GitHub repo (`MedVision`) as working folder.
+
 ```bash
 git clone https://github.com/YongchengYAO/MedVision.git MedVision
 cd MedVision
 pip install .
+pip show medvision_bm
 ```
 
-The benchmarking codebase `medvision_bm` will be installed.
+For integration in other project, install with
+
+```bash
+pip install "git+https://github.com/YongchengYAO/MedVision.git"
+pip show medvision_bm
+```
 
 <br/>
 
@@ -51,12 +59,16 @@ The benchmarking codebase `medvision_bm` will be installed.
 
 1. Choose the docker image for a specific model: https://hub.docker.com/r/vincentycyao/medvision/tags
 
+   ```bash
+   docker pull vincentycyao/medvision:<tag>
+   ```
+
 2. Map local volumes and GPUs, use docker image `vincentycyao/medvision:<tag>`
 
    ```bash
    # NOTE: replace </path/to/working/folder>, <tag>
    docker run -it --rm \
-   	--gpus '"device=0,1"' \
+   	--gpus all \
    	-v </path/to/working/folder>:/root/Documents/MedVision \
    	vincentycyao/medvision:<tag> \
    	bash
@@ -74,9 +86,9 @@ Next (in the container):
 
 - Skip environment setup:
 
-  - Benchmarking: use `--skip_env_setup` for scripts in /root/Documents/MedVision/script/benchmark-*
+  - Benchmarking: use `--skip_env_setup` for scripts in ``/root/Documents/MedVision/script/benchmark-*``
 
-  - SFT: disable this line in /root/Documents/MedVision/script/sft-*
+  - SFT: disable this line in ``/root/Documents/MedVision/script/sft-*``
 
     ```bash
     python -m medvision_bm.sft.env_setup --data_dir ${data_dir}
@@ -125,35 +137,36 @@ Next (in the container):
      # example 2: parse one model for the detection task and skip existing parsed files
      python -m medvision_bm.benchmark.parse_outputs --task_type Detection --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct --skip_existing
      ```
-
-
-  3. Summarize model performance for each task
-
-     ```bash
-     # CLI command: 
-     # python -m medvision_bm.benchmark.summarize_AD_task 
-     # python -m medvision_bm.benchmark.summarize_detection_task
-     # python -m medvision_bm.benchmark.summarize_TL_task
-     # python -m medvision_bm.benchmark.analyze_detection_task_boxsize
-     # python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random
-     #
-     # args:
-     # --task_dir: task folder
-     # --model_dir: model folder
-     # --skip_model_wo_parsed_files: skip model directories that don't have a 'parsed' folder
-     
-     # example 1: summarize all models for the A/D task
-     python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD
-     
-     # example 2: summarize one model for the detection task
-     python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct
-     
-     # example 3: analyze how target size affect detection performance
-     python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect
-     
-     # example 4: compare detection performance with randow guessing
-     python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect
-     ```
+  
+  
+    3. Summarize model performance for each task
+  
+       ```bash
+       # CLI command: 
+       # python -m medvision_bm.benchmark.summarize_AD_task 
+       # python -m medvision_bm.benchmark.summarize_detection_task
+       # python -m medvision_bm.benchmark.summarize_TL_task
+       # python -m medvision_bm.benchmark.analyze_detection_task_boxsize
+       # python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random
+       #
+       # args:
+       # --task_dir: task folder
+       # --model_dir: model folder
+       # --skip_model_wo_parsed_files: skip model directories that don't have a 'parsed' folder
+       
+       # example 1: summarize all models for the A/D task
+       python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD
+       
+       # example 2: summarize one model for the detection task
+       python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct
+       
+       # example 3: analyze how target size affect detection performance
+       python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect
+       
+       # example 4: compare detection performance with randow guessing
+       python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect
+       ```
+  
 
   File structure after these steps:
 

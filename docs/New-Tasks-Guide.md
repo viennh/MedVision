@@ -117,3 +117,5 @@
 ## Reference
 
 - [New tasks guide](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/task_guide.md) from `EvolvingLMMs-Lab/lmms-eval `
+- If you want to build a HF dataset like MedVision, read this [blog](https://huggingface.co/blog/YongchengYAO/medvision-dataset).
+
