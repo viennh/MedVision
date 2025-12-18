@@ -2,6 +2,7 @@ import argparse
 import gc
 import gzip
 import importlib
+import io
 import json
 import math
 import os
@@ -444,10 +445,7 @@ def _doc_to_target_AngleDistanceTask(doc):
 
 
 def _doc_to_target_AngleDistanceTask_CoT(doc, values_dict):
-    from medvision_bm.sft.sft_prompts import (
-        COT_TEMPLATE_ANGLE,
-        COT_TEMPLATE_DISTANCE,
-    )
+    from medvision_bm.sft.sft_prompts import COT_TEMPLATE_ANGLE, COT_TEMPLATE_DISTANCE
 
     biometric_profile = doc["biometric_profile"]
     metric_type = biometric_profile["metric_type"]
@@ -462,6 +460,37 @@ def _doc_to_target_AngleDistanceTask_CoT(doc, values_dict):
     target_outputs_cot = fill_in_template(cot_template, values_dict)
 
     return target_outputs_cot
+
+
+def __img_proccessor_nii2png_save2disk(example):
+    # Process image: read from nii.gz file and extract 2D slice
+    pil_img = _doc_to_visual(example)[0]
+
+    # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
+    img_path = example["image_file"]
+    slice_dim = example["slice_dim"]
+    slice_idx = example["slice_idx"]
+    png_basename = Path(img_path).name.split(".", 1)[0]
+    png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
+    png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
+    png_path = os.path.join(png_dir, png_filename)
+    os.makedirs(png_dir, exist_ok=True)
+    pil_img.save(png_path)
+    return [png_path]
+
+
+def __img_proccessor_nii2png_save2dataset(example):
+    # 1. Get the PIL Image object from your function
+    image_obj = _doc_to_visual(example)[0]
+    
+    # 2. Save the image to a BytesIO buffer in PNG format
+    img_byte_arr = io.BytesIO()
+    image_obj.save(img_byte_arr, format='PNG')
+    
+    # 3. Store as a new Image opened from the in-memory bytes
+    # This ensures the image data is fully loaded and "detached" from disk
+    image_data = [Image.open(io.BytesIO(img_byte_arr.getvalue()))]
+    return image_data 
 
 
 # NOTE: This is specific to the MedVision dataset
@@ -509,24 +538,11 @@ def _format_data_AngleDistanceTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = _doc_to_visual(example)
+        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        # Process image: read from nii.gz file and extract 2D slice
-        pil_img = _doc_to_visual(example)[0]
-
-        # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
-        img_path = example["image_file"]
-        slice_dim = example["slice_dim"]
-        slice_idx = example["slice_idx"]
-        png_basename = Path(img_path).name.split(".", 1)[0]
-        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
-        png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
-        png_path = os.path.join(png_dir, png_filename)
-        os.makedirs(png_dir, exist_ok=True)
-        pil_img.save(png_path)
-        example["image_file_png"] = [png_path]
+        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -577,25 +593,11 @@ def _format_data_AngleDistanceTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = _doc_to_visual(example)
+        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        # Process image: read from nii.gz file and extract 2D slice
-        pil_img = _doc_to_visual(example)[0]
-
-        # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
-        img_path = example["image_file"]
-        slice_dim = example["slice_dim"]
-        slice_idx = example["slice_idx"]
-        png_basename = Path(img_path).name.split(".", 1)[0]
-        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
-        png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
-        png_path = os.path.join(png_dir, png_filename)
-        os.makedirs(png_dir, exist_ok=True)
-        pil_img.save(png_path)
-        example["image_file_png"] = [png_path]
-
+       example["image_file_png"] = __img_proccessor_nii2png_save2disk(example) 
     return example
 
 
@@ -972,24 +974,11 @@ def _format_data_TumorLesionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = _doc_to_visual(example)
+        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        # Process image: read from nii.gz file and extract 2D slice
-        pil_img = _doc_to_visual(example)[0]
-
-        # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
-        img_path = example["image_file"]
-        slice_dim = example["slice_dim"]
-        slice_idx = example["slice_idx"]
-        png_basename = Path(img_path).name.split(".", 1)[0]
-        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
-        png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
-        png_path = os.path.join(png_dir, png_filename)
-        os.makedirs(png_dir, exist_ok=True)
-        pil_img.save(png_path)
-        example["image_file_png"] = [png_path]
+        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -1039,24 +1028,11 @@ def _format_data_TumorLesionTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = _doc_to_visual(example)
+        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        # Process image: read from nii.gz file and extract 2D slice
-        pil_img = _doc_to_visual(example)[0]
-
-        # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
-        img_path = example["image_file"]
-        slice_dim = example["slice_dim"]
-        slice_idx = example["slice_idx"]
-        png_basename = Path(img_path).name.split(".", 1)[0]
-        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
-        png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
-        png_path = os.path.join(png_dir, png_filename)
-        os.makedirs(png_dir, exist_ok=True)
-        pil_img.save(png_path)
-        example["image_file_png"] = [png_path]
+        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -1176,24 +1152,11 @@ def _format_data_DetectionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = _doc_to_visual(example)
+        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        # Process image: read from nii.gz file and extract 2D slice
-        pil_img = _doc_to_visual(example)[0]
-
-        # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
-        img_path = example["image_file"]
-        slice_dim = example["slice_dim"]
-        slice_idx = example["slice_idx"]
-        png_basename = Path(img_path).name.split(".", 1)[0]
-        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
-        png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
-        png_path = os.path.join(png_dir, png_filename)
-        os.makedirs(png_dir, exist_ok=True)
-        pil_img.save(png_path)
-        example["image_file_png"] = [png_path]
+        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -1530,10 +1493,13 @@ def prepare_dataset(
     )
 
     # Clean dataset to keep only necessary keys
+    # "image_file" is the original NIfTI image path
     keys_to_keep = ["messages", "labels", "image_file", "slice_dim", "slice_idx"]
     if process_img:
+        # "processed_images" is the embedded processed image tensor in the dataset (not recommended) 
         keys_to_keep.append("processed_images")
     if save_processed_img_to_disk:
+        # "image_file_png" is the path to the saved PNG image on disk
         keys_to_keep.append("image_file_png")
     dataset = clean_dataset(dataset, keys_to_keep)
 
