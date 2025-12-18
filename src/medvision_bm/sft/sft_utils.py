@@ -936,7 +936,6 @@ def _doc_to_target_TumorLesionTask_CoT(values_dict):
     return target_outputs_cot
 
 
-# NOTE: This is dataset-specific formatting function
 def _format_data_TumorLesionTask(
     example,
     img_processor=None,
@@ -983,7 +982,6 @@ def _format_data_TumorLesionTask(
     return example
 
 
-# NOTE: This is dataset-specific formatting function
 def _format_data_TumorLesionTask_CoT(
     example,
     img_processor=None,
@@ -1077,9 +1075,9 @@ def _doc_to_text_DetectionTask(doc):
 
 def _doc_to_target_DetectionTask(doc):
     """
-    Get bounding coordinates.
-    NOTE:
-    Definition of the output bounding box coordinates:
+    Get bounding box coordinates.
+
+    Definition of the output (target) bounding box coordinates:
     1.  The origin of the coordinates is at the [lower-left corner] of the image.
     2.  The first two numbers are the coordinates of the [lower-left] corner and
         the last two numbers are the coordinates of the [upper-right] corner of the bounding box.
@@ -1088,30 +1086,40 @@ def _doc_to_target_DetectionTask(doc):
         - coor1: upper-right corner of the bounding box
         - dim0: the first dimension of the image (height)
         - dim1: the second dimension of the image (width)
-    NOTE:
+        
     Definition of bounding box coordinates in the benchmark planner:
     1. The origin of the coordinates is at the [top-left corner] of the image.
     2. The first two numbers are the coordinates of the [upper-left] corner and
        the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
+
+    That is, 
+        - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
+        - target coordinates are in the format of [idx_width, idx_height] in image space
+    
     NOTE: CAVEAT!
     !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
+
+    Warning:
+    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images, 
+    such as in _doc_to_visual().
     """
     # Read NIfTI image
     img_size = doc["image_size_2d"]
+    imgsize_h, imgsize_w = img_size
     # Convert the coordinates from the benchmark planner format to the output format.
-    bm_coor0_dim0, bm_coor0_dim1 = doc["bounding_boxes"]["min_coords"][0]
-    bm_coor1_dim0, bm_coor1_dim1 = doc["bounding_boxes"]["max_coords"][0]
-    img_coor0_dim0 = bm_coor0_dim1
-    img_coor0_dim1 = img_size[0] - bm_coor1_dim0
-    img_coor1_dim0 = bm_coor1_dim1
-    img_coor1_dim1 = img_size[0] - bm_coor0_dim0
+    bm_coor0_h, bm_coor0_w = doc["bounding_boxes"]["min_coords"][0]
+    bm_coor1_h, bm_coor1_w = doc["bounding_boxes"]["max_coords"][0]
+    img_coor0_w = bm_coor0_w
+    img_coor0_h = imgsize_h - bm_coor1_h
+    img_coor1_w = bm_coor1_w
+    img_coor1_h = imgsize_h - bm_coor0_h
     # Convert bounding box coordinates to relative coordinates
-    coor0_dim1 = img_coor0_dim1 / img_size[0]
-    coor0_dim0 = img_coor0_dim0 / img_size[1]
-    coor1_dim1 = img_coor1_dim1 / img_size[0]
-    coor1_dim0 = img_coor1_dim0 / img_size[1]
+    coor0_h = img_coor0_h / imgsize_h
+    coor0_w = img_coor0_w / imgsize_w
+    coor1_h = img_coor1_h / imgsize_h
+    coor1_w = img_coor1_w / imgsize_w
     # Return the relative coordinates in the image space (the origin is at the lower-left corner)
-    return [coor0_dim0, coor0_dim1, coor1_dim0, coor1_dim1]
+    return [coor0_w, coor0_h, coor1_w, coor1_h]
 
 
 # NOTE: This is dataset-specific formatting function
