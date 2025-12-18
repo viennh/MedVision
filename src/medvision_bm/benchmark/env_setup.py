@@ -39,6 +39,12 @@ def parse_args() -> argparse.Namespace:
         default="12.4",
         help="CUDA toolkit version to install (default: 12.4).",
     )
+    parser.add_argument(
+        "--vllm_version",
+        type=str,
+        default="0.10.0",
+        help="vLLM version to install (default: 0.10.0).",
+    )
     return parser.parse_args()
 
 
@@ -57,12 +63,15 @@ def main() -> None:
 
     # Install dataset codebase: medvision_ds
     print("\n[Info] Installing medvision_ds package...")
-    data_dir = args.data_dir
-    os.makedirs(data_dir, exist_ok=True)
-    install_medvision_ds(data_dir)
+    os.makedirs(args.data_dir, exist_ok=True)
+    install_medvision_ds(args.data_dir)
 
     # Install CUDA
     install_cuda_toolkit(version=args.cuda_version)
+
+    # Install vLLM
+    # Some model evaluation may not need vLLM, but we install it here for completeness
+    install_vllm(data_dir=args.data_dir, version=args.vllm_version)
 
     # Install packages from the specified requirements file
     print(f"\n[Info] Installing packages from: {args.requirement}")
