@@ -1457,6 +1457,7 @@ def clean_dataset(dataset, keys_to_keep):
 
 
 def prepare_dataset(
+    *,
     tasks_list_json_path,
     limit_train_sample,
     limit_val_sample,
@@ -1557,6 +1558,7 @@ def recompute_total_max_steps(trainer):
 
 
 def prepare_trainer(
+    *,
     run_name,
     base_model_hf,
     lora_checkpoint_dir,
