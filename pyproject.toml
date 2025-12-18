@@ -17,7 +17,10 @@ dependencies = [
 
 [project.urls]
 "License" = "https://creativecommons.org/licenses/by-nc/4.0/"
-"Homepage" = "https://medvision.github.io"
+"Homepage" = "https://medvision-vlm.github.io"
+"Paper" = "https://arxiv.org/abs/2511.18676"
+"Source" = "https://github.com/YongchengYAO/MedVision"
+"Data" = "https://huggingface.co/datasets/YongchengYAO/MedVision"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
