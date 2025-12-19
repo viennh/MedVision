@@ -79,9 +79,9 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
     return doc_to_text_BoxCoordinate
 
 
-def _process_img_qwen25vl(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_qwen25vl(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "Qwen/Qwen2.5-VL-32B-Instruct")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "Qwen/Qwen2.5-VL-32B-Instruct")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor([img_PIL])
     image_grid_thw = processed_visual["image_grid_thw"][0]
@@ -91,9 +91,9 @@ def _process_img_qwen25vl(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_lingshu(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_lingshu(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "lingshu-medical-mllm/Lingshu-32B")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "lingshu-medical-mllm/Lingshu-32B")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor([img_PIL])
     image_grid_thw = processed_visual["image_grid_thw"][0]
@@ -103,9 +103,9 @@ def _process_img_lingshu(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_medgemma(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_medgemma(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "google/medgemma-4b-it")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "google/medgemma-4b-it")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
@@ -114,7 +114,7 @@ def _process_img_medgemma(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_meddr(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_meddr(img_2d_raw, extra_kwargs):
     # NOTE: This is a workaround to import package from local folders
     dir_meddr = os.environ.get("MedDr_DIR")
     sys.path.append(dir_meddr)
@@ -122,7 +122,7 @@ def _process_img_meddr(img_2d_raw, lmms_eval_specific_kwargs):
     from src.model.internvl_chat import InternVLChatModel
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "Sunanhe/MedDr_0401")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "Sunanhe/MedDr_0401")
     model = InternVLChatModel.from_pretrained(sample_model_hf, low_cpu_mem_usage=True).eval()
     image_size = model.config.force_image_size or model.config.vision_config.image_size
     pad2square = model.config.pad2square
@@ -132,11 +132,11 @@ def _process_img_meddr(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_llavaonevision(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_llavaonevision(img_2d_raw, extra_kwargs):
     from transformers.image_processing_utils import select_best_resolution
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "llava-hf/llava-onevision-qwen2-72b-ov-hf")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "llava-hf/llava-onevision-qwen2-72b-ov-hf")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
 
     # NOTE:
@@ -149,12 +149,12 @@ def _process_img_llavaonevision(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_llavamed(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_llavamed(img_2d_raw, extra_kwargs):
     from llava.mm_utils import get_model_name_from_path, process_images
     from llava.model.builder import load_pretrained_model
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "microsoft/llava-med-v1.5-mistral-7b")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "microsoft/llava-med-v1.5-mistral-7b")
     model_name = get_model_name_from_path(sample_model_hf)
     _, model, image_processor, _ = load_pretrained_model(sample_model_hf, None, model_name)
 
@@ -164,7 +164,7 @@ def _process_img_llavamed(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs):
     from typing import Optional, Union
 
     from transformers.image_utils import (
@@ -273,7 +273,7 @@ def _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs):
     # then resizes the image to the selected resolution, and pads the image and extract patches.
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "meta-llama/Llama-3.2-11B-Vision-Instruct")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "meta-llama/Llama-3.2-11B-Vision-Instruct")
 
     # Create custom image processor with the loaded config
     custom_img_processor = custom_MllamaImageProcessor.from_pretrained(sample_model_hf)
@@ -289,9 +289,9 @@ def _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_internvl3(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_internvl3(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "OpenGVLab/InternVL3-38B")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "OpenGVLab/InternVL3-38B")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
@@ -300,14 +300,14 @@ def _process_img_internvl3(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_huatuogpt_vision(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_huatuogpt_vision(img_2d_raw, extra_kwargs):
     # NOTE: This is a workaround to import package from local folders
     dir_huatuogpt_vision = os.environ.get("HuatuoGPTVision_DIR")
     sys.path.append(dir_huatuogpt_vision)
     from llava.model.language_model.llava_qwen2 import LlavaQwen2ForCausalLM
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "FreedomIntelligence/HuatuoGPT-Vision-34B")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "FreedomIntelligence/HuatuoGPT-Vision-34B")
     model, _ = LlavaQwen2ForCausalLM.from_pretrained(sample_model_hf, init_vision_encoder_from_ckpt=True, output_loading_info=True, torch_dtype=torch.bfloat16)
     vision_tower = model.get_vision_tower()
     if not vision_tower.is_loaded:
@@ -322,7 +322,7 @@ def _process_img_huatuogpt_vision(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_healthgpt_L14(img_2d_raw, extra_kwargs):
     # NOTE: This is a workaround to import package from local folders
     dir_healthgpt = os.environ.get("HEALTHGPT_DIR")
     dir_demo = os.path.join(dir_healthgpt, "llava", "demo")
@@ -337,15 +337,15 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
         load_weights,
     )
 
-    def prepare_model_healthgpt_L14(lmms_eval_specific_kwargs):
-        base_model_hf = lmms_eval_specific_kwargs.get("base_model_hf", "microsoft/phi-4")
-        vision_model_hf = lmms_eval_specific_kwargs.get("vision_model_hf", "openai/clip-vit-large-patch14-336")
-        dtype = lmms_eval_specific_kwargs.get("dtype", "FP16")
-        hlora_r = lmms_eval_specific_kwargs.get("hlora_r", 32)
-        hlora_alpha = lmms_eval_specific_kwargs.get("hlora_alpha", 64)
-        hlora_dropout = lmms_eval_specific_kwargs.get("hlora_dropout", 0)
-        hlora_nums = lmms_eval_specific_kwargs.get("hlora_nums", 4)
-        instruct_template = lmms_eval_specific_kwargs.get("instruct_template", "phi4_instruct")
+    def prepare_model_healthgpt_L14(extra_kwargs):
+        base_model_hf = extra_kwargs.get("base_model_hf", "microsoft/phi-4")
+        vision_model_hf = extra_kwargs.get("vision_model_hf", "openai/clip-vit-large-patch14-336")
+        dtype = extra_kwargs.get("dtype", "FP16")
+        hlora_r = extra_kwargs.get("hlora_r", 32)
+        hlora_alpha = extra_kwargs.get("hlora_alpha", 64)
+        hlora_dropout = extra_kwargs.get("hlora_dropout", 0)
+        hlora_nums = extra_kwargs.get("hlora_nums", 4)
+        instruct_template = extra_kwargs.get("instruct_template", "phi4_instruct")
 
         hlora_weights_local = os.environ.get("HEALTHGPT-L14-HLORA-WEIGHTS-FILE")
         assert hlora_weights_local is not None and os.path.exists(hlora_weights_local), f"hlora_weights_local, {hlora_weights_local}, does not exist."
@@ -394,7 +394,7 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
         processed_visual = model.get_vision_tower().image_processor.preprocess(image, return_tensors="pt")
         return processed_visual
 
-    model = prepare_model_healthgpt_L14(lmms_eval_specific_kwargs)
+    model = prepare_model_healthgpt_L14(extra_kwargs)
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
     processed_visual = process_img_healthgpt(img_PIL, model)
     pv_shape = processed_visual["pixel_values"].shape
@@ -404,9 +404,9 @@ def _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def _process_img_gemma3(img_2d_raw, lmms_eval_specific_kwargs):
+def _process_img_gemma3(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    sample_model_hf = lmms_eval_specific_kwargs.get("sample_model_hf", "google/gemma-3-27b-it")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "google/gemma-3-27b-it")
     img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
@@ -415,7 +415,7 @@ def _process_img_gemma3(img_2d_raw, lmms_eval_specific_kwargs):
     return img_shape_resized_hw
 
 
-def get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs):
+def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
     # Supported models
     supported_models = ["qwen2_5_vl", "medgemma", "meddr", "llava_onevision", "llava_med", "llama_3_2_vision", "internvl3", "huatuogpt_vision", "healthgpt_l14", "gemma3", "lingshu"]
     if model_name not in supported_models:
@@ -426,61 +426,61 @@ def get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs):
         # NOTE: Qwen2.5-VL resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
-        img_shape_resized_hw = _process_img_qwen25vl(img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_qwen25vl(img_2d_raw, extra_kwargs)
     elif model_name == "lingshu":
         # NOTE: Lingshu resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
-        img_shape_resized_hw = _process_img_lingshu(img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_lingshu(img_2d_raw, extra_kwargs)
     elif model_name == "llama_3_2_vision":
         # NOTE: Llama-3.2-Vision dynamically resize the image to a shape that can fit in patches of size [560, 560].
         # Preprocessor config: https://huggingface.co/meta-llama/Llama-3.2-11B-Vision-Instruct/blob/main/preprocessor_config.json
         # Image processor - MllamaImageProcessor: https://github.com/huggingface/transformers/blob/main/src/transformers/models/mllama/image_processing_mllama.py#L536
-        img_shape_resized_hw = _process_img_llama_3_2_vision(img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs)
     elif model_name == "llava_onevision":
         # NOTE: Llava-OneVision dynamically resize the image to a shape that can fit in patches of size [384,384]
         # NOTE: The current probing method only work for single image input, as padding is enabled for multiple image inputs
         # Preprocessor config: https://huggingface.co/llava-hf/llava-onevision-qwen2-72b-ov-hf/blob/main/preprocessor_config.json
         # Image processor - LlavaOnevisionImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/llava_onevision/image_processing_llava_onevision.py#L108
-        img_shape_resized_hw = _process_img_llavaonevision(img_2d_raw, lmms_eval_specific_kwargs)
+        img_shape_resized_hw = _process_img_llavaonevision(img_2d_raw, extra_kwargs)
     elif model_name == "gemma3":
         # NOTE: HealthGPT resize images to a fixed size [896, 896]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/google/gemma-3-27b-it/blob/main/preprocessor_config.json
         # Image processor - Gemma3ImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/gemma3/image_processing_gemma3.py#L53
         img_shape_resized_hw = [896, 896]
-        # img_shape_resized_hw = _process_img_gemma3(img_2d_raw, lmms_eval_specific_kwargs)  # for debugging only
+        # img_shape_resized_hw = _process_img_gemma3(img_2d_raw, extra_kwargs)  # for debugging only
     elif model_name == "medgemma":
         # NOTE: Medgemma resize images to a fixed size [896, 896]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/google/medgemma-4b-it/blob/main/preprocessor_config.json
         # Image processor - Gemma3ImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/gemma3/image_processing_gemma3.py#L53
         img_shape_resized_hw = [896, 896]
-        # img_shape_resized_hw = _process_img_medgemma(img_2d_raw, lmms_eval_specific_kwargs) # for debugging only
+        # img_shape_resized_hw = _process_img_medgemma(img_2d_raw, extra_kwargs) # for debugging only
     elif model_name == "meddr":
         # NOTE: MedDr resizes images to a fixed size [448, 448]. We used this size for pixel size adjustment.
         # Check the fixed size in the model config: https://huggingface.co/Sunanhe/MedDr_0401/blob/main/config.json
         img_shape_resized_hw = [448, 448]
-        # img_shape_resized_hw = _process_img_meddr(img_2d_raw, lmms_eval_specific_kwargs) # for debugging only
+        # img_shape_resized_hw = _process_img_meddr(img_2d_raw, extra_kwargs) # for debugging only
     elif model_name == "llava_med":
         # NOTE: Llava-Med resize images to a fixed size [336, 336]. We used this size for pixel size adjustment.
         # Check the fixed size in the model config: https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json
         img_shape_resized_hw = [336, 336]
-        # img_shape_resized_hw = _process_img_llavamed(img_2d_raw, lmms_eval_specific_kwargs) # for debugging only
+        # img_shape_resized_hw = _process_img_llavamed(img_2d_raw, extra_kwargs) # for debugging only
     elif model_name == "internvl3":
         # NOTE: InternVL3 resizes images to a fixed size [448, 448]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/OpenGVLab/InternVL3-38B/blob/main/preprocessor_config.json
         # Image processor - CLIPImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/clip/image_processing_clip.py#L54
         img_shape_resized_hw = [448, 448]
-        # img_shape_resized_hw = _process_img_internvl3(img_2d_raw, lmms_eval_specific_kwargs)  # for debugging only
+        # img_shape_resized_hw = _process_img_internvl3(img_2d_raw, extra_kwargs)  # for debugging only
     elif model_name == "huatuogpt_vision":
         # NOTE: HuatuoGPT-Vision resize images to a fixed size [336, 336]. We used this size for pixel size adjustment.
         # The fixed size is configured in the "shortest_edge" in image processor: https://huggingface.co/FreedomIntelligence/HuatuoGPT-Vision-34B-hf/blob/main/preprocessor_config.json
         # Image processor - CLIPImageProcessor:
         img_shape_resized_hw = [336, 336]
-        # img_shape_resized_hw = _process_img_huatuogpt_vision(img_2d_raw, lmms_eval_specific_kwargs)  # for debugging only
+        # img_shape_resized_hw = _process_img_huatuogpt_vision(img_2d_raw, extra_kwargs)  # for debugging only
     elif model_name == "healthgpt_l14":
         # NOTE: HealthGPT resize images to a fixed size [336, 336]. We used this size for pixel size adjustment.
         img_shape_resized_hw = [336, 336]
-        # img_shape_resized_hw = _process_img_healthgpt_L14(img_2d_raw, lmms_eval_specific_kwargs)  # for debugging only
+        # img_shape_resized_hw = _process_img_healthgpt_L14(img_2d_raw, extra_kwargs)  # for debugging only
     return img_shape_resized_hw
 
 
