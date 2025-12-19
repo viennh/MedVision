@@ -19,7 +19,6 @@ import os
 import torch
 from accelerate.utils import InitProcessGroupKwargs
 from datasets import DatasetDict, concatenate_datasets, load_from_disk
-from transformers import AutoProcessor
 from transformers.trainer_utils import get_last_checkpoint
 
 from medvision_bm.sft.qwen25vl_utils import make_collate_fn_Qwen25VL
@@ -67,6 +66,7 @@ except Exception:
 
 def main(
     run_name,
+    model_family_name,
     base_model_hf,
     data_dir,
     lora_checkpoint_dir,
@@ -113,7 +113,9 @@ def main(
             # NOTE: We add "CoT" to distinguish from non-CoT prepared datasets
             prepared_ds_dir = os.path.join(
                 data_dir,
-                f"tmp_prepared_ds__CoT__Qwen2_5VL__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
+                "SFT-CoT_datasets",
+                model_family_name,
+                f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
             )
             if is_main_process():
                 print(
@@ -123,12 +125,6 @@ def main(
         # Prepare the dataset on the main process ONLY
         if is_main_process():
             if not kwargs.get("skip_process_dataset"):
-                assert (
-                    base_model_hf is not None
-                ), "[Error] base_model_hf must be provided for processing dataset for Qwen2.5VL fine-tuning."
-                img_processor = AutoProcessor.from_pretrained(
-                    base_model_hf
-                ).image_processor
 
                 train_ds_list = []
                 val_ds_list = []
@@ -140,6 +136,7 @@ def main(
                         limit_train_sample=train_limit_AD,
                         limit_val_sample=val_limit_AD,
                         mapping_func=_format_data_AngleDistanceTask_CoT,
+                        model_family_name=model_family_name,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -148,7 +145,6 @@ def main(
                         ),
                         # MedVision dataset specific, used to extract dataset name from AD task configs
                         tag_ds="BiometricsFromLandmarks",
-                        img_processor=img_processor,
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
@@ -164,6 +160,7 @@ def main(
                         limit_train_sample=train_limit_detect,
                         limit_val_sample=val_limit_detect,
                         mapping_func=_format_data_DetectionTask_CoT,
+                        model_family_name=model_family_name,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -172,7 +169,6 @@ def main(
                         ),
                         # MedVision dataset specific, used to extract dataset name from detection task configs
                         tag_ds="BoxSize",
-                        img_processor=img_processor,
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
@@ -188,6 +184,7 @@ def main(
                         limit_train_sample=train_limit_TL,
                         limit_val_sample=val_limit_TL,
                         mapping_func=_format_data_TumorLesionTask_CoT,
+                        model_family_name=model_family_name,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -196,7 +193,6 @@ def main(
                         ),
                         # MedVision dataset specific, used to extract dataset name from TL task configs
                         tag_ds="TumorLesionSize",
-                        img_processor=img_processor,
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"

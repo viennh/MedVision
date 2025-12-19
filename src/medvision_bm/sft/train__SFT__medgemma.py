@@ -66,6 +66,7 @@ except Exception:
 
 def main(
     run_name,
+    model_family_name,
     base_model_hf,
     data_dir,
     lora_checkpoint_dir,
@@ -111,7 +112,9 @@ def main(
         else:
             prepared_ds_dir = os.path.join(
                 data_dir,
-                f"tmp_prepared_ds__MedGemma__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
+                "SFT_datasets",
+                model_family_name,
+                f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
             )
             if is_main_process():
                 print(
@@ -121,6 +124,7 @@ def main(
         # Prepare the dataset on the main process ONLY
         if is_main_process():
             if not kwargs.get("skip_process_dataset"):
+
                 train_ds_list = []
                 val_ds_list = []
 
@@ -131,6 +135,7 @@ def main(
                         limit_train_sample=train_limit_AD,
                         limit_val_sample=val_limit_AD,
                         mapping_func=_format_data_AngleDistanceTask,
+                        model_family_name=model_family_name,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -139,7 +144,6 @@ def main(
                         ),
                         # MedVision dataset specific, used to extract dataset name from AD task configs
                         tag_ds="BiometricsFromLandmarks",
-                        reshape_size=[896, 896],  # MedGemma specific
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
@@ -155,6 +159,7 @@ def main(
                         limit_train_sample=train_limit_detect,
                         limit_val_sample=val_limit_detect,
                         mapping_func=_format_data_DetectionTask,
+                        model_family_name=model_family_name,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -163,7 +168,6 @@ def main(
                         ),
                         # MedVision dataset specific, used to extract dataset name from detection task configs
                         tag_ds="BoxSize",
-                        reshape_size=[896, 896],  # MedGemma specific
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
@@ -179,6 +183,7 @@ def main(
                         limit_train_sample=train_limit_TL,
                         limit_val_sample=val_limit_TL,
                         mapping_func=_format_data_TumorLesionTask,
+                        model_family_name=model_family_name,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -187,7 +192,6 @@ def main(
                         ),
                         # MedVision dataset specific, used to extract dataset name from TL task configs
                         tag_ds="TumorLesionSize",
-                        reshape_size=[896, 896],  # MedGemma specific
                         process_img=kwargs.get("process_img"),
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"

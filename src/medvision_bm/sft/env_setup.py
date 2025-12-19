@@ -5,6 +5,7 @@ import sys
 from medvision_bm.utils import (
     install_flash_attention_torch_and_deps_py311_v2,
     install_medvision_ds,
+    install_vendored_lmms_eval,
     run_pip_install,
 )
 
@@ -56,13 +57,27 @@ def install_transformers(version="4.54.0"):
     subprocess.run(f"pip install transformers=={version}", shell=True, check=True)
 
 
-def install_sft_dependencies(data_dir=None, requirement=None):
+def install_sft_dependencies(data_dir=None, requirement=None, lmms_eval_opt_deps=None):
     """Install all dependencies in the correct order."""
     if requirement is not None:
-        print(f"Installing packages from requirements file: {requirement}")
+        # Install the vendored lmms_eval package since we use it in sft.utils
+        print("\n[Info] Installing vendored lmms_eval package...")
+        if lmms_eval_opt_deps is not None:
+            install_vendored_lmms_eval(proj_dependency=lmms_eval_opt_deps)
+        else:
+            install_vendored_lmms_eval()
+        # Install from requirements file
+        print(f"[Info] Installing packages from requirements file: {requirement}")
         run_pip_install(requirements_path=requirement)
         install_medvision_ds(data_dir)
     else:
+        # Install the vendored lmms_eval package since we use it in sft.utils
+        print("\n[Info] Installing vendored lmms_eval package...")
+        if lmms_eval_opt_deps is not None:
+            install_vendored_lmms_eval(proj_dependency=lmms_eval_opt_deps)
+        else:
+            install_vendored_lmms_eval()
+        # Install packages individually
         print("Installing packages individually...")
         install_basic_packages()
         install_flash_attention_torch_and_deps_py311_v2()
@@ -83,6 +98,11 @@ def parser_args():
         type=str,
         help="Path to the requirements.txt file.",
     )
+    parser.add_argument(
+        "--lmms_eval_opt_deps",
+        type=str,
+        help="Optional dependencies for lmms_eval installation.",
+    )
 
     return parser.parse_args()
 
@@ -90,4 +110,4 @@ def parser_args():
 if __name__ == "__main__":
     args = parser_args()
 
-    install_sft_dependencies(data_dir=args.data_dir, requirement=args.requirement)
+    install_sft_dependencies(data_dir=args.data_dir, requirement=args.requirement, lmms_eval_opt_deps=args.lmms_eval_opt_deps)

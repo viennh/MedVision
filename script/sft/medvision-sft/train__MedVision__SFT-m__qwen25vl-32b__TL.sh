@@ -30,6 +30,7 @@ tasks_list_json_path_TL="${benchmark_dir}/tasks_list/tasks_MedVision-TL__train_S
 
 
 # Model configs
+model_family_name="qwen2_5_vl" # NOTE: model_family_name must be in src/medvision_bm/sft/config/model_info.yaml
 base_model_hf="Qwen/Qwen2.5-VL-32B-Instruct"
 run_name="MedVision__SFT__qwen25vl-32b__TL"
 lora_checkpoint_dir="${train_sft_dir}/${run_name}/checkpoints/${run_name}" # Put ${run_name} at the end for distinct HF repo names when pushing LoRA checkpoints
@@ -103,9 +104,9 @@ pip install "${benchmark_dir}"
 
 
 # Setup training env
-python -m medvision_bm.sft.env_setup --data_dir ${data_dir}
+python -m medvision_bm.sft.env_setup --data_dir ${data_dir} --lmms_eval_opt_deps qwen2_5_vl
 # # [Alternative] Setup training env: use a specific requirements file
-# python -m medvision_bm.sft.env_setup --data_dir ${data_dir} --requirement "${benchmark_dir}/requirements/requirements_sft_qwen25vl.txt"
+# python -m medvision_bm.sft.env_setup --data_dir ${data_dir} --requirement "${benchmark_dir}/requirements/requirements_sft_qwen25vl.txt" --lmms_eval_opt_deps qwen2_5_vl
 
 
 # # [Debugging] Disable WANDB online logging
@@ -168,6 +169,7 @@ python -m  medvision_bm.sft.train__SFT__qwen2_5_vl \
 --skip_process_dataset ${skip_process_dataset} \
 --process_dataset_only true \
 --save_processed_img_to_disk ${save_processed_img_to_disk} \
+--model_family_name ${model_family_name} \
 --base_model_hf ${base_model_hf} \
 --data_dir ${data_dir} \
 --tasks_list_json_path_TL ${tasks_list_json_path_TL} \
@@ -185,6 +187,7 @@ accelerate launch --num_processes=4 --main_process_port=29502 --mixed_precision=
 --skip_process_dataset true \
 --process_dataset_only false \
 --run_name ${run_name} \
+--model_family_name ${model_family_name} \
 --base_model_hf ${base_model_hf} \
 --lora_checkpoint_dir ${lora_checkpoint_dir} \
 --merged_model_hf ${merged_model_hf} \

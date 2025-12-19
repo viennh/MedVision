@@ -22,11 +22,15 @@ from PIL import Image
 from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
+from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+    get_resized_img_shape,
+)
 from medvision_bm.sft.sft_prompts import (
     _get_prompt_angle,
     _get_prompt_distance,
     fill_in_template,
 )
+from medvision_bm.sft.config import load_model_info, check_model_supported
 from medvision_bm.utils import str2bool
 from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE, SEED
 
@@ -141,17 +145,9 @@ def _doc_to_visual(doc):
     return [pil_img]
 
 
-def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
+def _doc_to_text_AngleDistanceTask(doc, model_name):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
-
-    # Early assertions
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -184,29 +180,9 @@ def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
     pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
     img_shape = img_2d_raw.shape
 
-    # -------------
-    # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
-    # -------------
-    if img_processor is not None:
-        # ====== Qwen2.5VL specific processing ======
-        # FIXME: This block only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
-        # TODO: Generalize to other models; reuse code if possible
-        # ---
-        # Get reshaped image size so that we can adjust the pixel size dynamically
-        img_PIL = Image.fromarray(img_2d_raw)
-        processed_visual = img_processor([img_PIL])
-        image_grid_thw = processed_visual["image_grid_thw"][0]
-        patch_size = img_processor.patch_size
-        img_shape_resized = (
-            image_grid_thw[1] * patch_size,
-            image_grid_thw[2] * patch_size,
-        )
-        # ===== End of Qwen2.5VL specific processing ======
-    elif reshape_size is not None:
-        # NOTE: For all models that have a fixed reshape size
-        assert len(reshape_size) == 2, "reshape_size should be of length 2"
-        img_shape_resized = reshape_size
-    # -------------
+    # Get resized image shape
+    model_info = load_model_info()
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -278,22 +254,13 @@ def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
     return question
 
 
-def _doc_to_text_AngleDistanceTask_CoT(doc, img_processor=None, reshape_size=None):
+def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_ANGLE,
         COT_INSTRUCT_DISTANCE,
         FORMAT_PROMPT_AD_REASONING,
     )
-
-    # Early assertions
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
@@ -325,29 +292,9 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, img_processor=None, reshape_size=Non
     pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
     img_shape = img_2d_raw.shape
 
-    # -------------
-    # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
-    # -------------
-    if img_processor is not None:
-        # ====== Qwen2.5VL specific processing ======
-        # FIXME: This block only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
-        # TODO: Generalize to other models; reuse code if possible
-        # ---
-        # Get reshaped image size so that we can adjust the pixel size dynamically
-        img_PIL = Image.fromarray(img_2d_raw)
-        processed_visual = img_processor([img_PIL])
-        image_grid_thw = processed_visual["image_grid_thw"][0]
-        patch_size = img_processor.patch_size
-        img_shape_resized = (
-            image_grid_thw[1] * patch_size,
-            image_grid_thw[2] * patch_size,
-        )
-        # ===== End of Qwen2.5VL specific processing ======
-    elif reshape_size is not None:
-        # NOTE: For all models that have a fixed reshape size
-        assert len(reshape_size) == 2, "reshape_size should be of length 2"
-        img_shape_resized = reshape_size
-    # -------------
+    # Get resized image shape
+    model_info = load_model_info()
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -495,21 +442,12 @@ def img_proccessor_nii2png_save2dataset(example):
 
 def _format_data_AngleDistanceTask(
     example,
-    img_processor=None,
-    reshape_size=None,
+    model_name,
     process_img=False,
     save_processed_img_to_disk=False,
 ):
-    # Early assertions
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
     target_str = str(_doc_to_target_AngleDistanceTask(example))
-    prompt = _doc_to_text_AngleDistanceTask(example, img_processor, reshape_size)
+    prompt = _doc_to_text_AngleDistanceTask(example, model_name)
 
     example["messages"] = [
         {
@@ -548,21 +486,12 @@ def _format_data_AngleDistanceTask(
 
 def _format_data_AngleDistanceTask_CoT(
     example,
-    img_processor=None,
-    reshape_size=None,
+    model_name,
     process_img=False,
     save_processed_img_to_disk=False,
 ):
-    # Early assertions
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
     prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(
-        example, img_processor, reshape_size
+        example, model_name
     )
     target_str = _doc_to_target_AngleDistanceTask_CoT(example, values_dict)
 
@@ -600,17 +529,9 @@ def _format_data_AngleDistanceTask_CoT(
     return example
 
 
-def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
+def _doc_to_text_TumorLesionTask(doc, model_name):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
-
-    # Early assertions
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -658,25 +579,9 @@ def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
     else:
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
-    # -------------
-    # FIXME: This implementation only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
-    # TODO: Generalize to other models, reuse code if possible
-    # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
-    # -------------
-    if img_processor is not None:
-        # Get reshaped image size so that we can adjust the pixel size dynamically
-        img_PIL = Image.fromarray(img_2d_raw)
-        processed_visual = img_processor([img_PIL])
-        image_grid_thw = processed_visual["image_grid_thw"][0]
-        patch_size = img_processor.patch_size
-        img_shape_resized = (
-            image_grid_thw[1] * patch_size,
-            image_grid_thw[2] * patch_size,
-        )
-    elif reshape_size is not None:
-        assert len(reshape_size) == 2, "reshape_size should be of length 2"
-        img_shape_resized = reshape_size
-    # -------------
+    # Get resized image shape
+    model_info = load_model_info()
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -760,16 +665,8 @@ def _get_TL_landmarks_coords(example):
     return landmark_coords
 
 
-def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None):
+def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
     """Convert document to text."""
-    # Early assertions
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_TL_NORM,
         FORMAT_PROMPT_TL_REASONING,
@@ -821,25 +718,9 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
     else:
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
-    # -------------
-    # FIXME: This implementation only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
-    # TODO: Generalize to other models, reuse code if possible
-    # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
-    # -------------
-    if img_processor is not None:
-        # Get reshaped image size so that we can adjust the pixel size dynamically
-        img_PIL = Image.fromarray(img_2d_raw)
-        processed_visual = img_processor([img_PIL])
-        image_grid_thw = processed_visual["image_grid_thw"][0]
-        patch_size = img_processor.patch_size
-        img_shape_resized = (
-            image_grid_thw[1] * patch_size,
-            image_grid_thw[2] * patch_size,
-        )
-    elif reshape_size is not None:
-        assert len(reshape_size) == 2, "reshape_size should be of length 2"
-        img_shape_resized = reshape_size
-    # -------------
+    # Get resized image shape
+    model_info = load_model_info()
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -885,7 +766,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
     #              &---------------+   --
     # 
     # #: array space origin (upper-left corner)
-    # @: image space origin (lower-left corner)
+    # &: image space origin (lower-left corner)
     # The point * can be written in array space as P1 and in image space as P1':
     #   - P1: (idx_dim0, idx_dim1)
     #   - P1': (x_1, y_1) = (idx_dim1, image_size_height - idx_dim0)
@@ -958,14 +839,13 @@ def _doc_to_target_TumorLesionTask_CoT(values_dict):
 
 def _format_data_TumorLesionTask(
     example,
-    img_processor=None,
-    reshape_size=None,
+    model_name, 
     process_img=False,
     save_processed_img_to_disk=False,
 ):
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
-    prompt, _ = _doc_to_text_TumorLesionTask(example, img_processor, reshape_size)
+    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name)
 
     example["messages"] = [
         {
@@ -1004,8 +884,7 @@ def _format_data_TumorLesionTask(
 
 def _format_data_TumorLesionTask_CoT(
     example,
-    img_processor=None,
-    reshape_size=None,
+    model_name,
     process_img=False,
     save_processed_img_to_disk=False,
 ):
@@ -1016,7 +895,7 @@ def _format_data_TumorLesionTask_CoT(
     2. Returns a target string that includes reasoning steps.
     """
     prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(
-        example, img_processor, reshape_size
+        example, model_name
     )
     target_str = _doc_to_target_TumorLesionTask_CoT(values_dict)
 
@@ -1138,7 +1017,7 @@ def _doc_to_target_DetectionTask(doc):
         &-----------------------------+
     
     #: array space origin (upper-left corner)
-    @: image space origin (lower-left corner)
+    &: image space origin (lower-left corner)
     P1: upper-left corner in array space (benchmark planner)
     P2: lower-right corner in array space (benchmark planner)
     P1': lower-left corner in image space
@@ -1471,15 +1350,6 @@ def load_split_limit_dataset(
 def format_dataset(
     dataset, mapping_func, mapping_func_args, num_workers_format_dataset
 ):
-    img_processor = mapping_func_args.get("img_processor")
-    reshape_size = mapping_func_args.get("reshape_size")
-    assert (
-        img_processor is not None or reshape_size is not None
-    ), "\n [Error] Either img_processor or reshape_size must be provided."
-    assert not (
-        img_processor is not None and reshape_size is not None
-    ), "\n [Error] Provide only one of img_processor or reshape_size, not both."
-
     # Format the dataset with parallelism
     # Use conservative parallelism for formatting to avoid OOM
     available_cpus = get_cgroup_limited_cpus()
@@ -1515,11 +1385,10 @@ def prepare_dataset(
     limit_train_sample,
     limit_val_sample,
     mapping_func,
+    model_family_name,
     num_workers_concat_datasets=4,
     num_workers_format_dataset=32,
     tag_ds=None,
-    img_processor=None,
-    reshape_size=None,
     process_img=False,
     save_processed_img_to_disk=False,
 ):
@@ -1534,8 +1403,7 @@ def prepare_dataset(
 
     # Format dataset
     mapping_func_args = {
-        "img_processor": img_processor,
-        "reshape_size": reshape_size,
+        "model_name": model_family_name,
         "process_img": process_img,
         "save_processed_img_to_disk": save_processed_img_to_disk,
     }
@@ -1928,8 +1796,15 @@ def parse_args_multiTask():
 
     # -- Model arguments
     parser.add_argument(
+        "--model_family_name",
+        type=str,
+        required=True,
+        help="Model family name, used to identify the model groups that share the same image processor.",
+    )
+    parser.add_argument(
         "--base_model_hf",
         type=str,
+        required=True,
         help="Hugging Face model ID for the base model",
     )
     parser.add_argument(
@@ -2212,6 +2087,9 @@ def parse_args_multiTask():
 
 def parse_validate_args_multiTask():
     args = parse_args_multiTask()
+
+    # Validate model family name
+    check_model_supported(args.model_family_name)
 
     # Arguments
     # ------------------------------------------------------------
