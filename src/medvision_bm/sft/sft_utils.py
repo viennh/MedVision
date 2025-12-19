@@ -871,6 +871,25 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
         f"Follow the reasoning steps to get the final answer in the required format."
     )
 
+    # ------------------------------------------------------------------
+    # NOTE: CAVEAT!
+    # !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
+    # 
+    # Warning:
+    # If you use this function, make sure you do not rotate the image in _doc_to_visual().
+    #
+    #              #---------------+   --
+    #              |   * (P1)      |    |
+    #              |               |    | -> image_size_height
+    #              |               |    |
+    #              &---------------+   --
+    # 
+    # #: array space origin (upper-left corner)
+    # @: image space origin (lower-left corner)
+    # The point * can be written in array space as P1 and in image space as P1':
+    #   - P1: (idx_dim0, idx_dim1)
+    #   - P1': (x_1, y_1) = (idx_dim1, image_size_height - idx_dim0)
+    # --------------------------------------
     # Gather values to fill in the CoT template
     # NOTE: The keys must be in the COT_TEMPLATE_TL_NORM from medvision_bm.sft.sft_prompts
     landmarks_coords = _get_TL_landmarks_coords(doc)
@@ -879,13 +898,13 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
     # 2. use relative coordinates
     # 3. recalculate the major and minor axis lengths based on adjusted pixel size and resized image size; marginal error may exist compared to the original values due to rounding errors
     x1_major = landmarks_coords["landmark_P1"][1] / original_width
-    y1_major = landmarks_coords["landmark_P1"][0] / original_height
+    y1_major = 1 - landmarks_coords["landmark_P1"][0] / original_height
     x2_major = landmarks_coords["landmark_P2"][1] / original_width
-    y2_major = landmarks_coords["landmark_P2"][0] / original_height
+    y2_major = 1 - landmarks_coords["landmark_P2"][0] / original_height
     x1_minor = landmarks_coords["landmark_P3"][1] / original_width
-    y1_minor = landmarks_coords["landmark_P3"][0] / original_height
+    y1_minor = 1 - landmarks_coords["landmark_P3"][0] / original_height
     x2_minor = landmarks_coords["landmark_P4"][1] / original_width
-    y2_minor = landmarks_coords["landmark_P4"][0] / original_height
+    y2_minor = 1 - landmarks_coords["landmark_P4"][0] / original_height
     major_axis_length = math.sqrt(
         ((x2_major - x1_major) * resized_img_w * adjusted_pixel_width) ** 2
         + ((y2_major - y1_major) * resized_img_h * adjusted_pixel_height) ** 2
@@ -894,6 +913,8 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
         ((x2_minor - x1_minor) * resized_img_w * adjusted_pixel_width) ** 2
         + ((y2_minor - y1_minor) * resized_img_h * adjusted_pixel_height) ** 2
     )
+    # ------------------------------------------------------------------
+
     values_dict = {
         "<label>": label_name,
         "<image_description>": image_description,
