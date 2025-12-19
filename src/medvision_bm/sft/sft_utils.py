@@ -189,7 +189,7 @@ def _doc_to_text_AngleDistanceTask(doc, img_processor=None, reshape_size=None):
     # -------------
     if img_processor is not None:
         # ====== Qwen2.5VL specific processing ======
-        # FIXME: This block only works for Qwen2.5VL
+        # FIXME: This block only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
         # TODO: Generalize to other models; reuse code if possible
         # ---
         # Get reshaped image size so that we can adjust the pixel size dynamically
@@ -330,7 +330,7 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, img_processor=None, reshape_size=Non
     # -------------
     if img_processor is not None:
         # ====== Qwen2.5VL specific processing ======
-        # FIXME: This block only works for Qwen2.5VL
+        # FIXME: This block only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
         # TODO: Generalize to other models; reuse code if possible
         # ---
         # Get reshaped image size so that we can adjust the pixel size dynamically
@@ -462,7 +462,7 @@ def _doc_to_target_AngleDistanceTask_CoT(doc, values_dict):
     return target_outputs_cot
 
 
-def __img_proccessor_nii2png_save2disk(example):
+def img_proccessor_nii2png_save2disk(example):
     # Process image: read from nii.gz file and extract 2D slice
     pil_img = _doc_to_visual(example)[0]
 
@@ -479,7 +479,7 @@ def __img_proccessor_nii2png_save2disk(example):
     return [png_path]
 
 
-def __img_proccessor_nii2png_save2dataset(example):
+def img_proccessor_nii2png_save2dataset(example):
     # 1. Get the PIL Image object from your function
     image_obj = _doc_to_visual(example)[0]
     
@@ -493,7 +493,6 @@ def __img_proccessor_nii2png_save2dataset(example):
     return image_data 
 
 
-# NOTE: This is specific to the MedVision dataset
 def _format_data_AngleDistanceTask(
     example,
     img_processor=None,
@@ -538,11 +537,11 @@ def _format_data_AngleDistanceTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -593,11 +592,11 @@ def _format_data_AngleDistanceTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-       example["image_file_png"] = __img_proccessor_nii2png_save2disk(example) 
+       example["image_file_png"] = img_proccessor_nii2png_save2disk(example) 
     return example
 
 
@@ -660,7 +659,7 @@ def _doc_to_text_TumorLesionTask(doc, img_processor=None, reshape_size=None):
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
     # -------------
-    # FIXME: This implementation only works for Qwen2.5VL
+    # FIXME: This implementation only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
     # TODO: Generalize to other models, reuse code if possible
     # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
     # -------------
@@ -823,7 +822,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, img_processor=None, reshape_size=None)
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
     # -------------
-    # FIXME: This implementation only works for Qwen2.5VL
+    # FIXME: This implementation only works for Qwen2.5VL as "image_grid_thw" is unique to Qwen models
     # TODO: Generalize to other models, reuse code if possible
     # NOTE: If img_processor is provided, a model-specific processing is applied to get the reshaped image size
     # -------------
@@ -973,11 +972,11 @@ def _format_data_TumorLesionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -1026,11 +1025,11 @@ def _format_data_TumorLesionTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
 
     return example
 
@@ -1102,6 +1101,32 @@ def _doc_to_target_DetectionTask(doc):
     Warning:
     If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images, 
     such as in _doc_to_visual().
+
+    In summary, the conversion involves:
+    Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner, we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
+
+        #-----------------------------+
+        |   * (P1)         @ (P2')    |
+        |                             |
+        |                             |
+        |                             |
+        |                             |
+        |                             |
+        |   @ (P1')        * (P2)     |
+        |                             |
+        &-----------------------------+
+    
+    #: array space origin (upper-left corner)
+    @: image space origin (lower-left corner)
+    P1: upper-left corner in array space (benchmark planner)
+    P2: lower-right corner in array space (benchmark planner)
+    P1': lower-left corner in image space
+    P2': upper-right corner in image space
+
+    ------
+    NOTE for developers and future versions:
+    Rotating the image counter-clockwise by 90 degrees would avoid the need for coordinate conversion.
+    ------
     """
     # Read NIfTI image
     img_size = doc["image_size_2d"]
@@ -1122,7 +1147,6 @@ def _doc_to_target_DetectionTask(doc):
     return [coor0_w, coor0_h, coor1_w, coor1_h]
 
 
-# NOTE: This is dataset-specific formatting function
 # NOTE: img_processor and reshape_size are not used for detection task, but kept for API consistency
 def _format_data_DetectionTask(
     example,
@@ -1160,11 +1184,11 @@ def _format_data_DetectionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = __img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = __img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
 
     return example
 

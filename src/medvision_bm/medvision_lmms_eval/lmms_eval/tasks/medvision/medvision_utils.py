@@ -865,7 +865,33 @@ def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
 
     Warning:
     If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images, 
-    such as in doc_to_visual().
+    such as in _doc_to_visual().
+
+    In summary, the conversion involves:
+    Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner, we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
+
+        #-----------------------------+
+        |   * (P1)         @ (P2')    |
+        |                             |
+        |                             |
+        |                             |
+        |                             |
+        |                             |
+        |   @ (P1')        * (P2)     |
+        |                             |
+        &-----------------------------+
+    
+    #: array space origin (upper-left corner)
+    @: image space origin (lower-left corner)
+    P1: upper-left corner in array space (benchmark planner)
+    P2: lower-right corner in array space (benchmark planner)
+    P1': lower-left corner in image space
+    P2': upper-right corner in image space
+
+    ------
+    NOTE for developers and future versions:
+    Rotating the image counter-clockwise by 90 degrees would avoid the need for coordinate conversion.
+    ------
     """
     # Read NIfTI image
     img_path = doc["image_file"]
