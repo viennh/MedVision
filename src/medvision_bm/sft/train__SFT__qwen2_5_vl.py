@@ -206,16 +206,25 @@ def main(
                 dataset["validation"] = concatenate_datasets(val_ds_list)
 
                 # Limit the total number of samples if specified
-                dataset["train"] = (
-                    dataset["train"]
-                    .shuffle(seed=SEED)
-                    .select(range(kwargs.get("train_sample_limit")))
-                )
-                dataset["validation"] = (
-                    dataset["validation"]
-                    .shuffle(seed=SEED)
-                    .select(range(kwargs.get("val_sample_limit")))
-                )
+                train_limit = kwargs.get("train_sample_limit")
+                if train_limit > 0:
+                    dataset["train"] = (
+                        dataset["train"]
+                        .shuffle(seed=SEED)
+                        .select(range(min(len(dataset["train"]), train_limit)))
+                    )
+                else:
+                    dataset["train"] = dataset["train"].shuffle(seed=SEED)
+
+                val_limit = kwargs.get("val_sample_limit")
+                if val_limit > 0:
+                    dataset["validation"] = (
+                        dataset["validation"]
+                        .shuffle(seed=SEED)
+                        .select(range(min(len(dataset["validation"]), val_limit)))
+                    )
+                else:
+                    dataset["validation"] = dataset["validation"].shuffle(seed=SEED)
 
                 # Save the prepared dataset to disk for other processes to load
                 os.makedirs(prepared_ds_dir, exist_ok=True)
