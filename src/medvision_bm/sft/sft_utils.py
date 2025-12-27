@@ -25,12 +25,12 @@ from trl import SFTConfig, SFTTrainer
 from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
     get_resized_img_shape,
 )
+from medvision_bm.sft.config import check_model_supported, load_model_info
 from medvision_bm.sft.sft_prompts import (
     _get_prompt_angle,
     _get_prompt_distance,
     fill_in_template,
 )
-from medvision_bm.sft.config import load_model_info, check_model_supported
 from medvision_bm.utils import str2bool
 from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE, SEED
 
@@ -261,6 +261,7 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
         COT_INSTRUCT_DISTANCE,
         FORMAT_PROMPT_AD_REASONING,
     )
+
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
@@ -380,7 +381,158 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
         f"Follow the reasoning steps to get the final answer in the required format."
     )
 
-    values_dict = {}
+    # ------------------------------------------------------------------
+    # NOTE: CAVEAT!
+    # !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
+    #
+    # Warning:
+    # If you use this function, make sure you do not rotate the image in _doc_to_visual().
+    #
+    #              #---------------+   --
+    #              |   * (P1)      |    |
+    #              |               |    | -> image_size_height
+    #              |               |    |
+    #              &---------------+   --
+    #
+    # #: array space origin (upper-left corner)
+    # &: image space origin (lower-left corner)
+    # The point * can be written in array space as P1 and in image space as P1':
+    #   - P1: (idx_dim0, idx_dim1)
+    #   - P1': (x_1, y_1) = (idx_dim1, image_size_height - idx_dim0)
+    # --------------------------------------
+
+    # NOTE: keys should be in the "COT_TEMPLATE_DISTANCE" or "COT_TEMPLATE_ANGLE" from medvision_bm.sft.sft_prompts
+    if metric_type == "distance":
+        # Gather values to fill in the CoT template
+        landmarks_coords = _get_landmarks_coords(
+            doc, lms
+        )  # this coordinates are indices in array space
+        # Convert to relative coordinates in image space
+        x1_relative_coord = landmarks_coords["landmark_" + lms[0]][1] / original_width
+        y1_relative_coord = 1.0 - (
+            landmarks_coords["landmark_" + lms[0]][0] / original_height
+        )
+        x2_relative_coord = landmarks_coords["landmark_" + lms[1]][1] / original_width
+        y2_relative_coord = 1.0 - (
+            landmarks_coords["landmark_" + lms[1]][0] / original_height
+        )
+        # Recalculate the distance based on the adjusted pixel size and resized image size
+        distance = np.sqrt(
+            (
+                (x2_relative_coord - x1_relative_coord)
+                * resized_img_w
+                * adjusted_pixel_width
+            )
+            ** 2
+            + (
+                (y2_relative_coord - y1_relative_coord)
+                * resized_img_h
+                * adjusted_pixel_height
+            )
+            ** 2
+        )
+        # Prepare values to fill in the CoT template
+        values_dict = {
+            "<landmark 1>": p1_name,
+            "<landmark 2>": p2_name,
+            "<x1>": x1_relative_coord,
+            "<y1>": y1_relative_coord,
+            "<x2>": x2_relative_coord,
+            "<y2>": y2_relative_coord,
+            "<pixel_width>": adjusted_pixel_width,
+            "<pixel_height>": adjusted_pixel_height,
+            "<image_width>": resized_img_w,
+            "<image_height>": resized_img_h,
+            "<distance>": distance,
+        }
+
+    elif metric_type == "angle":
+        # Gather values to fill in the CoT template
+        line1_landmarks_coords = _get_landmarks_coords(
+            doc, line1_lms
+        )  # this coordinates are indices in array space
+        line2_landmarks_coords = _get_landmarks_coords(
+            doc, line2_lms
+        )  # this coordinates are indices in array space
+        # Convert to relative coordinates in image space
+        x1_line1_relative_coord = (
+            line1_landmarks_coords["landmark_" + line1_lms[0]][1] / original_width
+        )
+        y1_line1_relative_coord = 1.0 - (
+            line1_landmarks_coords["landmark_" + line1_lms[0]][0] / original_height
+        )
+        x2_line1_relative_coord = (
+            line1_landmarks_coords["landmark_" + line1_lms[1]][1] / original_width
+        )
+        y2_line1_relative_coord = 1.0 - (
+            line1_landmarks_coords["landmark_" + line1_lms[1]][0] / original_height
+        )
+        x1_line2_relative_coord = (
+            line2_landmarks_coords["landmark_" + line2_lms[0]][1] / original_width
+        )
+        y1_line2_relative_coord = 1.0 - (
+            line2_landmarks_coords["landmark_" + line2_lms[0]][0] / original_height
+        )
+        x2_line2_relative_coord = (
+            line2_landmarks_coords["landmark_" + line2_lms[1]][1] / original_width
+        )
+        y2_line2_relative_coord = 1.0 - (
+            line2_landmarks_coords["landmark_" + line2_lms[1]][0] / original_height
+        )
+        # Recalculate the angle based on the adjusted pixel size and resized image size
+        v1 = np.array(
+            [
+                (x2_line1_relative_coord - x1_line1_relative_coord)
+                * resized_img_w
+                * adjusted_pixel_width,
+                (y2_line1_relative_coord - y1_line1_relative_coord)
+                * resized_img_h
+                * adjusted_pixel_height,
+            ]
+        )
+        v2 = np.array(
+            [
+                (x2_line2_relative_coord - x1_line2_relative_coord)
+                * resized_img_w
+                * adjusted_pixel_width,
+                (y2_line2_relative_coord - y1_line2_relative_coord)
+                * resized_img_h
+                * adjusted_pixel_height,
+            ]
+        )
+        abs_cos_theta = np.abs(np.dot(v1, v2)) / (
+            np.linalg.norm(v1) * np.linalg.norm(v2)
+        )
+        angle = np.arccos(abs_cos_theta)
+        angle_degree = np.degrees(angle)
+        # Prepare values to fill in the CoT template
+        values_dict = {
+            "<landmark 1>": line1_p1_name,
+            "<landmark 2>": line1_p2_name,
+            "<landmark 3>": line2_p1_name,
+            "<landmark 4>": line2_p2_name,
+            "<x1_line1>": x1_line1_relative_coord,
+            "<y1_line1>": y1_line1_relative_coord,
+            "<x2_line1>": x2_line1_relative_coord,
+            "<y2_line1>": y2_line1_relative_coord,
+            "<x1_line2>": x1_line2_relative_coord,
+            "<y1_line2>": y1_line2_relative_coord,
+            "<x2_line2>": x2_line2_relative_coord,
+            "<y2_line2>": y2_line2_relative_coord,
+            "<pixel_width>": adjusted_pixel_width,
+            "<pixel_height>": adjusted_pixel_height,
+            "<image_width>": resized_img_w,
+            "<image_height>": resized_img_h,
+            "<Ax>": v1[0],
+            "<Ay>": v1[1],
+            "<Bx>": v2[0],
+            "<By>": v2[1],
+            "<angle>": angle,
+            "<angle_degree>": angle_degree,
+        }
+    else:
+        raise ValueError(f"Unsupported metric_type: {metric_type}")
+    # ------------------------------------------------------------------
 
     return question, values_dict
 
@@ -429,15 +581,15 @@ def img_proccessor_nii2png_save2disk(example):
 def img_proccessor_nii2png_save2dataset(example):
     # 1. Get the PIL Image object from your function
     image_obj = _doc_to_visual(example)[0]
-    
+
     # 2. Save the image to a BytesIO buffer in PNG format
     img_byte_arr = io.BytesIO()
-    image_obj.save(img_byte_arr, format='PNG')
-    
+    image_obj.save(img_byte_arr, format="PNG")
+
     # 3. Store as a new Image opened from the in-memory bytes
     # This ensures the image data is fully loaded and "detached" from disk
     image_data = [Image.open(io.BytesIO(img_byte_arr.getvalue()))]
-    return image_data 
+    return image_data
 
 
 def _format_data_AngleDistanceTask(
@@ -490,9 +642,7 @@ def _format_data_AngleDistanceTask_CoT(
     process_img=False,
     save_processed_img_to_disk=False,
 ):
-    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(
-        example, model_name
-    )
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name)
     target_str = _doc_to_target_AngleDistanceTask_CoT(example, values_dict)
 
     example["messages"] = [
@@ -525,7 +675,7 @@ def _format_data_AngleDistanceTask_CoT(
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-       example["image_file_png"] = img_proccessor_nii2png_save2disk(example) 
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
     return example
 
 
@@ -634,9 +784,30 @@ def _extract_3dCoor_to_2dCoor(coor_3d, slice_dim):
         raise ValueError("slice_dim must be 0, 1, or 2")
 
 
-def _get_TL_landmarks_coords(example):
+def _get_landmarks_coords(example, landmark_keys):
+    """
+    This function extracts the 2D coordinates of specified landmarks from the landmark file
+    corresponding to the given slice dimension and slice index in the input case "example".
+
+    This is based on the landmark file structure in the MedVision dataset:
+        - HF: YongchengYAO/MedVision
+        - commit: 6a774bf5b378788f1ca5447e4d593c431b81bb98
+
+    CAUTION:
+        - Changing the landmark file format in the dataset may break this function.
+
+    Tips: To better understand the structure of landmarks in defferent tasks, check corresponding json.gz files in MedVision dataset.
+        e.g.:
+        - tumor/lesion size tasks: landmark_dict["slice_landmarks_x"][0]["landmarks"] is list of dict -- the length of list is the number of lesions in that 2D image slice
+        - angle/distance tasks: landmark_dict["slice_landmarks_x"][0]["landmarks"] is dict
+
+    Note for developers: read the NOTE comments in the code below for more details.
+    """
+
     # Used in reasoning process reward
-    landmark_data = _load_json(example["landmark_file"])
+    landmark_data = _load_json(
+        example["landmark_file"]
+    )  # dict of keys: slice_landmarks_x, slice_landmarks_y, slice_landmarks_z
     slice_dim = example["slice_dim"]
     if slice_dim == 0:
         lm_key = "slice_landmarks_x"
@@ -645,23 +816,59 @@ def _get_TL_landmarks_coords(example):
     elif slice_dim == 2:
         lm_key = "slice_landmarks_z"
     slice_idx = example["slice_idx"]
-    lm_slice_ls = landmark_data[lm_key]
+    lm_slice_ls = landmark_data[lm_key]  # list of dicts
 
-    matched_entry = next(
-        (itm for itm in lm_slice_ls if itm.get("slice_idx") == slice_idx), None
-    )
-    if matched_entry is not None:
-        lm_slice = matched_entry
+    # Find the entry for the specified slice_idx
+    matched_entries = [itm for itm in lm_slice_ls if itm.get("slice_idx") == slice_idx]
+
+    # NOTE: Merge all landmarks from matched entries into a single dict
+    # ------
+    # e.g.,
+    # matched_entries = [
+    #     {
+    #         "slice_idx": 128,
+    #         "landmarks": {"P1": [...], "P2": [...]}
+    #     },
+    #     {
+    #         "slice_idx": 128,
+    #         "landmarks": {"P3": [...], "P4": [...]}
+    #     }
+    # ]
+    # Result:
+    # lm_slice = {
+    #     "slice_idx": 128,
+    #     "landmarks": {"P1": [...], "P2": [...], "P3": [...], "P4": [...]}
+    # }
+    # ------
+    if matched_entries:
+        lm_slice = {"slice_idx": slice_idx, "landmarks": {}}
+        for entry in matched_entries:
+            # ---
+            # NOTE: For compatibility with landmark file formats from different datasets/tasks
+            # In the current MedVision dataset format,
+            # the only case where "landmarks" is a list is for tumor/lesion size tasks,
+            # where there can be multiple lesions in the same 2D slice.
+            # Since we filter out cases with multiple lesions in our study,
+            # we directly extract the first element of the list here.
+            # ---
+            entry_landmarks = (
+                entry.get("landmarks")[0]
+                if isinstance(entry.get("landmarks"), list)
+                else entry.get("landmarks")
+            )
+            lm_slice["landmarks"].update(entry_landmarks)
     else:
         raise ValueError(
             f"No landmark entry found for slice_dim: {slice_dim} and slice_idx: {slice_idx}"
         )
 
     landmark_coords = {}
-    for p_name in ("P1", "P2", "P3", "P4"):
-        coor_2d = _extract_3dCoor_to_2dCoor(lm_slice["landmarks"][0][p_name], slice_dim)
+    for p_name in landmark_keys:
+        coor_3d = lm_slice["landmarks"][p_name]
+        coor_2d = _extract_3dCoor_to_2dCoor(coor_3d, slice_dim)
         key = f"landmark_{p_name}"
         landmark_coords[key] = coor_2d
+
     return landmark_coords
 
 
@@ -755,7 +962,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
     # ------------------------------------------------------------------
     # NOTE: CAVEAT!
     # !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
-    # 
+    #
     # Warning:
     # If you use this function, make sure you do not rotate the image in _doc_to_visual().
     #
@@ -764,7 +971,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
     #              |               |    | -> image_size_height
     #              |               |    |
     #              &---------------+   --
-    # 
+    #
     # #: array space origin (upper-left corner)
     # &: image space origin (lower-left corner)
     # The point * can be written in array space as P1 and in image space as P1':
@@ -772,8 +979,8 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
     #   - P1': (x_1, y_1) = (idx_dim1, image_size_height - idx_dim0)
     # --------------------------------------
     # Gather values to fill in the CoT template
-    # NOTE: The keys must be in the COT_TEMPLATE_TL_NORM from medvision_bm.sft.sft_prompts
-    landmarks_coords = _get_TL_landmarks_coords(doc)
+    landmarks_coords = _get_landmarks_coords(doc, ["P1", "P2", "P3", "P4"])
+
     # Caveat:
     # 1. x is the width direction, y is the height direction
     # 2. use relative coordinates
@@ -794,8 +1001,8 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
         ((x2_minor - x1_minor) * resized_img_w * adjusted_pixel_width) ** 2
         + ((y2_minor - y1_minor) * resized_img_h * adjusted_pixel_height) ** 2
     )
-    # ------------------------------------------------------------------
 
+    # NOTE: keys should be in the "COT_TEMPLATE_TL_NORM" from medvision_bm.sft.sft_prompts
     values_dict = {
         "<label>": label_name,
         "<image_description>": image_description,
@@ -815,6 +1022,8 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
         "<major_axis_length>": f"{major_axis_length:.3f}",
         "<minor_axis_length>": f"{minor_axis_length:.3f}",
     }
+    # ------------------------------------------------------------------
+
     return question, values_dict
 
 
@@ -839,7 +1048,7 @@ def _doc_to_target_TumorLesionTask_CoT(values_dict):
 
 def _format_data_TumorLesionTask(
     example,
-    model_name, 
+    model_name,
     process_img=False,
     save_processed_img_to_disk=False,
 ):
@@ -894,9 +1103,7 @@ def _format_data_TumorLesionTask_CoT(
     1. Uses a different prompt template that includes reasoning steps.
     2. Returns a target string that includes reasoning steps.
     """
-    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(
-        example, model_name
-    )
+    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name)
     target_str = _doc_to_target_TumorLesionTask_CoT(values_dict)
 
     example["messages"] = [
@@ -985,21 +1192,21 @@ def _doc_to_target_DetectionTask(doc):
         - coor1: upper-right corner of the bounding box
         - dim0: the first dimension of the image (height)
         - dim1: the second dimension of the image (width)
-        
+
     Definition of bounding box coordinates in the benchmark planner:
     1. The origin of the coordinates is at the [top-left corner] of the image.
     2. The first two numbers are the coordinates of the [upper-left] corner and
        the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
 
-    That is, 
+    That is,
         - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
         - target coordinates are in the format of [idx_width, idx_height] in image space
-    
+
     NOTE: CAVEAT!
     !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
 
     Warning:
-    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images, 
+    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images,
     such as in _doc_to_visual().
 
     In summary, the conversion involves:
@@ -1015,7 +1222,7 @@ def _doc_to_target_DetectionTask(doc):
         |   @ (P1')        * (P2)     |
         |                             |
         &-----------------------------+
-    
+
     #: array space origin (upper-left corner)
     &: image space origin (lower-left corner)
     P1: upper-left corner in array space (benchmark planner)
@@ -1418,7 +1625,7 @@ def prepare_dataset(
     # "image_file" is the original NIfTI image path
     keys_to_keep = ["messages", "labels", "image_file", "slice_dim", "slice_idx"]
     if process_img:
-        # "processed_images" is the embedded processed image tensor in the dataset (not recommended) 
+        # "processed_images" is the embedded processed image tensor in the dataset (not recommended)
         keys_to_keep.append("processed_images")
     if save_processed_img_to_disk:
         # "image_file_png" is the path to the saved PNG image on disk
@@ -2132,6 +2339,22 @@ def parse_validate_args_multiTask():
 
 
 def parse_sample_limits(**kwargs):
+    """
+    Determine sample limits for each task with fallbacks.
+
+    Logic:
+        - If task-specific limit > 0: use it
+        - Else: use per-task limit
+        - If task JSON path is None: set limit to 0 (task not used)
+
+    Returns:
+        A tuple of sample limits:
+        (train_limit_AD, val_limit_AD,
+         train_limit_detect, val_limit_detect,
+         train_limit_TL, val_limit_TL,
+         train_limit_total)
+    """
+
     # Determine sample limits for each task
     # Angle/distance task
     if kwargs.get("train_sample_limit_task_AD") > 0:

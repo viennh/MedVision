@@ -192,14 +192,14 @@ COT_TEMPLATE_ANGLE = (
     "angle = arccos(|A · B| / (||A|| ||B||), where A and B are the vectors of the two lines computed from the physical coordinates of their endpoints. "
     "A = ((x2_line1 - x1_line1) * image_width * pixel_width, (y2_line1 - y1_line1) * image_height * pixel_height) = ( (<x2_line1> - <x1_line1>) * <image_width> * <pixel_width>, (<y2_line1> - <y1_line1>) * <image_height> * <pixel_height>) = (<Ax>, <Ay>). "
     "B = ((x2_line2 - x1_line2) * image_width * pixel_width, (y2_line2 - y1_line2) * image_height * pixel_height) = ( (<x2_line2> - <x1_line2>) * <image_width> * <pixel_width>, (<y2_line2> - <y1_line2>) * <image_height> * <pixel_height>) = (<Bx>, <By>). "
-    "Denote A=(Ax, Ay) and B=(Bx, By). Then, angle = arccos(|Ax*Bx + Ay*By| / (sqrt(Ax^2 + Ay^2) * sqrt(Bx^2 + By^2))) = arccos(|<Ax>*<Bx> + <Ay>*<By>| / (sqrt(<Ax>^2 + <Ay>^2) * sqrt(<Bx>^2 + <By>^2))) = <angle>. "
+    "Denote A=(Ax, Ay) and B=(Bx, By). Then, angle = arccos(|Ax*Bx + Ay*By| / (sqrt(Ax^2 + Ay^2) * sqrt(Bx^2 + By^2))) = arccos(|<Ax>*<Bx> + <Ay>*<By>| / (sqrt(<Ax>^2 + <Ay>^2) * sqrt(<Bx>^2 + <By>^2))) = <angle> = <angle_degree> degrees. "
     "</step-3-reasoning> "
     "<step-3-answer> "
-    "The angle: <angle>. "
+    "The angle: <angle_degree>. "
     "</step-3-answer> "
     "</think> "
     "<answer> "
-    "<angle> "
+    "<angle_degree> "
     "</answer>"
 )
 

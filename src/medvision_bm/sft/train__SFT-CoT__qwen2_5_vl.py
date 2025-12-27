@@ -77,6 +77,7 @@ def main(
         setup_env_hf_medvision_ds(data_dir=data_dir)
 
     if not kwargs.get("merge_only"):
+        # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
         # Parse sample limits
         (
             train_limit_AD,
@@ -88,15 +89,14 @@ def main(
             train_limit_total,
         ) = parse_sample_limits(**kwargs)
 
-        # Prepare the dataset cache directory
-        # NOTE:
-        # IMPORTANT: The prepared dataset directory must uniquely encode the sample limits and the model identifier.
-        # This is because dataset preparation performs model-specific processing (for example, the model's image_processor
-        # determines image resize ratios and final pixel dimensions). Loading a dataset prepared with different limits
-        # or a different model can produce incorrect preprocessing or mismatched prompts.
-
         # Print a clear runtime warning on the main process so users notice this requirement
         if is_main_process():
+            # Prepare the dataset cache directory
+            # NOTE:
+            # IMPORTANT: The prepared dataset directory must uniquely encode the sample limits and the model identifier.
+            # This is because dataset preparation performs model-specific processing (for example, the model's image_processor
+            # determines image resize ratios and final pixel dimensions). Loading a dataset prepared with different limits
+            # or a different model can produce incorrect preprocessing or mismatched prompts.
             print(
                 "\n[WARNING] The prepared dataset directory name must uniquely include the model identifier and sample limits.\n"
                 "Dataset preparation depends on model-specific image processing (e.g., resize scale and pixel dimensions).\n"
@@ -104,13 +104,14 @@ def main(
             )
 
         if kwargs.get("prepared_ds_dir") is not None:
+            # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
             prepared_ds_dir = kwargs.get("prepared_ds_dir")
             if is_main_process():
                 print(
                     f"[Info] Using user-specified prepared dataset directory: {prepared_ds_dir}\n"
                 )
         else:
-            # NOTE: We add "CoT" to distinguish from non-CoT prepared datasets
+            # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
             prepared_ds_dir = os.path.join(
                 data_dir,
                 "SFT-CoT_datasets",
@@ -118,6 +119,7 @@ def main(
                 f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
             )
             if is_main_process():
+                os.makedirs(prepared_ds_dir, exist_ok=True)
                 print(
                     f"[Info] Using default prepared dataset directory: {prepared_ds_dir}\n"
                 )

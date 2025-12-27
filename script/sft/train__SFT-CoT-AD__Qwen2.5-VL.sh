@@ -24,18 +24,18 @@ data_dir="${benchmark_dir}/Data"
 # NOTE: At least one of the following 3 task JSON paths must be provided
 #       Set multiple task JSON paths for multi-task training
 # ----------------------------------------------------------------------------------
-# tasks_list_json_path_AD="${benchmark_dir}/tasks_list/tasks_MedVision-AD__train_SFT.json" # Total samples: 5545
+tasks_list_json_path_AD="${benchmark_dir}/tasks_list/tasks_MedVision-AD__train_SFT.json" # Total samples: 5545
 # tasks_list_json_path_detect="${benchmark_dir}/tasks_list/tasks_MedVision-detect__train_SFT.json" # Total samples: 2695205
-tasks_list_json_path_TL="${benchmark_dir}/tasks_list/tasks_MedVision-TL__train_SFT.json" # Total samples: 5551
+# tasks_list_json_path_TL="${benchmark_dir}/tasks_list/tasks_MedVision-TL__train_SFT.json" # Total samples: 5551
 # ----------------------------------------------------------------------------------
 
 
 # Model configs
 model_family_name="qwen2_5_vl" # NOTE: model_family_name must be in src/medvision_bm/sft/config/model_info.yaml
 base_model_hf="Qwen/Qwen2.5-VL-32B-Instruct"
-run_name="MedVision__SFT__qwen25vl-32b__CoT-TL"
+run_name="MedVision__SFT__qwen25vl-32b__CoT-AD"
 lora_checkpoint_dir="${train_sft_dir}/${run_name}/checkpoints/${run_name}" # Put ${run_name} at the end for distinct HF repo names when pushing LoRA checkpoints
-merged_model_hf="MedVision__SFT-m__qwen25vl-32b__CoT-TL"
+merged_model_hf="MedVision__SFT-m__qwen25vl-32b__CoT-AD"
 merged_model_dir="${train_sft_dir}/${run_name}/merged_model"
 
 
@@ -61,12 +61,12 @@ val_sample_limit=500
 # val_sample_limit_per_task=166
 
 # # [Option 2] For task-specific sampling across 3 tasks (these numbers are the maximum samples per task)
-# train_sample_limit_task_AD=5500
-# val_sample_limit_task_AD=45
+train_sample_limit_task_AD=5000
+val_sample_limit_task_AD=500
 # train_sample_limit_task_Detection=11000
 # val_sample_limit_task_Detection=105
-train_sample_limit_task_TL=5000
-val_sample_limit_task_TL=500
+# train_sample_limit_task_TL=5000
+# val_sample_limit_task_TL=500
 # ----------------------------------------------------------------------------------
 dataloader_pin_memory=true
 use_flash_attention_2=true
@@ -96,7 +96,7 @@ wandb_dir="${train_sft_dir}/${run_name}"
 wandb_project="MedVision-SFT"
 wandb_run_name=${run_name}
 # NOTE: For continuing an existing run, set the wandb_run_id to the ID of the existing run.
-wandb_run_id="CoT-TL5k" # run ID must be unique in the wandb_project
+wandb_run_id="CoT-AD5k" # run ID must be unique in the wandb_project
 
 
 # Install medvision_bm
@@ -173,13 +173,13 @@ python -m  medvision_bm.sft.train__SFT-CoT__qwen2_5_vl \
 --model_family_name ${model_family_name} \
 --base_model_hf ${base_model_hf} \
 --data_dir ${data_dir} \
---tasks_list_json_path_TL ${tasks_list_json_path_TL} \
+--tasks_list_json_path_AD ${tasks_list_json_path_AD} \
 --num_workers_concat_datasets ${num_workers_concat_datasets} \
 --num_workers_format_dataset ${num_workers_format_dataset} \
 --train_sample_limit ${train_sample_limit} \
 --val_sample_limit ${val_sample_limit} \
---train_sample_limit_task_TL ${train_sample_limit_task_TL} \
---val_sample_limit_task_TL ${val_sample_limit_task_TL} \
+--train_sample_limit_task_AD ${train_sample_limit_task_AD} \
+--val_sample_limit_task_AD ${val_sample_limit_task_AD} \
 
 # Skip dataset processing and directly load from disk for training
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
@@ -199,7 +199,7 @@ accelerate launch --num_processes=4 --main_process_port=29502 --mixed_precision=
 --wandb_run_name ${wandb_run_name} \
 --wandb_run_id ${wandb_run_id} \
 --data_dir ${data_dir} \
---tasks_list_json_path_TL ${tasks_list_json_path_TL} \
+--tasks_list_json_path_AD ${tasks_list_json_path_AD} \
 --epoch ${epoch} \
 --save_steps ${save_steps} \
 --eval_steps ${eval_steps} \
@@ -214,8 +214,8 @@ accelerate launch --num_processes=4 --main_process_port=29502 --mixed_precision=
 --dataloader_num_workers ${dataloader_num_workers} \
 --train_sample_limit ${train_sample_limit} \
 --val_sample_limit ${val_sample_limit} \
---train_sample_limit_task_TL ${train_sample_limit_task_TL} \
---val_sample_limit_task_TL ${val_sample_limit_task_TL} \
+--train_sample_limit_task_AD ${train_sample_limit_task_AD} \
+--val_sample_limit_task_AD ${val_sample_limit_task_AD} \
 --push_LoRA ${push_LoRA} \
 --push_merged_model ${push_merged_model} \
 --merge_model ${merge_model} \
