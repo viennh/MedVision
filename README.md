@@ -1,6 +1,8 @@
 <div align="center">
 <img src="fig/medvision-logo.png" alt="MedVision Logo" /><br>
 
+
+
 # MedVision: Dataset and Benchmark for Quantitative Medical Image Analysis
 
 | 🌏 [**Project**](https://medvision-vlm.github.io) | 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) | 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) | 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) | 🤗 [**Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) | 📖 [**arXiv**](https://arxiv.org/abs/2511.18676) |
@@ -8,6 +10,8 @@
 🔎 Benchmarking VLMs for detection, tumor/lesion size estimation, and angle/distance measurement from medical images 📏
 
 💿 30.8M annotated samples | multi-modality | multi-anatomy | 3D/2D medical image 💿
+
+🎯 Post-training: SFT, RFT (RL), CoT, LoRA | Framework: [TRL](https://github.com/huggingface/trl), [verl](https://github.com/volcengine/verl) 🎯
 
 </div>
 
@@ -28,6 +32,8 @@
 
 # 🔥 News
 
+- [Dec 21, 2025] 🩻 Data & tasks preview: MedVision includes [area-estimation (`MaskSize`) tasks](https://huggingface.co/datasets/YongchengYAO/MedVision/blob/main/info/ConfigurationsList_All.csv)
+- [Dec 20, 2025] 🎯 New recipe: [SFT with CoT data](https://github.com/YongchengYAO/MedVision/tree/master/script/sft), [build parquet dataset for RFT in verl](https://github.com/YongchengYAO/MedVision/tree/master/script/rft)
 - [Dec 10, 2025] Add preprint, training code, docker images, released models, new tasks/models guide
 - [Oct 8, 2025] 🚀 Release **MedVision** dataset v1.0.0
 
@@ -137,10 +143,10 @@ Next (in the container):
      # example 2: parse one model for the detection task and skip existing parsed files
      python -m medvision_bm.benchmark.parse_outputs --task_type Detection --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct --skip_existing
      ```
-  
-  
+
+
     3. Summarize model performance for each task
-  
+    
        ```bash
        # CLI command: 
        # python -m medvision_bm.benchmark.summarize_AD_task 
@@ -166,32 +172,33 @@ Next (in the container):
        # example 4: compare detection performance with randow guessing
        python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect
        ```
-  
+
 
   File structure after these steps:
 
     ```
-    ├── MedVision
-      ├── completed_tasks 
-        ├── completed_tasks_MedVision-AD.json           # <== tasks status tracker
+
+  ├── MedVision
+    ├── completed_tasks 
+      ├── completed_tasks_MedVision-AD.json           # <== tasks status tracker
+      ├── ...
+    ├── Results                                         # <== benchmark results
+      ├── MedVision-AD
         ├── ...
-      ├── Results                                         # <== benchmark results
-        ├── MedVision-AD
-          ├── ...
-          ├── summary_AD_task.txt                     # <== [step 3] summary
-        ├── MedVision-detect
-          ├── Qwen2.5-VL-32B-Instruct
-            ├── parsed                               
-              ├── *.jsonl                           # <== [step 2] parsed model outputs
-              ├── *.json                            # <== [step 2] parsed summary file
-              ├── summary_*                         # <== [step 3] mean metrics, values
-            ├── *.jsonl                               # <== [step 1] model outputs
-            ├── *.json                                # <== [step 1] summary file
-          ├── ...
-          ├── summary_detection_task.txt              # <== [step 3] summary
-        ├── MedVision-TL
-          ├── ...
-          ├── summary_TL_task.txt                     # <== [step 3] summary
+        ├── summary_AD_task.txt                     # <== [step 3] summary
+      ├── MedVision-detect
+        ├── Qwen2.5-VL-32B-Instruct
+          ├── parsed                               
+            ├── *.jsonl                           # <== [step 2] parsed model outputs
+            ├── *.json                            # <== [step 2] parsed summary file
+            ├── summary_*                         # <== [step 3] mean metrics, values
+          ├── *.jsonl                               # <== [step 1] model outputs
+          ├── *.json                                # <== [step 1] summary file
+        ├── ...
+        ├── summary_detection_task.txt              # <== [step 3] summary
+      ├── MedVision-TL
+        ├── ...
+        ├── summary_TL_task.txt                     # <== [step 3] summary
     ```
 
 - **[Debug]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
@@ -270,7 +277,9 @@ Since it takes some time for data downloading and processing, you can just downl
 # NOTE: replace <task-list-json>, <data-folder>
 python -m medvision_bm.benchmark.download_datasets --tasks_json <task-list-json> --data_dir <data-folder>
 ```
+
 or
+
 ```bash
 # NOTE: replace <config-list-csv>, <data-folder>
 python -m medvision_bm.benchmark.download_datasets --configs_csv <config-list-csv> --data_dir <data-folder>
