@@ -69,9 +69,10 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
         image_description = task_info["image_description"]
         # Question
         question = (
-            f"Task:\n" f"Given the input medical image: {image_description}, " 
-            f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n" 
-            f"Format requirement:\n" 
+            f"Task:\n"
+            f"Given the input medical image: {image_description}, "
+            f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
+            f"Format requirement:\n"
             f"{FORMAT_PROMPT_BOX_COORDINATES}"
         )
         return question
@@ -710,12 +711,7 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
 
         # Question
         question = (
-            f"Task:\n" f"Given the input medical image: {image_description}, "
-            f"estimate the physical size of the {label_name}.\n"
-            f"Additional information:\n"
-            f"{pixel_size_text}\n"
-            f"Format requirement:\n"
-            f"{FORMAT_PROMPT_MASK_SIZE}"
+            f"Task:\n" f"Given the input medical image: {image_description}, " f"estimate the physical size of the {label_name}.\n" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_MASK_SIZE}"
         )
         return question
 
@@ -825,16 +821,138 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             biometrics_name = angle_dict["name"]
             task_prompt = _get_biometric_prompt_angle(biometrics_name, line1_p1_name, line1_p2_name, line2_p1_name, line2_p2_name, metric_unit)
 
-        question = (
-            f"Task:\n" f"Given the input medical image: {image_description}, " 
-            f"{task_prompt}" f"Additional information:\n" 
-            f"{pixel_size_text}\n" 
-            f"Format requirement:\n" 
-            f"{FORMAT_PROMPT_BIOMETRICS}"
-        )
+        question = f"Task:\n" f"Given the input medical image: {image_description}, " f"{task_prompt}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
         return question
 
     return doc_to_text_BiometricsFromLandmarks
+
+
+def create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry_module):
+    def doc_to_text_BiometricsFromLandmarks_CoT(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        from medvision_bm.sft.sft_prompts import (
+            COT_INSTRUCT_ANGLE,
+            COT_INSTRUCT_DISTANCE,
+            FORMAT_PROMPT_AD_REASONING,
+        )
+
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_biometry_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+
+        # Get biometrics profile for this case
+        biometric_profile = doc["biometric_profile"]
+        metric_type = biometric_profile["metric_type"]
+        metric_map_name = biometric_profile["metric_map_name"]
+        metric_key = biometric_profile["metric_key"]
+        metric_unit = biometric_profile["metric_unit"]
+
+        # Get 2D image info
+        image_description = task_info["image_description"]
+
+        # Read NIfTI image
+        img_path = doc["image_file"]
+        slice_dim = doc["slice_dim"]
+        slice_idx = doc["slice_idx"]
+
+        # Load 2D slice from NIfTI file, with optional resizing
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        if reshape_image_hw is not None:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        else:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+        img_shape_hw = img_2d_raw.shape
+
+        # -------------
+        # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
+        # -------------
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
+
+        # Adjust pixel size based on the resize ratio
+        original_height, original_width = img_shape_hw
+        pixel_height, pixel_width = pixel_size_hw
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        adjusted_pixel_height = pixel_height / resize_ratio_h
+        adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+
+        # Include pixel size information in question text
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
+        # -------------
+
+        # Question
+        if metric_type == "distance":
+            # CoT instruction - reasoning step description
+            cot_instruction = COT_INSTRUCT_DISTANCE
+            # Task prompt
+            lines_map = task_info[metric_map_name]
+            line_dict = lines_map[metric_key]
+            lms_map_name = line_dict["element_map_name"]
+            lms_map = task_info[lms_map_name]
+            # list of 2 strings -- names of points (landmarks)
+            lms = line_dict["element_keys"]
+            p1_name = lms_map[lms[0]]
+            p2_name = lms_map[lms[1]]
+            biometrics_name = line_dict["name"]
+            task_prompt = _get_biometric_prompt_distance(biometrics_name, p1_name, p2_name, metric_unit)
+        if metric_type == "angle":
+            # CoT instruction - reasoning step description
+            cot_instruction = COT_INSTRUCT_ANGLE
+            # Task prompt
+            angles_map = task_info[metric_map_name]
+            angle_dict = angles_map[metric_key]
+            lines_map_name = angle_dict["element_map_name"]
+            # list of 2 strings -- names of lines
+            line_keys = angle_dict["element_keys"]
+            lines_map = task_info[lines_map_name]
+            line1_dict = lines_map[line_keys[0]]
+            # list of 2 strings -- names of points (landmarks)
+            line1_lms = line1_dict["element_keys"]
+            line1_lms_map_name = line1_dict["element_map_name"]
+            line1_lms_map = task_info[line1_lms_map_name]
+            line1_p1_name = line1_lms_map[line1_lms[0]]
+            line1_p2_name = line1_lms_map[line1_lms[1]]
+            line2_dict = lines_map[line_keys[1]]
+            # list of 2 strings -- names of points (landmarks)
+            line2_lms = line2_dict["element_keys"]
+            line2_lms_map_name = line2_dict["element_map_name"]
+            line2_lms_map = task_info[line2_lms_map_name]
+            line2_p1_name = line2_lms_map[line2_lms[0]]
+            line2_p2_name = line2_lms_map[line2_lms[1]]
+            biometrics_name = angle_dict["name"]
+            task_prompt = _get_biometric_prompt_angle(
+                biometrics_name,
+                line1_p1_name,
+                line1_p2_name,
+                line2_p1_name,
+                line2_p2_name,
+                metric_unit,
+            )
+
+        question = (
+            f"Task:\n"
+            f"Given the input medical image: {image_description}, "
+            f"{task_prompt}"
+            f"Additional information:\n"
+            f"{image_size_text}\n"
+            f"{pixel_size_text}\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_AD_REASONING}\n"
+            f"Reasoning steps:\n"
+            f"{cot_instruction}\n"
+            f"Follow the reasoning steps to get the final answer in the required format."
+        )
+
+        return question
+
+    return doc_to_text_BiometricsFromLandmarks_CoT
 
 
 def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
@@ -850,21 +968,21 @@ def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
         - coor1: upper-right corner of the bounding box
         - dim0: the first dimension of the image (height)
         - dim1: the second dimension of the image (width)
-        
+
     Definition of bounding box coordinates in the benchmark planner:
     1. The origin of the coordinates is at the [top-left corner] of the image.
     2. The first two numbers are the coordinates of the [upper-left] corner and
        the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
 
-    That is, 
+    That is,
         - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
         - target coordinates are in the format of [idx_width, idx_height] in image space
-    
+
     NOTE: CAVEAT!
     !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
 
     Warning:
-    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images, 
+    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images,
     such as in _doc_to_visual().
 
     In summary, the conversion involves:
@@ -880,7 +998,7 @@ def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
         |   @ (P1')        * (P2)     |
         |                             |
         &-----------------------------+
-    
+
     #: array space origin (upper-left corner)
     @: image space origin (lower-left corner)
     P1: upper-left corner in array space (benchmark planner)
@@ -1191,16 +1309,6 @@ def parser_last_2_nums(text):
     if len(numbers) < 2:
         return ""
     return ",".join(numbers[-2:])
-
-
-def parser_last_k_nums(text, k):
-    # Find all numbers in the text
-    numbers = re.findall(r"-?\d+\.?\d*", text)
-
-    # Return the last k numbers
-    if len(numbers) < k:
-        return ""
-    return ",".join(numbers[-k:])
 
 
 def parser_last_k_nums(text, k):
