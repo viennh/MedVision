@@ -13,11 +13,11 @@ conda activate "${ENV_NAME}"
 # Set paths and configs
 benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
-model_name="gemini-2.5-flash-wTool"
+model_name="gemini-2.5-pro-wTool"
 batch_size=1
 
 # API model code: https://ai.google.dev/gemini-api/docs/models#model-variations
-google_model_code="gemini-2.5-flash"
+google_model_code="gemini-2.5-pro"
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-detect"

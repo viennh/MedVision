@@ -16,6 +16,9 @@ data_dir="${benchmark_dir}/Data"
 model_name="gemini-2.5-flash-woTool"
 batch_size=1
 
+# API model code: https://ai.google.dev/gemini-api/docs/models#model-variations
+google_model_code="gemini-2.5-flash"
+
 # Other configs (safe to leave as is)
 task_tag="MedVision-detect"
 result_dir="${benchmark_dir}/Results/${task_tag}"
@@ -32,7 +35,8 @@ pip install "${benchmark_dir}"
 # --env_setup_only \
 # --skip_env_setup \
 # --skip_update_status \
-python -m  medvision_bm.benchmark.eval__gemini2_5_flash_wo_tool \
+python -m  medvision_bm.benchmark.eval__gemini2_5_wo_tool \
+--google_model_code $google_model_code \
 --model_name $model_name \
 --results_dir $result_dir \
 --data_dir $data_dir \

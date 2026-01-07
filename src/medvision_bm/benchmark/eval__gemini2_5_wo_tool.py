@@ -51,8 +51,14 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run MedVision benchmarking.")
     # model-specific arguments
     parser.add_argument(
+        "--google_model_code",
+        required=True,
+        type=str,
+        help="Google model code. Check https://ai.google.dev/gemini-api/docs/models#model-variations",
+    )
+    parser.add_argument(
         "--model_name",
-        default="gemini-2.5-flash-wTool",
+        required=True,
         type=str,
         help="Name of the model to evaluate.",
     )
@@ -66,22 +72,26 @@ def parse_args():
     # task-specific arguments
     parser.add_argument(
         "--tasks_list_json_path",
+        required=True,
         type=str,
         help="Path to the tasks list JSON file.",
     )
     # data, output and status paths
     parser.add_argument(
         "--results_dir",
+        required=True,
         type=str,
         help="Path to the results directory.",
     )
     parser.add_argument(
         "--task_status_json_path",
+        required=True,
         type=str,
         help="Path to the task status JSON file.",
     )
     parser.add_argument(
         "--data_dir",
+        required=True,
         type=str,
         help="Path to the MedVision data directory.",
     )
@@ -115,6 +125,7 @@ def main():
     args = parse_args()
 
     # Configuration
+    google_model_code = args.google_model_code
     model_name = args.model_name
     tasks_list_json_path = args.tasks_list_json_path
     result_dir = args.results_dir
@@ -148,14 +159,13 @@ def main():
             print(f"Task {task} already completed. Skipping...")
             continue
 
-        # model configuration for Gemini 2.5 with tool use
+        # model configuration for Gemini 2.5 without tool use
         model_args = (
-            "model=gemini-2.5-flash,"
+            f"model={google_model_code},"
             "thinkingBudget=-1,"
-            "use_tool=True,"
-            "json_output=False,"
-            "ignore_thoughts=False,"
-            "ignore_code=True"
+            "use_tool=False,"
+            "json_output=True,"
+            "ignore_thoughts=False"
         )
 
         rc = run_evaluation_for_task_API_models(
@@ -166,6 +176,7 @@ def main():
             sample_limit=sample_limit,
             output_path=os.path.join(result_dir, model_name),
         )
+
         if rc == 0 and not args.skip_update_status:
             update_task_status(task_status_json_path, model_name, task)
         else:

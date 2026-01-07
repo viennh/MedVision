@@ -13,11 +13,11 @@ conda activate "${ENV_NAME}"
 # Set paths and configs
 benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
-model_name="gemini-2.5-flash-wTool"
+model_name="gemini-2.5-pro-woTool"
 batch_size=1
 
 # API model code: https://ai.google.dev/gemini-api/docs/models#model-variations
-google_model_code="gemini-2.5-flash"
+google_model_code="gemini-2.5-pro"
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-detect"
@@ -35,7 +35,7 @@ pip install "${benchmark_dir}"
 # --env_setup_only \
 # --skip_env_setup \
 # --skip_update_status \
-python -m  medvision_bm.benchmark.eval__gemini2_5_w_tool \
+python -m  medvision_bm.benchmark.eval__gemini2_5_wo_tool \
 --google_model_code $google_model_code \
 --model_name $model_name \
 --results_dir $result_dir \
@@ -44,7 +44,7 @@ python -m  medvision_bm.benchmark.eval__gemini2_5_w_tool \
 --task_status_json_path $task_status_json_path \
 --batch_size $batch_size \
 --sample_limit $sample_limit \
-2>&1 | tee eval__gemini2_5_flash_w_tool__detect.log
+2>&1 | tee eval__gemini2_5_pro_wo_tool__detect.log
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y
