@@ -105,9 +105,11 @@ def get_cgroup_limited_cpus():
     return os.cpu_count()
 
 
-def _load_nifti_2d(img_path, slice_dim, slice_idx):
+def _load_nifti_2d(nii_path, slice_dim, slice_idx):
     """Map function to load 2D slice from a 3D NIFTI images."""
-    img_nib = nib.load(img_path)
+    if not os.path.exists(nii_path):
+        raise FileNotFoundError(f"Image file {nii_path} does not exist.")
+    img_nib = nib.load(nii_path)
     voxel_size = img_nib.header.get_zooms()
     image_3d = img_nib.get_fdata().astype("float32")
     if slice_dim == 0:
@@ -433,17 +435,18 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
         )
         # Prepare values to fill in the CoT template
         values_dict = {
+            "metric_type": "distance",
             "<landmark 1>": p1_name,
             "<landmark 2>": p2_name,
-            "<x1>": x1_relative_coord,
-            "<y1>": y1_relative_coord,
-            "<x2>": x2_relative_coord,
-            "<y2>": y2_relative_coord,
-            "<pixel_width>": adjusted_pixel_width,
-            "<pixel_height>": adjusted_pixel_height,
-            "<image_width>": resized_img_w,
-            "<image_height>": resized_img_h,
-            "<distance>": distance,
+            "<x1>": f"{x1_relative_coord:.3f}",
+            "<y1>": f"{y1_relative_coord:.3f}",
+            "<x2>": f"{x2_relative_coord:.3f}",
+            "<y2>": f"{y2_relative_coord:.3f}",
+            "<pixel_width>": f"{adjusted_pixel_width:.3f}",
+            "<pixel_height>": f"{adjusted_pixel_height:.3f}",
+            "<image_width>": f"{resized_img_w}",
+            "<image_height>": f"{resized_img_h}",
+            "<distance>": f"{distance:.3f}",
         }
 
     elif metric_type == "angle":
@@ -507,28 +510,29 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
         angle_degree = np.degrees(angle)
         # Prepare values to fill in the CoT template
         values_dict = {
+            "metric_type": "angle",
             "<landmark 1>": line1_p1_name,
             "<landmark 2>": line1_p2_name,
             "<landmark 3>": line2_p1_name,
             "<landmark 4>": line2_p2_name,
-            "<x1_line1>": x1_line1_relative_coord,
-            "<y1_line1>": y1_line1_relative_coord,
-            "<x2_line1>": x2_line1_relative_coord,
-            "<y2_line1>": y2_line1_relative_coord,
-            "<x1_line2>": x1_line2_relative_coord,
-            "<y1_line2>": y1_line2_relative_coord,
-            "<x2_line2>": x2_line2_relative_coord,
-            "<y2_line2>": y2_line2_relative_coord,
-            "<pixel_width>": adjusted_pixel_width,
-            "<pixel_height>": adjusted_pixel_height,
-            "<image_width>": resized_img_w,
-            "<image_height>": resized_img_h,
-            "<Ax>": v1[0],
-            "<Ay>": v1[1],
-            "<Bx>": v2[0],
-            "<By>": v2[1],
-            "<angle>": angle,
-            "<angle_degree>": angle_degree,
+            "<x1_line1>": f"{x1_line1_relative_coord:.3f}",
+            "<y1_line1>": f"{y1_line1_relative_coord:.3f}",
+            "<x2_line1>": f"{x2_line1_relative_coord:.3f}",
+            "<y2_line1>": f"{y2_line1_relative_coord:.3f}",
+            "<x1_line2>": f"{x1_line2_relative_coord:.3f}",
+            "<y1_line2>": f"{y1_line2_relative_coord:.3f}",
+            "<x2_line2>": f"{x2_line2_relative_coord:.3f}",
+            "<y2_line2>": f"{y2_line2_relative_coord:.3f}",
+            "<pixel_width>": f"{adjusted_pixel_width:.3f}",
+            "<pixel_height>": f"{adjusted_pixel_height:.3f}",
+            "<image_width>": f"{resized_img_w}",
+            "<image_height>": f"{resized_img_h}",
+            "<Ax>": f"{v1[0]:.3f}",
+            "<Ay>": f"{v1[1]:.3f}",
+            "<Bx>": f"{v2[0]:.3f}",
+            "<By>": f"{v2[1]:.3f}",
+            "<angle>": f"{angle:.3f}",
+            "<angle_degree>": f"{angle_degree:.3f}",
         }
     else:
         raise ValueError(f"Unsupported metric_type: {metric_type}")

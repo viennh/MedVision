@@ -1,6 +1,8 @@
 from medvision_bm.sft.sft_utils import (
     _doc_to_target_TumorLesionTask,
     _doc_to_text_TumorLesionTask_CoT,
+    _doc_to_target_AngleDistanceTask,
+    _doc_to_text_AngleDistanceTask_CoT,
     format_dataset,
     img_proccessor_nii2png_save2dataset,
     load_split_limit_dataset,
@@ -101,10 +103,124 @@ def _format_data_TumorLesionTask_CoT_verl(
     return example
 
 
-def _format_data_AngleDistanceTask_CoT_verl():
-    raise NotImplementedError(
-        "Mapping function for the angle distance task not implemented yet."
-    )
+def _format_data_AngleDistanceTask_CoT_verl(
+    example,
+    model_name,
+):
+    """
+    NOTE: The function is tailored for Verl framework.
+
+    Format data for AngleDistanceTask with CoT reasoning.
+
+    Feilds required by Verl:
+        - prompt: List of messages with roles and content.
+        - ground_truth: Target string.
+        - data_source: Data source identifier.
+        - ability: Ability identifier.
+        - reward_model: Reward model information.
+        - extra_info: Additional information.
+
+    Reference:
+    RLHFDataset class in Verl
+    (https://github.com/YongchengYAO/verl/blob/670aeea7cd6af2de0ce7da9ae8d3fd0c522d0f0e/verl/utils/dataset/rl_dataset.py#L69)
+
+    """
+    from medvision_bm.rft.verl.rft_prompts import SYSTEM_PROMPT
+    
+    # Reuse existing function for SFT with CoT for TumorLesionTask
+    # We can extract GT landmark coordinates from value_dict
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name)
+    target = _doc_to_target_AngleDistanceTask(example)
+    if not isinstance(target, list):
+        target = [target]
+    target_str = ", ".join([f"{value:.3f}" for value in target])
+
+    # Build: "prompt"
+    example["prompt"] = [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": SYSTEM_PROMPT}],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                },
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+            ],
+        },
+    ]
+
+    # Build: "images", embedded processed image list
+    example["images"] = img_proccessor_nii2png_save2dataset(example)
+
+    # Build: "extra_info", used for medvision-ad reward
+    # ---
+    # Reference: https://github.com/YongchengYAO/verl/blob/medvision-rl/verl/utils/reward_score/medvision_rewards/medvision_ad.py
+    # Required fields for distance metric:
+    #   - metric_type
+    #   - landmark_1_wh
+    #   - landmark_2_wh
+    # Required fields for angle metric:
+    #   - metric_type
+    #   - line_1_point_1_wh
+    #   - line_1_point_2_wh
+    #   - line_2_point_1_wh
+    #   - line_2_point_2_wh
+    # Dimensions definition:
+    #   - *_wh: [relative width, relative height]
+    # Note: the origin of coordinate depends on _doc_to_text_AngleDistanceTask_CoT()
+    # ---
+    metric_type = values_dict.get("metric_type", None)
+    assert metric_type is not None, "metric_type not found in values_dict"
+
+    if metric_type=="distance":
+        extra_info = {
+            "metric_type": "distance",
+            "landmark_1_wh": [
+                float(values_dict["<x1>"]),
+                float(values_dict["<y1>"]),
+            ], 
+            "landmark_2_wh": [
+                float(values_dict["<x2>"]),
+                float(values_dict["<y2>"]),
+            ], 
+        }
+    elif metric_type=="angle":
+        extra_info = {
+            "metric_type": "angle",
+            "line_1_point_1_wh": [
+                float(values_dict["<x1_line1>"]),
+                float(values_dict["<y1_line1>"]),
+            ], 
+            "line_1_point_2_wh": [
+                float(values_dict["<x2_line1>"]),
+                float(values_dict["<y2_line1>"]),
+            ], 
+            "line_2_point_1_wh": [
+                float(values_dict["<x1_line2>"]),
+                float(values_dict["<y1_line2>"]),
+            ], 
+            "line_2_point_2_wh": [
+                float(values_dict["<x2_line2>"]),
+                float(values_dict["<y2_line2>"]),
+            ],
+        }
+    else:
+        raise ValueError(f"Unsupported metric_type: {metric_type}")
+
+    # Other fields required by Verl
+    example["ground_truth"] = target_str
+    example["data_source"] = "medvision-ad"
+    example["ability"] = f"medvision-{metric_type}" # e.g., medvision-angle, medvision-distance
+    example["reward_model"] = {"style": "rule", "ground_truth": target_str}
+    example["extra_info"] = extra_info
+
+    return example
 
 
 def _format_data_DetectionTask_CoT_verl():
