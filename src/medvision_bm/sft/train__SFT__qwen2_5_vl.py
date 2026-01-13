@@ -148,6 +148,7 @@ def main(
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
                         ),
+                        new_shape_hw=kwargs.get("new_shape_hw"),
                     )
                     train_ds_list.append(dataset_AD["train"])
                     val_ds_list.append(dataset_AD["validation"])
@@ -172,6 +173,7 @@ def main(
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
                         ),
+                        new_shape_hw=kwargs.get("new_shape_hw"),
                     )
                     train_ds_list.append(dataset_detect["train"])
                     val_ds_list.append(dataset_detect["validation"])
@@ -196,6 +198,7 @@ def main(
                         save_processed_img_to_disk=kwargs.get(
                             "save_processed_img_to_disk"
                         ),
+                        new_shape_hw=kwargs.get("new_shape_hw"),
                     )
                     train_ds_list.append(dataset_TL["train"])
                     val_ds_list.append(dataset_TL["validation"])

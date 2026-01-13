@@ -19,6 +19,7 @@ from accelerate import PartialState
 from datasets import concatenate_datasets, load_dataset
 from peft import LoraConfig, PeftModel
 from PIL import Image
+from scipy.ndimage import zoom
 from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
 from trl import SFTConfig, SFTTrainer
 
@@ -126,13 +127,32 @@ def _load_nifti_2d(nii_path, slice_dim, slice_idx):
     return (pixel_size, image_2d)
 
 
-def _doc_to_visual(doc):
+def _load_resize_nifti_2d(nii_path, slice_dim, slice_idx, new_shape_hw=None):
+    """Map function to load 2D slice from a 3D NIFTI images and maybe resize."""
+    pixel_size_hw, image_2d = _load_nifti_2d(nii_path, slice_dim, slice_idx) 
+
+    # Reshape image and update pixel size if new_shape_hw is provided
+    if new_shape_hw is not None:
+        original_shape_hw = image_2d.shape
+        # Calculate zoom factors for each dimension
+        zoom_factors = (new_shape_hw[0] / original_shape_hw[0], new_shape_hw[1] / original_shape_hw[1])
+        # Use scipy.ndimage.zoom for resizing (order=1 for bilinear interpolation)
+        image_2d = zoom(image_2d, zoom_factors, order=1)
+
+        # Update pixel size based on zoom factors
+        pixel_size_hw = (pixel_size_hw[0] / zoom_factors[0], pixel_size_hw[1] / zoom_factors[1])
+
+    return (pixel_size_hw, image_2d)
+
+
+def _doc_to_visual(doc, new_shape_hw=None):
     """Convert document to image with scale bar added."""
     # Read NIfTI image
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    # Load and maybe resize
+    _, img_2d = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw)
     # Normalize the image to 0-255 range
     if img_2d.max() > img_2d.min():
         img_2d_normalized = (
@@ -147,7 +167,7 @@ def _doc_to_visual(doc):
     return [pil_img]
 
 
-def _doc_to_text_AngleDistanceTask(doc, model_name):
+def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
 
@@ -179,12 +199,12 @@ def _doc_to_text_AngleDistanceTask(doc, model_name):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit/dynamic resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -256,7 +276,7 @@ def _doc_to_text_AngleDistanceTask(doc, model_name):
     return question
 
 
-def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
+def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, new_shape_hw=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_ANGLE,
@@ -292,13 +312,12 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
-
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit/dynamic resizing from VLM
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
@@ -565,16 +584,23 @@ def _doc_to_target_AngleDistanceTask_CoT(doc, values_dict):
     return target_outputs_cot
 
 
-def img_proccessor_nii2png_save2disk(example):
+def img_proccessor_nii2png_save2disk(example, new_shape_hw=None):
     # Process image: read from nii.gz file and extract 2D slice
-    pil_img = _doc_to_visual(example)[0]
+    pil_img = _doc_to_visual(example, new_shape_hw)[0]
 
     # Save tmp PNGs next to the source image inside a tmp_prepared_png folder
     img_path = example["image_file"]
     slice_dim = example["slice_dim"]
     slice_idx = example["slice_idx"]
     png_basename = Path(img_path).name.split(".", 1)[0]
-    png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}.png"
+
+    # NOTE: The size of Pillow image is given as a 2-tuple (width, height).
+    imgsize_w, imgsize_h = pil_img.size
+    if new_shape_hw is not None:
+        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}_resized-wh-{imgsize_w}x{imgsize_h}.png"
+    else:
+        png_filename = f"{png_basename}_dim{slice_dim}_slice{slice_idx}_original-wh-{imgsize_w}x{imgsize_h}.png"
+
     png_dir = os.path.join(os.path.dirname(img_path), "tmp_prepared_png")
     png_path = os.path.join(png_dir, png_filename)
     os.makedirs(png_dir, exist_ok=True)
@@ -582,9 +608,9 @@ def img_proccessor_nii2png_save2disk(example):
     return [png_path]
 
 
-def img_proccessor_nii2png_save2dataset(example):
+def img_proccessor_nii2png_save2dataset(example, new_shape_hw=None):
     # 1. Get the PIL Image object from your function
-    image_obj = _doc_to_visual(example)[0]
+    image_obj = _doc_to_visual(example, new_shape_hw)[0]
 
     # 2. Save the image to a BytesIO buffer in PNG format
     img_byte_arr = io.BytesIO()
@@ -601,9 +627,10 @@ def _format_data_AngleDistanceTask(
     model_name,
     process_img=False,
     save_processed_img_to_disk=False,
+    new_shape_hw=None,
 ):
     target_str = str(_doc_to_target_AngleDistanceTask(example))
-    prompt = _doc_to_text_AngleDistanceTask(example, model_name)
+    prompt = _doc_to_text_AngleDistanceTask(example, model_name, new_shape_hw)
 
     example["messages"] = [
         {
@@ -631,11 +658,11 @@ def _format_data_AngleDistanceTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
 
     return example
 
@@ -645,8 +672,9 @@ def _format_data_AngleDistanceTask_CoT(
     model_name,
     process_img=False,
     save_processed_img_to_disk=False,
+    new_shape_hw=None,
 ):
-    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name)
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name, new_shape_hw)
     target_str = _doc_to_target_AngleDistanceTask_CoT(example, values_dict)
 
     example["messages"] = [
@@ -675,15 +703,15 @@ def _format_data_AngleDistanceTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
     return example
 
 
-def _doc_to_text_TumorLesionTask(doc, model_name):
+def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
 
@@ -716,7 +744,7 @@ def _doc_to_text_TumorLesionTask(doc, model_name):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get biometrics profile for this case
@@ -735,7 +763,7 @@ def _doc_to_text_TumorLesionTask(doc, model_name):
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit/dynamic resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -876,7 +904,7 @@ def _get_landmarks_coords(example, landmark_keys):
     return landmark_coords
 
 
-def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
+def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_TL_NORM,
@@ -912,7 +940,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get biometrics profile for this case
@@ -931,7 +959,7 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name):
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info)
+    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -1055,10 +1083,11 @@ def _format_data_TumorLesionTask(
     model_name,
     process_img=False,
     save_processed_img_to_disk=False,
+    new_shape_hw=None,
 ):
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
-    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name)
+    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name, new_shape_hw)
 
     example["messages"] = [
         {
@@ -1086,11 +1115,11 @@ def _format_data_TumorLesionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
 
     return example
 
@@ -1100,6 +1129,7 @@ def _format_data_TumorLesionTask_CoT(
     model_name,
     process_img=False,
     save_processed_img_to_disk=False,
+    new_shape_hw=None,
 ):
     """
     Format data for TumorLesionTask with CoT reasoning.
@@ -1107,7 +1137,7 @@ def _format_data_TumorLesionTask_CoT(
     1. Uses a different prompt template that includes reasoning steps.
     2. Returns a target string that includes reasoning steps.
     """
-    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name)
+    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name, new_shape_hw)
     target_str = _doc_to_target_TumorLesionTask_CoT(values_dict)
 
     example["messages"] = [
@@ -1136,11 +1166,11 @@ def _format_data_TumorLesionTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
 
     return example
 
@@ -1259,15 +1289,19 @@ def _doc_to_target_DetectionTask(doc):
 
 
 # NOTE: img_processor and reshape_size are not used for detection task, but kept for API consistency
+# TODO: testing removing img_processor and reshape_size 
 def _format_data_DetectionTask(
     example,
     img_processor=None,
     reshape_size=None,
     process_img=False,
     save_processed_img_to_disk=False,
+    new_shape_hw=None,
 ):
+    # Since reshaping does not affect relative coordinates, we do not pass new_shape_hw to _doc_to_text_DetectionTask() 
     target_coords = _doc_to_target_DetectionTask(example)
-    coord_str = f"{target_coords[0]:.3f}, {target_coords[1]:.3f}, {target_coords[2]:.3f}, {target_coords[3]:.3f}"
+    target_str = f"{target_coords[0]:.3f}, {target_coords[1]:.3f}, {target_coords[2]:.3f}, {target_coords[3]:.3f}"
+    prompt = _doc_to_text_DetectionTask(example)
 
     example["messages"] = [
         {
@@ -1278,7 +1312,7 @@ def _format_data_DetectionTask(
                 },
                 {
                     "type": "text",
-                    "text": _doc_to_text_DetectionTask(example),
+                    "text": prompt,
                 },
             ],
         },
@@ -1287,7 +1321,7 @@ def _format_data_DetectionTask(
             "content": [
                 {
                     "type": "text",
-                    "text": coord_str,
+                    "text": target_str,
                 },
             ],
         },
@@ -1295,11 +1329,11 @@ def _format_data_DetectionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
 
     return example
 
@@ -1602,6 +1636,7 @@ def prepare_dataset(
     tag_ds=None,
     process_img=False,
     save_processed_img_to_disk=False,
+    new_shape_hw=None,
 ):
     # Load and split dataset
     dataset = load_split_limit_dataset(
@@ -1617,6 +1652,7 @@ def prepare_dataset(
         "model_name": model_family_name,
         "process_img": process_img,
         "save_processed_img_to_disk": save_processed_img_to_disk,
+        "new_shape_hw": new_shape_hw,
     }
     dataset = format_dataset(
         dataset=dataset,
@@ -2112,6 +2148,13 @@ def parse_args_multiTask():
         type=str2bool,
         default=False,
         help="Whether to save processed images to PNG files on disk during dataset formatting",
+    )
+    parser.add_argument(
+        "--new_shape_hw",
+        default=None,
+        type=int,
+        nargs=2,
+        help="Target resize shape as (height, width). Example: --new_shape_hw 1080 1920. Result: args.new_shape_hw → [1080, 1920]"
     )
 
     # -- Training arguments
