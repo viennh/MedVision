@@ -12,6 +12,7 @@ from medvision_bm.sft.sft_utils import (
 def _format_data_TumorLesionTask_CoT_verl(
     example,
     model_name,
+    new_shape_hw=None,
 ):
     """
     NOTE: The function is tailored for Verl framework.
@@ -35,7 +36,7 @@ def _format_data_TumorLesionTask_CoT_verl(
     
     # Reuse existing function for SFT with CoT for TumorLesionTask
     # We can extract GT landmark coordinates from value_dict
-    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name)
+    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name, new_shape_hw)
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
 
@@ -60,7 +61,7 @@ def _format_data_TumorLesionTask_CoT_verl(
     ]
 
     # Build: "images", embedded processed image list
-    example["images"] = img_proccessor_nii2png_save2dataset(example)
+    example["images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # Build: "extra_info", used for medvision-tl reward
     # ---
@@ -106,6 +107,7 @@ def _format_data_TumorLesionTask_CoT_verl(
 def _format_data_AngleDistanceTask_CoT_verl(
     example,
     model_name,
+    new_shape_hw=None,
 ):
     """
     NOTE: The function is tailored for Verl framework.
@@ -129,7 +131,7 @@ def _format_data_AngleDistanceTask_CoT_verl(
     
     # Reuse existing function for SFT with CoT for TumorLesionTask
     # We can extract GT landmark coordinates from value_dict
-    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name)
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name, new_shape_hw)
     target = _doc_to_target_AngleDistanceTask(example)
     if not isinstance(target, list):
         target = [target]
@@ -156,7 +158,7 @@ def _format_data_AngleDistanceTask_CoT_verl(
     ]
 
     # Build: "images", embedded processed image list
-    example["images"] = img_proccessor_nii2png_save2dataset(example)
+    example["images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
 
     # Build: "extra_info", used for medvision-ad reward
     # ---
@@ -239,6 +241,7 @@ def prepare_dataset_for_verl(
     num_workers_concat_datasets=4,
     num_workers_format_dataset=32,
     tag_ds=None,
+    new_shape_hw=None,
 ):
     # Load and split dataset
     dataset = load_split_limit_dataset(
@@ -252,6 +255,7 @@ def prepare_dataset_for_verl(
     # Format dataset
     mapping_func_args = {
         "model_name": model_family_name,
+        "new_shape_hw": new_shape_hw,
     }
     dataset = format_dataset(
         dataset=dataset,

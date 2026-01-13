@@ -37,6 +37,14 @@ def parse_arguments():
         type=str,
         help="Path to the prepared dataset directory to load from disk",
     )
+    # -- Data processing
+    parser.add_argument(
+        "--new_shape_hw",
+        default=None,
+        type=int,
+        nargs=2,
+        help="Target resize shape as (height, width). Ignore to use the original size. Example: --new_shape_hw 1080 1920. Result: args.new_shape_hw → [1080, 1920]"
+    )
     # -- Tasks list
     parser.add_argument(
         "--tasks_list_json_path_AD",
@@ -168,12 +176,19 @@ def build_parquet_dataset(**kwargs):
         "Dataset preparation depends on model-specific image processing (e.g., resize scale and pixel dimensions).\n"
         "Reusing a dataset prepared with different settings or a different model may lead to incorrect results."
     )
+
+    # Prepare the output parquet dataset directory
+    if kwargs.get("new_shape_hw") is not None:
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}_resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}"
+    else:
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}"
     parquet_ds_dir = os.path.join(
         data_dir,
         "verl_datasets",
         model_family_name,
-        f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
+        ds_dir,
     )
+    print(f"\nPrepared Verl parquet dataset directory: {parquet_ds_dir}")
 
     # Prepare datasets for Verl
     train_ds_list = []
@@ -189,6 +204,7 @@ def build_parquet_dataset(**kwargs):
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
             # MedVision dataset specific, used to extract dataset name from AD task configs
             tag_ds="BiometricsFromLandmarks",
+            new_shape_hw=kwargs.get("new_shape_hw"),
         )
         train_ds_list.append(dataset_AD["train"])
         val_ds_list.append(dataset_AD["validation"])
@@ -203,10 +219,12 @@ def build_parquet_dataset(**kwargs):
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
             # MedVision dataset specific, used to extract dataset name from AD task configs
             tag_ds="TumorLesionSize",
+            new_shape_hw=kwargs.get("new_shape_hw"),
         )
         train_ds_list.append(dataset_TL["train"])
         val_ds_list.append(dataset_TL["validation"])
     if kwargs.get("tasks_list_json_path_detect") is not None:
+        # TODO: implement _format_data_DetectionTask_CoT_verl()
         dataset_detect = prepare_dataset_for_verl(
             tasks_list_json_path=kwargs.get("tasks_list_json_path_detect"),
             limit_train_sample=train_limit_detect,
@@ -217,6 +235,7 @@ def build_parquet_dataset(**kwargs):
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
             # MedVision dataset specific, used to extract dataset name from AD task configs
             tag_ds="BoxSize",
+            new_shape_hw=kwargs.get("new_shape_hw"),
         )
         train_ds_list.append(dataset_detect["train"])
         val_ds_list.append(dataset_detect["validation"])
