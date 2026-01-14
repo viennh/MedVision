@@ -1,17 +1,15 @@
-<div align="center">
-<img src="fig/medvision-logo.png" alt="MedVision Logo" /><br>
+*<div align="center">
+  <img src="fig/medvision-logo.png" alt="MedVision Logo" /><br>
 
+  # MedVision: Dataset and Benchmark for Quantitative Medical Image Analysis
 
+  | 🌏 [**Project**](https://medvision-vlm.github.io) | 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) | 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) | 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) | 🤗 [**Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) | 📖 [**arXiv**](https://arxiv.org/abs/2511.18676) |
 
-# MedVision: Dataset and Benchmark for Quantitative Medical Image Analysis
+  🔎 Benchmarking VLMs for detection, tumor/lesion size estimation, and angle/distance measurement from medical images 📏
 
-| 🌏 [**Project**](https://medvision-vlm.github.io) | 🧑🏻‍💻 [**Code**](https://github.com/YongchengYAO/MedVision) | 🩻 [**Dataset**](https://huggingface.co/datasets/YongchengYAO/MedVision) | 🐳 [**Docker**](https://hub.docker.com/r/vincentycyao/medvision/tags) | 🤗 [**Models**](https://huggingface.co/collections/YongchengYAO/medvision-sft-models) | 📖 [**arXiv**](https://arxiv.org/abs/2511.18676) |
+  💿 30.8M annotated samples | multi-modality | multi-anatomy | 3D/2D medical image 💿
 
-🔎 Benchmarking VLMs for detection, tumor/lesion size estimation, and angle/distance measurement from medical images 📏
-
-💿 30.8M annotated samples | multi-modality | multi-anatomy | 3D/2D medical image 💿
-
-🎯 Post-training: SFT, RFT (RL), CoT, LoRA | Framework: [TRL](https://github.com/huggingface/trl), [verl](https://github.com/volcengine/verl) 🎯
+  🎯 Post-training: SFT, RFT (RL), CoT, LoRA | Framework: [TRL](https://github.com/huggingface/trl), [verl](https://github.com/volcengine/verl) 🎯
 
 </div>
 
@@ -50,7 +48,7 @@ pip install .
 pip show medvision_bm
 ```
 
-For integration in other project, install with
+For integration in other projects, install with
 
 ```bash
 pip install "git+https://github.com/YongchengYAO/MedVision.git"
@@ -74,10 +72,10 @@ pip show medvision_bm
    ```bash
    # NOTE: replace </path/to/working/folder>, <tag>
    docker run -it --rm \
-   	--gpus all \
-   	-v </path/to/working/folder>:/root/Documents/MedVision \
-   	vincentycyao/medvision:<tag> \
-   	bash
+       --gpus all \
+       -v </path/to/working/folder>:/root/Documents/MedVision \
+       vincentycyao/medvision:<tag> \
+       bash
    ```
 
    ```bash
@@ -126,6 +124,16 @@ Next (in the container):
 
   2. After evaluating all models in step 1, parse model outputs and calculate metrics (e.g., MRE, MAE, IoU, Success Rate):
 
+     > ⚠️
+     >
+     > Known issue for some models: gemini-2.5
+     >
+     > Issue: Have to ensure no subfolder in each model folder before running the command below
+     >
+     > e.g.
+     > 
+     >`mv gemini-2.5-pro-woTool/gemini-2.5-pro/* gemini-2.5-pro-woTool/`
+
      ```bash
      # CLI command: 
      # python -m medvision_bm.benchmark.parse_outputs
@@ -135,7 +143,7 @@ Next (in the container):
      # --task_dir: task folder
      # --model_dir: model folder
      # --limit: limit sample size in the parsed files
-     # --skip_existing: (store_ture arg) skip parsed files
+     # --skip_existing: (store_true arg) skip parsed files
      
      # example 1: parse all models for the T/L task 
      python -m medvision_bm.benchmark.parse_outputs --task_type TL --task_dir Results/MedVision-TL
@@ -144,62 +152,65 @@ Next (in the container):
      python -m medvision_bm.benchmark.parse_outputs --task_type Detection --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct --skip_existing
      ```
 
-
-    3. Summarize model performance for each task
+  3. Summarize model performance for each task
+      > ⚠️
+      > 
+      > If `medvision_ds` is missing, install with:
+      > 
+      > `python -m medvision_bm.benchmark.install_medvision_ds --data_dir <local-data-folder> `
     
-       ```bash
-       # CLI command: 
-       # python -m medvision_bm.benchmark.summarize_AD_task 
-       # python -m medvision_bm.benchmark.summarize_detection_task
-       # python -m medvision_bm.benchmark.summarize_TL_task
-       # python -m medvision_bm.benchmark.analyze_detection_task_boxsize
-       # python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random
-       #
-       # args:
-       # --task_dir: task folder
-       # --model_dir: model folder
-       # --skip_model_wo_parsed_files: skip model directories that don't have a 'parsed' folder
-       
-       # example 1: summarize all models for the A/D task
-       python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD
-       
-       # example 2: summarize one model for the detection task
-       python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct
-       
-       # example 3: analyze how target size affect detection performance
-       python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect
-       
-       # example 4: compare detection performance with randow guessing
-       python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect
-       ```
+      ```bash
+      # CLI command: 
+      # python -m medvision_bm.benchmark.summarize_AD_task 
+      # python -m medvision_bm.benchmark.summarize_detection_task
+      # python -m medvision_bm.benchmark.summarize_TL_task
+      # python -m medvision_bm.benchmark.analyze_detection_task_boxsize
+      # python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random
+      #
+      # args:
+      # --task_dir: task folder
+      # --model_dir: model folder
+      # --skip_model_wo_parsed_files: skip model directories that don't have a 'parsed' folder
+      
+      # example 1: summarize all models for the A/D task
+      python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD
+      
+      # example 2: summarize one model for the detection task
+      python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct
+      
+      # example 3: analyze how target size affect detection performance
+      python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect
+      
+      # example 4: compare detection performance with random guessing
+      python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect
+      ```
 
 
   File structure after these steps:
 
-    ```
-
+  ```text
   ├── MedVision
-    ├── completed_tasks 
-      ├── completed_tasks_MedVision-AD.json           # <== tasks status tracker
-      ├── ...
-    ├── Results                                         # <== benchmark results
-      ├── MedVision-AD
-        ├── ...
-        ├── summary_AD_task.txt                     # <== [step 3] summary
-      ├── MedVision-detect
-        ├── Qwen2.5-VL-32B-Instruct
-          ├── parsed                               
-            ├── *.jsonl                           # <== [step 2] parsed model outputs
-            ├── *.json                            # <== [step 2] parsed summary file
-            ├── summary_*                         # <== [step 3] mean metrics, values
-          ├── *.jsonl                               # <== [step 1] model outputs
-          ├── *.json                                # <== [step 1] summary file
-        ├── ...
-        ├── summary_detection_task.txt              # <== [step 3] summary
-      ├── MedVision-TL
-        ├── ...
-        ├── summary_TL_task.txt                     # <== [step 3] summary
-    ```
+  │   ├── completed_tasks 
+  │   │   ├── completed_tasks_MedVision-AD.json       # <== tasks status tracker
+  │   │   ├── ...
+  │   ├── Results                                     # <== benchmark results
+  │   │   ├── MedVision-AD
+  │   │   │   ├── ...
+  │   │   │   ├── summary_AD_task.txt                 # <== [step 3] summary
+  │   │   ├── MedVision-detect
+  │   │   │   ├── Qwen2.5-VL-32B-Instruct
+  │   │   │   │   ├── parsed                               
+  │   │   │   │   │   ├── *.jsonl                     # <== [step 2] parsed model outputs
+  │   │   │   │   │   ├── *.json                      # <== [step 2] parsed summary file
+  │   │   │   │   │   ├── summary_*                   # <== [step 3] mean metrics, values
+  │   │   │   │   ├── *.jsonl                         # <== [step 1] model outputs
+  │   │   │   │   ├── *.json                          # <== [step 1] summary file
+  │   │   │   ├── ...
+  │   │   │   ├── summary_detection_task.txt          # <== [step 3] summary
+  │   │   ├── MedVision-TL
+  │   │   │   ├── ...
+  │   │   │   ├── summary_TL_task.txt                 # <== [step 3] summary
+  ```
 
 - **[Debug]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
 
@@ -239,7 +250,7 @@ Next (in the container):
 
 # 💿 Data Downloading (Optional)
 
-Something about the **MedVision** dataset:
+About the **MedVision** dataset:
 
 - Concepts
   - `MedVision`: the collection of public imaging data and our annotations
@@ -258,7 +269,7 @@ Something about the **MedVision** dataset:
       - `slice`: [`Sagittal`, `Coronal`, `Axial`]
       - `split`: [`Train`, `Test`]
 
-Since it takes some time for data downloading and processing, you can just download datasets from tasks list (example [here](https://github.com/YongchengYAO/MedVision/tree/master/tasks_list)) or configs list (example [here](https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/info)) in advance.
+Since data downloading and processing takes time, you can download datasets from the tasks list (example [here](https://github.com/YongchengYAO/MedVision/tree/master/tasks_list)) or configs list (example [here](https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/info)) in advance.
 
 > [!NOTE]
 > ⚠️ You need to set API token for these datasets (see [detailed instructions](https://huggingface.co/datasets/YongchengYAO/MedVision#datasets)): FeTA24, SKM-TEA, and ToothFairy2

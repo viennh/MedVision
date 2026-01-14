@@ -48,8 +48,8 @@ val_sample_limit_task_AD=500
 # train_sample_limit_task_TL=5000
 # val_sample_limit_task_TL=500
 
-# (Optional) Resize shape for images during dataset preparation
-new_shape_hw=(256 256)  # explicitly reshape images to size (height, width)
+# # (Optional) Resize shape for images during dataset preparation
+# new_shape_hw=(256 256)  # explicitly reshape images to size (height, width)
 # ----------------------------------------------------------------------------------
 
 
@@ -63,10 +63,14 @@ python -m medvision_bm.sft.env_setup --data_dir ${data_dir} --requirement "${ben
 
 
 # Build Verl datasets
+# ------
+# Add optional argument below:
+# To resize all images to a new shape during dataset preparation:
+# --new_shape_hw ${new_shape_hw[0]} ${new_shape_hw[1]} \
+# ------
 python -m medvision_bm.rft.verl.build_parquet_ds \
 --model_family_name ${model_family_name} \
 --data_dir ${data_dir} \
---new_shape_hw ${new_shape_hw[0]} ${new_shape_hw[1]} \
 --tasks_list_json_path_AD ${tasks_list_json_path_AD} \
 --num_workers_concat_datasets ${num_workers_concat_datasets} \
 --num_workers_format_dataset ${num_workers_format_dataset} \
