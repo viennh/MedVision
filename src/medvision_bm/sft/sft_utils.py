@@ -264,9 +264,14 @@ def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
             metric_unit,
         )
 
+    if image_description != "" and image_description is not None:
+        image_prompt = ": " + image_description
+    else:
+        image_prompt = ""
+
     question = (
         f"Task:\n"
-        f"Given the input medical image: {image_description}, "
+        f"Given the input medical image{image_prompt}, "
         f"{task_prompt}"
         f"Additional information:\n"
         f"{pixel_size_text}\n"
@@ -387,10 +392,15 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, new_shape_hw=None):
             metric_unit,
         )
 
+    if image_description != "" and image_description is not None:
+        image_prompt = ": " + image_description
+    else:
+        image_prompt = ""
+
     # Question
     question = (
         f"Task:\n"
-        f"Given the input medical image: {image_description}, "
+        f"Given the input medical image{image_prompt}, "
         f"{task_prompt}"
         f"Additional information:\n"
         f"{image_size_text}\n"
@@ -775,10 +785,15 @@ def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
 
+    if image_description != "" and image_description is not None:
+        image_prompt = ": " + image_description
+    else:
+        image_prompt = ""
+
     # Question
     question = (
         f"Task:\n"
-        f"Given the input medical image: {image_description}, "
+        f"Given the input medical image{image_prompt}, "
         f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
         f"Additional information:\n"
         f"{pixel_size_text}\n"
@@ -976,10 +991,15 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
 
+    if image_description != "" and image_description is not None:
+        image_prompt = ": " + image_description
+    else:
+        image_prompt = ""
+
     # Question
     question = (
         f"Task:\n"
-        f"Given the input medical image: {image_description}, "
+        f"Given the input medical image{image_prompt}, "
         f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
         f"Additional information:\n"
         f"{image_size_text}\n"
@@ -1202,10 +1222,15 @@ def _doc_to_text_DetectionTask(doc):
     # Get image info
     image_description = task_info["image_description"]
 
+    if image_description != "" and image_description is not None:
+        image_prompt = ": " + image_description
+    else:
+        image_prompt = ""
+
     # Question
     question = (
         f"Task:\n"
-        f"Given the input medical image: {image_description}, "
+        f"Given the input medical image{image_prompt}, "
         f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
         f"Format requirement:\n"
         f"{FORMAT_PROMPT_BOX_COORDINATES}"
