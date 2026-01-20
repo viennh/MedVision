@@ -8,6 +8,7 @@ import math
 import os
 import time
 import traceback
+from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -16,7 +17,7 @@ import numpy as np
 import psutil
 import torch
 from accelerate import PartialState
-from datasets import concatenate_datasets, load_dataset
+from datasets import DatasetDict, concatenate_datasets, load_dataset
 from peft import LoraConfig, PeftModel
 from PIL import Image
 from scipy.ndimage import zoom
@@ -129,18 +130,24 @@ def _load_nifti_2d(nii_path, slice_dim, slice_idx):
 
 def _load_resize_nifti_2d(nii_path, slice_dim, slice_idx, new_shape_hw=None):
     """Map function to load 2D slice from a 3D NIFTI images and maybe resize."""
-    pixel_size_hw, image_2d = _load_nifti_2d(nii_path, slice_dim, slice_idx) 
+    pixel_size_hw, image_2d = _load_nifti_2d(nii_path, slice_dim, slice_idx)
 
     # Reshape image and update pixel size if new_shape_hw is provided
     if new_shape_hw is not None:
         original_shape_hw = image_2d.shape
         # Calculate zoom factors for each dimension
-        zoom_factors = (new_shape_hw[0] / original_shape_hw[0], new_shape_hw[1] / original_shape_hw[1])
+        zoom_factors = (
+            new_shape_hw[0] / original_shape_hw[0],
+            new_shape_hw[1] / original_shape_hw[1],
+        )
         # Use scipy.ndimage.zoom for resizing (order=1 for bilinear interpolation)
         image_2d = zoom(image_2d, zoom_factors, order=1)
 
         # Update pixel size based on zoom factors
-        pixel_size_hw = (pixel_size_hw[0] / zoom_factors[0], pixel_size_hw[1] / zoom_factors[1])
+        pixel_size_hw = (
+            pixel_size_hw[0] / zoom_factors[0],
+            pixel_size_hw[1] / zoom_factors[1],
+        )
 
     return (pixel_size_hw, image_2d)
 
@@ -199,12 +206,16 @@ def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(
+        img_path, slice_dim, slice_idx, new_shape_hw
+    )  # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit/dynamic resizing from VLM
+    img_shape_resized = get_resized_img_shape(
+        model_name, img_2d_raw, model_info
+    )  # implicit/dynamic resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -317,12 +328,16 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, new_shape_hw=None):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(
+        img_path, slice_dim, slice_idx, new_shape_hw
+    )  # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit/dynamic resizing from VLM
+    img_shape_resized = get_resized_img_shape(
+        model_name, img_2d_raw, model_info
+    )  # implicit/dynamic resizing from VLM
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
@@ -668,11 +683,15 @@ def _format_data_AngleDistanceTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(
+            example, new_shape_hw
+        )
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(
+            example, new_shape_hw
+        )
 
     return example
 
@@ -684,7 +703,9 @@ def _format_data_AngleDistanceTask_CoT(
     save_processed_img_to_disk=False,
     new_shape_hw=None,
 ):
-    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name, new_shape_hw)
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(
+        example, model_name, new_shape_hw
+    )
     target_str = _doc_to_target_AngleDistanceTask_CoT(example, values_dict)
 
     example["messages"] = [
@@ -713,11 +734,15 @@ def _format_data_AngleDistanceTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(
+            example, new_shape_hw
+        )
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(
+            example, new_shape_hw
+        )
     return example
 
 
@@ -754,7 +779,9 @@ def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(
+        img_path, slice_dim, slice_idx, new_shape_hw
+    )  # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get biometrics profile for this case
@@ -773,7 +800,9 @@ def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit/dynamic resizing from VLM
+    img_shape_resized = get_resized_img_shape(
+        model_name, img_2d_raw, model_info
+    )  # implicit/dynamic resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -955,7 +984,9 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw) # explicit resizing
+    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(
+        img_path, slice_dim, slice_idx, new_shape_hw
+    )  # explicit resizing
     img_shape = img_2d_raw.shape
 
     # Get biometrics profile for this case
@@ -974,7 +1005,9 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
 
     # Get resized image shape
     model_info = load_model_info()
-    img_shape_resized = get_resized_img_shape(model_name, img_2d_raw, model_info) # implicit resizing from VLM
+    img_shape_resized = get_resized_img_shape(
+        model_name, img_2d_raw, model_info
+    )  # implicit resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
@@ -1135,11 +1168,15 @@ def _format_data_TumorLesionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(
+            example, new_shape_hw
+        )
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(
+            example, new_shape_hw
+        )
 
     return example
 
@@ -1157,7 +1194,9 @@ def _format_data_TumorLesionTask_CoT(
     1. Uses a different prompt template that includes reasoning steps.
     2. Returns a target string that includes reasoning steps.
     """
-    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name, new_shape_hw)
+    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(
+        example, model_name, new_shape_hw
+    )
     target_str = _doc_to_target_TumorLesionTask_CoT(values_dict)
 
     example["messages"] = [
@@ -1186,11 +1225,15 @@ def _format_data_TumorLesionTask_CoT(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(
+            example, new_shape_hw
+        )
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(
+            example, new_shape_hw
+        )
 
     return example
 
@@ -1314,7 +1357,7 @@ def _doc_to_target_DetectionTask(doc):
 
 
 # NOTE: img_processor and reshape_size are not used for detection task, but kept for API consistency
-# TODO: testing removing img_processor and reshape_size 
+# TODO: testing removing img_processor and reshape_size
 def _format_data_DetectionTask(
     example,
     img_processor=None,
@@ -1323,7 +1366,7 @@ def _format_data_DetectionTask(
     save_processed_img_to_disk=False,
     new_shape_hw=None,
 ):
-    # Since reshaping does not affect relative coordinates, we do not pass new_shape_hw to _doc_to_text_DetectionTask() 
+    # Since reshaping does not affect relative coordinates, we do not pass new_shape_hw to _doc_to_text_DetectionTask()
     target_coords = _doc_to_target_DetectionTask(example)
     target_str = f"{target_coords[0]:.3f}, {target_coords[1]:.3f}, {target_coords[2]:.3f}, {target_coords[3]:.3f}"
     prompt = _doc_to_text_DetectionTask(example)
@@ -1354,11 +1397,15 @@ def _format_data_DetectionTask(
 
     # [Not recommended] Save processed images to dataset, making the cached dataset very large
     if process_img:
-        example["processed_images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(
+            example, new_shape_hw
+        )
 
     # [Recommended] Save processed images to PNG files on disk
     if save_processed_img_to_disk:
-        example["image_file_png"] = img_proccessor_nii2png_save2disk(example, new_shape_hw)
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(
+            example, new_shape_hw
+        )
 
     return example
 
@@ -1491,6 +1538,78 @@ def safe_concatenate_datasets(datasets_list):
     return combined_dataset
 
 
+def group_train_test_split(dataset, group_column, test_size, seed=None):
+    """
+    Splits a HF Dataset into train and validation sets ensuring samples with the
+    same value in 'group_column' are in the same split.
+
+    Args:
+        dataset: The HF Dataset to split.
+        group_column: The column name to group by (e.g., 'image_file').
+        test_size: If float < 1.0, represents fraction of *samples* to aim for.
+                   If int >= 1, represents exact number of *samples* to aim for.
+        seed: Random seed for shuffling.
+
+    Returns:
+        DatasetDict containing 'train' and 'validation'.
+    """
+    # 1. Group indices by the group_column (e.g., path to 3D volume)
+    # This might load the column into memory, which is usually fine for string paths
+    groups = dataset[group_column]
+    group_to_indices = defaultdict(list)
+    for idx, g_val in enumerate(groups):
+        group_to_indices[g_val].append(idx)
+
+    unique_groups = list(group_to_indices.keys())
+
+    # 2. Shuffle groups
+    rng = np.random.default_rng(seed)
+    rng.shuffle(unique_groups)
+
+    # 3. Determine target sample count
+    total_samples = len(dataset)
+    if isinstance(test_size, float) and test_size < 1.0:
+        target_test_samples = int(total_samples * test_size)
+    else:
+        target_test_samples = int(test_size)
+
+    # 4. Allocate groups to validation until target count is reached
+    val_indices = []
+    current_val_samples = 0
+
+    # Split index for groups
+    split_idx = 0
+    for i, g_val in enumerate(unique_groups):
+        indices = group_to_indices[g_val]
+
+        # If adding this group exceeds target significantly, we might skip (simple greedy here)
+        # For now, we accumulate until we hit or exceed the target slightly to ensure adequate val size
+        val_indices.extend(indices)
+        current_val_samples += len(indices)
+
+        if current_val_samples >= target_test_samples:
+            split_idx = i + 1
+            break
+
+    # The rest go to train
+    train_groups = unique_groups[split_idx:]
+    train_indices = []
+    for g_val in train_groups:
+        train_indices.extend(group_to_indices[g_val])
+
+    # 5. Create splits
+    # optional: shuffle indices within the splits so they aren't ordered by volume
+    rng.shuffle(train_indices)
+    rng.shuffle(val_indices)
+
+    return DatasetDict(
+        {
+            "train": dataset.select(train_indices),
+            "validation": dataset.select(val_indices),
+        }
+    )
+
+
 def load_split_limit_dataset(
     tasks_list_json_path,
     limit_train_sample,
@@ -1596,15 +1715,19 @@ def load_split_limit_dataset(
 
     # Split the dataset into training and validation sets
     print(
-        f"\n[Info] Splitting dataset into training (size: {len(combined_dataset) - limit_val_sample}) and validation (size: {limit_val_sample}) sets"
+        f"\n[Info] Splitting dataset into training and validation (target val size: {limit_val_sample}) sets"
     )
-    dataset = combined_dataset.train_test_split(
-        train_size=len(combined_dataset) - limit_val_sample,
+
+    # Split with group consideration (image_file) to prevent leakage
+    print(
+        f"\n[Info] Splitting dataset into training and validation (target val size: {limit_val_sample}) keeping 3D volumes grouped."
+    )
+    dataset = group_train_test_split(
+        combined_dataset,
+        group_column="image_file",
         test_size=limit_val_sample,
-        shuffle=True,
         seed=SEED,
     )
-    dataset["validation"] = dataset.pop("test")
 
     # Limit the number of training and validation samples if specified
     if limit_train_sample > 0 and limit_train_sample < len(dataset["train"]):
@@ -2179,7 +2302,7 @@ def parse_args_multiTask():
         default=None,
         type=int,
         nargs=2,
-        help="Target resize shape as (height, width). Example: --new_shape_hw 1080 1920. Result: args.new_shape_hw → [1080, 1920]"
+        help="Target resize shape as (height, width). Example: --new_shape_hw 1080 1920. Result: args.new_shape_hw → [1080, 1920]",
     )
 
     # -- Training arguments
