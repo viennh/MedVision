@@ -68,9 +68,13 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
         # Get image info
         image_description = task_info["image_description"]
         # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
         question = (
             f"Task:\n"
-            f"Given the input medical image: {image_description}, "
+            f"Given the input medical image{image_prompt}, "
             f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_BOX_COORDINATES}"
@@ -551,9 +555,13 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         # -------------
 
         # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
         question = (
             f"Task:\n"
-            f"Given the input medical image: {image_description}, "
+            f"Given the input medical image{image_prompt}, "
             f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
             f"Additional information:\n"
             f"{pixel_size_text}\n"
@@ -640,9 +648,13 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         # -------------
 
         # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
         question = (
             f"Task:\n"
-            f"Given the input medical image: {image_description}, "
+            f"Given the input medical image{image_prompt}, "
             f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
             f"Additional information:\n"
             f"{image_size_text}\n"
@@ -710,8 +722,18 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         # -------------
 
         # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
         question = (
-            f"Task:\n" f"Given the input medical image: {image_description}, " f"estimate the physical size of the {label_name}.\n" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_MASK_SIZE}"
+            f"Task:\n" 
+            f"Given the input medical image{image_prompt}, " 
+            f"estimate the physical size of the {label_name}.\n" 
+            f"Additional information:\n" 
+            f"{pixel_size_text}\n" 
+            f"Format requirement:\n" 
+            f"{FORMAT_PROMPT_MASK_SIZE}"
         )
         return question
 
@@ -821,7 +843,18 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             biometrics_name = angle_dict["name"]
             task_prompt = _get_biometric_prompt_angle(biometrics_name, line1_p1_name, line1_p2_name, line2_p1_name, line2_p2_name, metric_unit)
 
-        question = f"Task:\n" f"Given the input medical image: {image_description}, " f"{task_prompt}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+        question = (
+            f"Task:\n" 
+            f"Given the input medical image{image_prompt}, " 
+            f"{task_prompt}" 
+            f"Additional information:\n" 
+            f"{pixel_size_text}\n" 
+            f"Format requirement:\n" 
+            f"{FORMAT_PROMPT_BIOMETRICS}")
         return question
 
     return doc_to_text_BiometricsFromLandmarks
@@ -936,9 +969,13 @@ def create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry_module):
                 metric_unit,
             )
 
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
         question = (
             f"Task:\n"
-            f"Given the input medical image: {image_description}, "
+            f"Given the input medical image{image_prompt}, "
             f"{task_prompt}"
             f"Additional information:\n"
             f"{image_size_text}\n"
