@@ -18,7 +18,7 @@ from medvision_bm.utils import (
 )
 
 
-def install_transformers_accelerate_for_qwen25vl():
+def install_transformers_accelerate_for_qwen25vl(transformers_version="4.54.1", accelerate_version="1.9.0"):
     # NOTE: Reinstall dev version of transformers and accelerate
     # NOTE: This is specific for the Qwen2.5-VL model
     # Install the required packages
@@ -28,12 +28,12 @@ def install_transformers_accelerate_for_qwen25vl():
             "-m",
             "pip",
             "install",
-            "transformers==4.54.1",
+            f"transformers=={transformers_version}",
         ],
         check=True,
     )
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", "accelerate==1.9.0"], check=True
+        [sys.executable, "-m", "pip", "install", f"accelerate=={accelerate_version}"], check=True
     )
 
 
@@ -175,10 +175,13 @@ def main():
         install_vendored_lmms_eval(proj_dependency="qwen2_5_vl")
         install_medvision_ds(data_dir)
         install_torch_cu124()
+
         # NOTE: vllm version may need to be adjusted based on compatibility of model and transformers version
-        install_vllm(data_dir, version="0.10.0")
+        install_vllm(data_dir, version="0.14.0")
+
         # NOTE: Reinstall packages to overwrite potentially incompatible versions
-        install_transformers_accelerate_for_qwen25vl()
+        install_transformers_accelerate_for_qwen25vl(transformers_version="5.0.0.rc2", accelerate_version="1.9.0")
+
         if args.env_setup_only:
             print(
                 "\nEnvironment setup completed as per argument --env_setup_only. Exiting now.\n"
