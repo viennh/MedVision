@@ -573,6 +573,100 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
     return doc_to_text_TumorLesionSize
 
 
+def create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry_module):
+    def doc_to_text_TumorLesionSize_CoT_woInstruct(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        from medvision_bm.sft.sft_prompts import (
+            FORMAT_PROMPT_TL_REASONING,
+        )
+
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_biometry_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+
+        # Get label info
+        label = str(doc["label"])
+        labels_map = task_info["labels_map"]
+        if label not in labels_map:
+            raise ValueError(f"Label {label} not found in labels_map.")
+        else:
+            label_name = labels_map.get(label)
+
+        # Get 2D image info
+        image_description = task_info["image_description"]
+
+        # Read NIfTI image
+        img_path = doc["image_file"]
+        slice_dim = doc["slice_dim"]
+        slice_idx = doc["slice_idx"]
+
+        # Load 2D slice from NIfTI file, with optional resizing
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        if reshape_image_hw is not None:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        else:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+        img_shape_hw = img_2d_raw.shape
+
+        # Get biometrics profile for this case
+        biometric_profile = doc["biometric_profile"]
+        metric_unit = biometric_profile["metric_unit"]
+        if isinstance(metric_unit, list):
+            assert len(metric_unit) == 1, "metric_unit list should have only one element."
+            metric_unit = metric_unit[0]
+        elif isinstance(metric_unit, str):
+            if metric_unit == "mm":
+                metric_unit = "millimeters"
+            elif metric_unit == "cm":
+                metric_unit = "centimeters"
+        else:
+            raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
+
+        # -------------
+        # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
+        # -------------
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
+
+        # Adjust pixel size based on the resize ratio
+        original_height, original_width = img_shape_hw
+        pixel_height, pixel_width = pixel_size_hw
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        adjusted_pixel_height = pixel_height / resize_ratio_h
+        adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+
+        # Include pixel size information in question text
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
+        # -------------
+
+        # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+        question = (
+            f"Task:\n"
+            f"Given the input medical image{image_prompt}, "
+            f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
+            f"Additional information:\n"
+            f"{image_size_text}\n"
+            f"{pixel_size_text}\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_TL_REASONING}\n"
+            f"Follow the reasoning steps to get the final answer in the required format."
+        )
+        return question
+
+    return doc_to_text_TumorLesionSize_CoT_woInstruct
+
+
 def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
     def doc_to_text_TumorLesionSize_CoT(doc, lmms_eval_specific_kwargs=None):
         """Convert document to text."""
@@ -858,6 +952,130 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
         return question
 
     return doc_to_text_BiometricsFromLandmarks
+
+
+def create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(preprocess_biometry_module):
+    def doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        from medvision_bm.sft.sft_prompts import (
+            FORMAT_PROMPT_AD_REASONING,
+        )
+
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_biometry_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+
+        # Get biometrics profile for this case
+        biometric_profile = doc["biometric_profile"]
+        metric_type = biometric_profile["metric_type"]
+        metric_map_name = biometric_profile["metric_map_name"]
+        metric_key = biometric_profile["metric_key"]
+        metric_unit = biometric_profile["metric_unit"]
+
+        # Get 2D image info
+        image_description = task_info["image_description"]
+
+        # Read NIfTI image
+        img_path = doc["image_file"]
+        slice_dim = doc["slice_dim"]
+        slice_idx = doc["slice_idx"]
+
+        # Load 2D slice from NIfTI file, with optional resizing
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        if reshape_image_hw is not None:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        else:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+        img_shape_hw = img_2d_raw.shape
+
+        # -------------
+        # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
+        # -------------
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
+
+        # Adjust pixel size based on the resize ratio
+        original_height, original_width = img_shape_hw
+        pixel_height, pixel_width = pixel_size_hw
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        adjusted_pixel_height = pixel_height / resize_ratio_h
+        adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+
+        # Include pixel size information in question text
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
+        # -------------
+
+        # Question
+        if metric_type == "distance":
+            # Task prompt
+            lines_map = task_info[metric_map_name]
+            line_dict = lines_map[metric_key]
+            lms_map_name = line_dict["element_map_name"]
+            lms_map = task_info[lms_map_name]
+            # list of 2 strings -- names of points (landmarks)
+            lms = line_dict["element_keys"]
+            p1_name = lms_map[lms[0]]
+            p2_name = lms_map[lms[1]]
+            biometrics_name = line_dict["name"]
+            task_prompt = _get_biometric_prompt_distance(biometrics_name, p1_name, p2_name, metric_unit)
+        if metric_type == "angle":
+            # Task prompt
+            angles_map = task_info[metric_map_name]
+            angle_dict = angles_map[metric_key]
+            lines_map_name = angle_dict["element_map_name"]
+            # list of 2 strings -- names of lines
+            line_keys = angle_dict["element_keys"]
+            lines_map = task_info[lines_map_name]
+            line1_dict = lines_map[line_keys[0]]
+            # list of 2 strings -- names of points (landmarks)
+            line1_lms = line1_dict["element_keys"]
+            line1_lms_map_name = line1_dict["element_map_name"]
+            line1_lms_map = task_info[line1_lms_map_name]
+            line1_p1_name = line1_lms_map[line1_lms[0]]
+            line1_p2_name = line1_lms_map[line1_lms[1]]
+            line2_dict = lines_map[line_keys[1]]
+            # list of 2 strings -- names of points (landmarks)
+            line2_lms = line2_dict["element_keys"]
+            line2_lms_map_name = line2_dict["element_map_name"]
+            line2_lms_map = task_info[line2_lms_map_name]
+            line2_p1_name = line2_lms_map[line2_lms[0]]
+            line2_p2_name = line2_lms_map[line2_lms[1]]
+            biometrics_name = angle_dict["name"]
+            task_prompt = _get_biometric_prompt_angle(
+                biometrics_name,
+                line1_p1_name,
+                line1_p2_name,
+                line2_p1_name,
+                line2_p2_name,
+                metric_unit,
+            )
+
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+        question = (
+            f"Task:\n"
+            f"Given the input medical image{image_prompt}, "
+            f"{task_prompt}"
+            f"Additional information:\n"
+            f"{image_size_text}\n"
+            f"{pixel_size_text}\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_AD_REASONING}\n"
+            f"Follow the reasoning steps to get the final answer in the required format."
+        )
+
+        return question
+
+    return doc_to_text_BiometricsFromLandmarks_CoT_woInstruct
 
 
 def create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry_module):

@@ -1,0 +1,3 @@
+include: KiPA22_TumorLesionSize_base-CoT-woInstruct.yaml
+task: KiPA22_TumorLesionSize_Task01_Coronal-CoT-woInstruct
+dataset_name: KiPA22_TumorLesionSize_Task01_Coronal_Test

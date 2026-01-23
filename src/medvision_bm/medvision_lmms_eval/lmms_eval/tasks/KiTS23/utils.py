@@ -8,6 +8,7 @@ from lmms_eval.tasks.medvision.medvision_utils import (
     create_doc_to_text_MaskSize,
     create_doc_to_text_TumorLesionSize,
     create_doc_to_text_TumorLesionSize_CoT,
+    create_doc_to_text_TumorLesionSize_CoT_woInstruct,
     doc_to_target_BoxCoordinate,
     doc_to_target_MaskSize,
     doc_to_target_TumorLesionSize,
@@ -27,3 +28,4 @@ doc_to_text_TumorLesionSize = create_doc_to_text_TumorLesionSize(preprocess_biom
 doc_to_text_MaskSize = create_doc_to_text_MaskSize(preprocess_segmentation)
 
 doc_to_text_TumorLesionSize_CoT = create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry)
+doc_to_text_TumorLesionSize_CoT_woInstruct = create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry)

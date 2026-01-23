@@ -6,6 +6,7 @@ from lmms_eval.tasks.medvision.medvision_utils import (
     aggregate_results_SuccessRate,
     create_doc_to_text_BiometricsFromLandmarks,
     create_doc_to_text_BiometricsFromLandmarks_CoT,
+    create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct,
     create_doc_to_text_BoxCoordinate,
     create_doc_to_text_MaskSize,
     doc_to_target_BiometricsFromLandmarks,
@@ -27,3 +28,4 @@ doc_to_text_BiometricsFromLandmarks = create_doc_to_text_BiometricsFromLandmarks
 doc_to_text_MaskSize = create_doc_to_text_MaskSize(preprocess_segmentation)
 
 doc_to_text_BiometricsFromLandmarks_CoT = create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry)
+doc_to_text_BiometricsFromLandmarks_CoT_woInstruct = create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(preprocess_biometry)
