@@ -5,8 +5,11 @@ from datasets import DatasetDict, concatenate_datasets
 
 from medvision_bm.rft.verl.verl_utils import (
     _format_data_AngleDistanceTask_CoT_verl,
+    _format_data_AngleDistanceTask_verl,
     _format_data_DetectionTask_CoT_verl,
+    _format_data_DetectionTask_verl,
     _format_data_TumorLesionTask_CoT_verl,
+    _format_data_TumorLesionTask_verl,
     prepare_dataset_for_verl,
 )
 from medvision_bm.sft.sft_utils import parse_sample_limits
@@ -44,6 +47,11 @@ def parse_arguments():
         type=int,
         nargs=2,
         help="Target resize shape as (height, width). Ignore to use the original size. Example: --new_shape_hw 1080 1920. Result: args.new_shape_hw → [1080, 1920]"
+    )
+    parser.add_argument(
+        "--without_cot_instruction",
+        action="store_true",
+        help="If specified, do not include CoT instruction in the prompts.",
     )
     # -- Tasks list
     parser.add_argument(
@@ -178,10 +186,14 @@ def build_parquet_dataset(**kwargs):
     )
 
     # Prepare the output parquet dataset directory
-    if kwargs.get("new_shape_hw") is not None:
-        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}_resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}"
+    if kwargs.get("without_cot_instruction"):
+        cot_tag = "_wo-CoT-Instruct"
     else:
-        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}"
+        cot_tag = ""
+    if kwargs.get("new_shape_hw") is not None:
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}_resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}{cot_tag}__v2"
+    else:
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__v2"
     parquet_ds_dir = os.path.join(
         data_dir,
         "verl_datasets",
@@ -194,11 +206,12 @@ def build_parquet_dataset(**kwargs):
     train_ds_list = []
     val_ds_list = []
     if kwargs.get("tasks_list_json_path_AD") is not None:
+        format_func = _format_data_AngleDistanceTask_CoT_verl if not kwargs.get("without_cot_instruction") else _format_data_AngleDistanceTask_verl
         dataset_AD = prepare_dataset_for_verl(
             tasks_list_json_path=kwargs.get("tasks_list_json_path_AD"),
             limit_train_sample=train_limit_AD,
             limit_val_sample=val_limit_AD,
-            mapping_func=_format_data_AngleDistanceTask_CoT_verl,
+            mapping_func=format_func,
             model_family_name=model_family_name,
             num_workers_concat_datasets=kwargs.get("num_workers_concat_datasets"),
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
@@ -209,11 +222,12 @@ def build_parquet_dataset(**kwargs):
         train_ds_list.append(dataset_AD["train"])
         val_ds_list.append(dataset_AD["validation"])
     if kwargs.get("tasks_list_json_path_TL") is not None:
+        format_func = _format_data_TumorLesionTask_CoT_verl if not kwargs.get("without_cot_instruction") else _format_data_TumorLesionTask_verl
         dataset_TL = prepare_dataset_for_verl(
             tasks_list_json_path=kwargs.get("tasks_list_json_path_TL"),
             limit_train_sample=train_limit_TL,
             limit_val_sample=val_limit_TL,
-            mapping_func=_format_data_TumorLesionTask_CoT_verl,
+            mapping_func=format_func,
             model_family_name=model_family_name,
             num_workers_concat_datasets=kwargs.get("num_workers_concat_datasets"),
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
@@ -224,12 +238,13 @@ def build_parquet_dataset(**kwargs):
         train_ds_list.append(dataset_TL["train"])
         val_ds_list.append(dataset_TL["validation"])
     if kwargs.get("tasks_list_json_path_detect") is not None:
-        # TODO: implement _format_data_DetectionTask_CoT_verl()
+        # TODO: implement _format_data_DetectionTask_CoT_verl() and _format_data_DetectionTask_verl()
+        format_func = _format_data_DetectionTask_CoT_verl if not kwargs.get("without_cot_instruction") else _format_data_DetectionTask_verl
         dataset_detect = prepare_dataset_for_verl(
             tasks_list_json_path=kwargs.get("tasks_list_json_path_detect"),
             limit_train_sample=train_limit_detect,
             limit_val_sample=val_limit_detect,
-            mapping_func=_format_data_DetectionTask_CoT_verl,
+            mapping_func=format_func,
             model_family_name=model_family_name,
             num_workers_concat_datasets=kwargs.get("num_workers_concat_datasets"),
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),

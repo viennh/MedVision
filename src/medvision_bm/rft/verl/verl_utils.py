@@ -1,8 +1,10 @@
 from medvision_bm.sft.sft_utils import (
     _doc_to_target_TumorLesionTask,
     _doc_to_text_TumorLesionTask_CoT,
+    _doc_to_text_TumorLesionTask,
     _doc_to_target_AngleDistanceTask,
     _doc_to_text_AngleDistanceTask_CoT,
+    _doc_to_text_AngleDistanceTask,
     format_dataset,
     img_proccessor_nii2png_save2dataset,
     load_split_limit_dataset,
@@ -65,7 +67,6 @@ def _format_data_TumorLesionTask_CoT_verl(
 
     # Build: "extra_info", used for medvision-tl reward
     # ---
-    # Reference: https://github.com/YongchengYAO/verl/blob/medvision-rl/verl/utils/reward_score/medvision_rewards/medvision_tl.py
     # Required fields:
     #   - landmark_P1_wh
     #   - landmark_P2_wh
@@ -93,6 +94,78 @@ def _format_data_TumorLesionTask_CoT_verl(
             float(values_dict["<y2_minor>"]),
         ],
     }
+
+    # Other fields required by Verl
+    example["ground_truth"] = target_str
+    example["data_source"] = "medvision-tl"
+    example["ability"] = "medvision-tl"
+    example["reward_model"] = {"style": "rule", "ground_truth": target_str}
+    example["extra_info"] = extra_info
+
+    return example
+
+
+def _format_data_TumorLesionTask_verl(
+    example,
+    model_name,
+    new_shape_hw=None,
+):
+    """
+    NOTE: The function is tailored for Verl framework.
+
+    Format data for TumorLesionTask with CoT reasoning.
+
+    Feilds required by Verl:
+        - prompt: List of messages with roles and content.
+        - ground_truth: Target string.
+        - data_source: Data source identifier.
+        - ability: Ability identifier.
+        - reward_model: Reward model information.
+        - extra_info: Additional information.
+
+    Reference:
+    RLHFDataset class in Verl
+    (https://github.com/YongchengYAO/verl/blob/670aeea7cd6af2de0ce7da9ae8d3fd0c522d0f0e/verl/utils/dataset/rl_dataset.py#L69)
+
+    """
+    from medvision_bm.rft.verl.rft_prompts import SYSTEM_PROMPT_LITE
+    
+    # Reuse existing function for SFT without CoT for TumorLesionTask
+    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name, new_shape_hw)
+    target = _doc_to_target_TumorLesionTask(example)
+    target_str = ", ".join([f"{value:.3f}" for value in target])
+
+    # Build: "prompt"
+    example["prompt"] = [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": SYSTEM_PROMPT_LITE}],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                },
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+            ],
+        },
+    ]
+
+    # Build: "images", embedded processed image list
+    example["images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+
+    # Build: "extra_info", used for reward calculation in RFT via Verl
+    # ---
+    # Since this function build a simple prompt without CoT,
+    # and the model reasoning process in RFT (using GRPO) does not follow a CoT template,
+    # we do not have process reward based on landmark coordinates here.
+    # Thus, we leave extra_info empty.
+    # ---
+    extra_info = {"placeholder": True}
 
     # Other fields required by Verl
     example["ground_truth"] = target_str
@@ -225,7 +298,92 @@ def _format_data_AngleDistanceTask_CoT_verl(
     return example
 
 
+def _format_data_AngleDistanceTask_verl(
+    example,
+    model_name,
+    new_shape_hw=None,
+):
+    """
+    NOTE: The function is tailored for Verl framework.
+
+    Format data for AngleDistanceTask with CoT reasoning.
+
+    Feilds required by Verl:
+        - prompt: List of messages with roles and content.
+        - ground_truth: Target string.
+        - data_source: Data source identifier.
+        - ability: Ability identifier.
+        - reward_model: Reward model information.
+        - extra_info: Additional information.
+
+    Reference:
+    RLHFDataset class in Verl
+    (https://github.com/YongchengYAO/verl/blob/670aeea7cd6af2de0ce7da9ae8d3fd0c522d0f0e/verl/utils/dataset/rl_dataset.py#L69)
+
+    """
+    from medvision_bm.rft.verl.rft_prompts import SYSTEM_PROMPT_LITE
+    
+    # Reuse existing function for SFT with CoT for TumorLesionTask
+    # We can extract GT landmark coordinates from value_dict
+    prompt = _doc_to_text_AngleDistanceTask(example, model_name, new_shape_hw)
+    target = _doc_to_target_AngleDistanceTask(example)
+    if not isinstance(target, list):
+        target = [target]
+    target_str = ", ".join([f"{value:.3f}" for value in target])
+
+    # Build: "prompt"
+    example["prompt"] = [
+        {
+            "role": "system",
+            "content": [{"type": "text", "text": SYSTEM_PROMPT_LITE}],
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                },
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+            ],
+        },
+    ]
+
+    # Build: "images", embedded processed image list
+    example["images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
+
+    # Extract metric_type (tailored for the MedVision dataset structure)
+    biometric_profile = example["biometric_profile"]
+    metric_type = biometric_profile["metric_type"]
+
+    # Build: "extra_info", used for reward calculation in RFT via Verl
+    # ---
+    # Since this function build a simple prompt without CoT,
+    # and the model reasoning process in RFT (using GRPO) does not follow a CoT template,
+    # we do not have process reward based on landmark coordinates here.
+    # Thus, we leave extra_info empty.
+    # ---
+    extra_info = {"metric_type": metric_type}
+
+    # Other fields required by Verl
+    example["ground_truth"] = target_str
+    example["data_source"] = "medvision-ad"
+    example["ability"] = f"medvision-{metric_type}" # e.g., medvision-angle, medvision-distance
+    example["reward_model"] = {"style": "rule", "ground_truth": target_str}
+    example["extra_info"] = extra_info
+
+    return example
+
+
 def _format_data_DetectionTask_CoT_verl():
+    raise NotImplementedError(
+        "Mapping function for the detection task not implemented yet."
+    )
+
+
+def _format_data_DetectionTask_verl():
     raise NotImplementedError(
         "Mapping function for the detection task not implemented yet."
     )
