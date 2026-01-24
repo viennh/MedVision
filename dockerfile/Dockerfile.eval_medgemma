@@ -36,8 +36,9 @@ RUN set -eux; \
 # Setup evaluation environment
 RUN set -eux; \
     CONDA_BIN="/opt/miniconda/bin/conda"; \
+    rm -rf /root/Documents/MedVision; \
+    git clone https://github.com/YongchengYAO/MedVision /root/Documents/MedVision; \
     cd /root/Documents/MedVision; \
-    git pull; \
     DATA_DIR="/root/Documents/MedVision/Data"; \
     mkdir -p "${DATA_DIR}"; \
     ${CONDA_BIN} run -n "${ENV_NAME}" --no-capture-output python -m medvision_bm.benchmark.env_setup -r requirements/requirements_eval_medgemma.txt --data_dir "${DATA_DIR}"

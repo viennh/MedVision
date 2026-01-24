@@ -43,8 +43,8 @@ RUN set -eux; \
 # Setup evaluation environment
 RUN set -eux; \
     CONDA_BIN="/opt/miniconda/bin/conda"; \
-    cd /root/Documents/MedVision; \
-    git pull; \
+    rm -rf /root/Documents/MedVision; \
+    git clone https://github.com/YongchengYAO/MedVision /root/Documents/MedVision; \
     \
     # Set paths and configs
     benchmark_dir="/root/Documents/MedVision"; \
