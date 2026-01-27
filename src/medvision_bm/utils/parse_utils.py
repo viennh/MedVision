@@ -164,35 +164,60 @@ def cal_Precision(pred, target):
 
 
 def cal_Recall(pred, target):
-    # Ensure inputs are 1D numpy arrays with 4 numbers
+    """
+    Calculates Recall with robustness fixes for floating point errors
+    and invalid box checks.
+    
+    Args:
+        pred: (list or np.array) [xmin, ymin, xmax, ymax]
+        target: (list or np.array) [xmin, ymin, xmax, ymax]
+    
+    Returns:
+        float: Recall value (0.0 to 1.0)
+    """
+    # Flatten and ensure numpy arrays
     pred = np.asarray(pred).flatten()
     target = np.asarray(target).flatten()
 
     if len(pred) != 4 or len(target) != 4:
-        raise ValueError(
-            "Both pred and target must be 1D arrays with exactly 4 numbers"
-        )
+        raise ValueError("Inputs must be 1D arrays with 4 elements.")
 
-    # Calculate intersection coordinates
-    x1 = max(pred[0], target[0])  # max of lower_x values
-    y1 = max(pred[1], target[1])  # max of lower_y values
-    x2 = min(pred[2], target[2])  # min of upper_x values
-    y2 = min(pred[3], target[3])  # min of upper_y values
+    # Extract coordinates
+    px1, py1, px2, py2 = pred
+    tx1, ty1, tx2, ty2 = target
 
-    # Check if there is an intersection
-    if x1 >= x2 or y1 >= y2:
-        return 0.0  # No intersection
+    # Normalize both boxes: to accommodate incorrect input order [xmax, xmin, ymax, ymin]
+    # which will be sorted as if they were [xmin, xmax, ymin, ymax]
+    px1, px2 = sorted([px1, px2])
+    py1, py2 = sorted([py1, py2])
+    tx1, tx2 = sorted([tx1, tx2])
+    ty1, ty2 = sorted([ty1, ty2])
 
-    # Calculate intersection area
-    intersection_area = (x2 - x1) * (y2 - y1)
+    # Calculate Intersection
+    ix1 = max(px1, tx1)
+    iy1 = max(py1, ty1)
+    ix2 = min(px2, tx2)
+    iy2 = min(py2, ty2)
 
-    # Calculate areas of both bounding boxes
-    target_area = (target[2] - target[0]) * (target[3] - target[1])
+    # Check for no overlap
+    if ix1 >= ix2 or iy1 >= iy2:
+        return 0.0
+
+    intersection_area = (ix2 - ix1) * (iy2 - iy1)
+
+    # Calculate Target Area
+    target_area = (tx2 - tx1) * (ty2 - ty1)
 
     # Calculate Recall
-    Recall = intersection_area / target_area if target_area > 0 else np.nan
+    if target_area <= 0:
+        raise ValueError("Target box has non-positive area.")
 
-    return Recall
+    # Calculate Recall 
+    recall = intersection_area / target_area
+    
+    # CRITICAL FIX: Floating point clamping
+    # Simple clip to handle precision errors (e.g. 1.000000000004 -> 1.0)
+    return min(recall, 1.0)
 
 
 def cal_metrics_detection_task(results):
