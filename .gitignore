@@ -208,6 +208,7 @@ completed_tasks
 local
 **/dev
 **/dev_*
+dev-*
 
 *.log
 

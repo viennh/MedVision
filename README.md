@@ -308,3 +308,14 @@ python -m medvision_bm.benchmark.install_medvision_ds --data_dir <local-data-fol
 ```
 
 <br/>
+
+# 📝 Miscellaneous
+If you encounter "missing package" error when using modules in `src/medvision_bm/sft`, install dependencies with
+```bash
+python -m medvision_bm.sft.env_setup --data_dir <local-data-folder>
+```
+
+# 🩵 Acknowledgement
+MedVision is based on some open-source projects:
+- [EvolvingLMMs-Lab/lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval): VLM evaluation framework
+- [EleutherAI/lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness): LLM evaluation framework
