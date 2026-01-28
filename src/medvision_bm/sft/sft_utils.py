@@ -1417,49 +1417,53 @@ def _format_data_DetectionTask_CoT():
     )
 
 
-def _load_single_dataset(task, tag_ds):
+def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None):
     """Load a single dataset configuration with improved error handling."""
     try:
-        print(f"\n[Info] Loading dataset for task: {task}")
-        config = task + "_Train"
+        print(
+            f"\n[Info] Loading dataset:\nHF Dataset ID: {dataset_hf_id}\nConfiguration:{config}"
+        )
 
         # Add timeout and retry logic for dataset loading
-        max_retries = 3
+        max_retries = 5
         for attempt in range(max_retries):
             try:
                 ds = load_dataset(
-                    "YongchengYAO/MedVision",
+                    dataset_hf_id,
                     name=config,
                     trust_remote_code=True,
-                    split="train",
+                    split=split,
                     streaming=False,
                 )
+                if limit is not None and limit > 0 and len(ds) > limit:
+                    ds = ds.select(range(limit))
                 break
             except Exception as e:
                 if attempt < max_retries - 1:
                     wait_time = 2**attempt  # Exponential backoff
                     print(
-                        f"[Warning] Attempt {attempt + 1} failed for {task}, retrying in {wait_time}s: {e}"
+                        f"[Warning] Attempt {attempt + 1} failed for {config}, retrying in {wait_time}s: {e}"
                     )
                     time.sleep(wait_time)
                 else:
                     raise
 
-        # NOTE: This is specific to the MedVision dataset and configs
-        # Add dataset name column
-        # Extract dataset name (part before "_BiometricsFromLandmarks")
-        dataset_name = task.split(f"_{tag_ds}")[0]
-        ds = ds.add_column("dataset_name", [dataset_name] * len(ds))
+        if dataset_name is not None:
+            ds = ds.add_column("dataset_name", [dataset_name] * len(ds))
 
         print(
             f"\n[Info] Successfully loaded {len(ds)} samples from config {config} (dataset: {dataset_name})"
         )
         return ds
 
-    except Exception as e:
-        print(f"[Error] Failed to load dataset for task {task}: {str(e)}")
+    except Exception:
+        print(
+            f"[Error] Failed to load dataset:\nHF Dataset ID: {dataset_hf_id}\nConfiguration:{config}"
+        )
         print(f"Traceback: {traceback.format_exc()}")
-        raise Exception(f"Task {task} failed: {str(e)}")
+        raise Exception(
+            f"[Error] Failed to load dataset:\nHF Dataset ID: {dataset_hf_id}\nConfiguration:{config}"
+        )
 
 
 def safe_concat_align_top_keys(datasets_list, fill_value=None):
@@ -1670,9 +1674,22 @@ def load_split_limit_dataset(
 
     # Process datasets with controlled parallelism
     with ProcessPoolExecutor(max_workers=concat_workers) as executor:
-        # Submit all tasks
+        # Load training splits for all tasks in parallel
+        # ------
+        # NOTE: This is specific to the MedVision dataset and configs
+        # For MedVision dataset:
+        # - Config name for training set is in the format of "{task}_Train", while the test set is "{task}_Test"
+        # - Dataset name can be extracted from task name (e.g., part before f"_{tag_ds}"): task.split(f"_{tag_ds}")[0]
+        # ------
         future_to_task = {
-            executor.submit(_load_single_dataset, task, tag_ds): task for task in tasks
+            executor.submit(
+                _load_single_dataset,
+                "YongchengYAO/MedVision",
+                task.split(f"_{tag_ds}")[0],
+                task + "_Train",
+                "train",
+            ): task
+            for task in tasks
         }
 
         # Collect results as they complete
@@ -1722,6 +1739,9 @@ def load_split_limit_dataset(
     print(
         f"\n[Info] Splitting dataset into training and validation (target val size: {limit_val_sample}) keeping 3D volumes grouped."
     )
+
+    # NOTE: "image_file" is a column in the MedVision dataset representing the path to the 3D NIfTI image.
+    # TODO: Make group_column configurable if needed.
     dataset = group_train_test_split(
         combined_dataset,
         group_column="image_file",
