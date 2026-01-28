@@ -69,28 +69,40 @@ def cal_IoU(pred, target):
             "Both pred and target must be 1D arrays with exactly 4 numbers"
         )
 
+    # Extract coordinates
+    px1, py1, px2, py2 = pred
+    tx1, ty1, tx2, ty2 = target
+
+    # Normalize both boxes: to accommodate incorrect input order [xmax, xmin, ymax, ymin]
+    # which will be sorted as if they were [xmin, xmax, ymin, ymax]
+    px1, px2 = sorted([px1, px2])
+    py1, py2 = sorted([py1, py2])
+    tx1, tx2 = sorted([tx1, tx2])
+    ty1, ty2 = sorted([ty1, ty2])
+
     # Calculate intersection coordinates
-    x1 = max(pred[0], target[0])  # max of lower_x values
-    y1 = max(pred[1], target[1])  # max of lower_y values
-    x2 = min(pred[2], target[2])  # min of upper_x values
-    y2 = min(pred[3], target[3])  # min of upper_y values
+    ix1 = max(px1, tx1)
+    iy1 = max(py1, ty1)
+    ix2 = min(px2, tx2)
+    iy2 = min(py2, ty2)
 
     # Check if there is an intersection
-    if x1 >= x2 or y1 >= y2:
+    if ix1 >= ix2 or iy1 >= iy2:
         return 0.0  # No intersection
 
     # Calculate intersection area
-    intersection_area = (x2 - x1) * (y2 - y1)
+    intersection_area = (ix2 - ix1) * (iy2 - iy1)
 
     # Calculate areas of both bounding boxes
-    pred_area = (pred[2] - pred[0]) * (pred[3] - pred[1])
-    target_area = (target[2] - target[0]) * (target[3] - target[1])
+    pred_area = (px2 - px1) * (py2 - py1)
+    target_area = (tx2 - tx1) * (ty2 - ty1)
 
     # Calculate union area
     union_area = pred_area + target_area - intersection_area
 
     # Return IoU
-    return intersection_area / union_area if union_area > 0 else 0.0
+    iou = intersection_area / union_area if union_area > 0 else 0.0
+    return min(iou, 1.0)
 
 
 def cal_F1(pred, target):
@@ -103,30 +115,44 @@ def cal_F1(pred, target):
             "Both pred and target must be 1D arrays with exactly 4 numbers"
         )
 
+    # Extract coordinates
+    px1, py1, px2, py2 = pred
+    tx1, ty1, tx2, ty2 = target
+
+    # Normalize both boxes
+    px1, px2 = sorted([px1, px2])
+    py1, py2 = sorted([py1, py2])
+    tx1, tx2 = sorted([tx1, tx2])
+    ty1, ty2 = sorted([ty1, ty2])
+
     # Calculate intersection coordinates
-    x1 = max(pred[0], target[0])  # max of lower_x values
-    y1 = max(pred[1], target[1])  # max of lower_y values
-    x2 = min(pred[2], target[2])  # min of upper_x values
-    y2 = min(pred[3], target[3])  # min of upper_y values
+    ix1 = max(px1, tx1)
+    iy1 = max(py1, ty1)
+    ix2 = min(px2, tx2)
+    iy2 = min(py2, ty2)
 
     # Check if there is an intersection
-    if x1 >= x2 or y1 >= y2:
+    if ix1 >= ix2 or iy1 >= iy2:
         return 0.0  # No intersection
 
     # Calculate intersection area
-    intersection_area = (x2 - x1) * (y2 - y1)
+    intersection_area = (ix2 - ix1) * (iy2 - iy1)
 
     # Calculate areas of both bounding boxes
-    pred_area = (pred[2] - pred[0]) * (pred[3] - pred[1])
-    target_area = (target[2] - target[0]) * (target[3] - target[1])
+    pred_area = (px2 - px1) * (py2 - py1)
+    target_area = (tx2 - tx1) * (ty2 - ty1)
 
     # Calculate F1 (Dice Similarity Coefficient)
     # F1 = 2 * intersection / (area1 + area2)
+    denominator = pred_area + target_area
     f1 = (
-        (2.0 * intersection_area) / (pred_area + target_area)
-        if (pred_area + target_area) > 0
+        (2.0 * intersection_area) / denominator
+        if denominator > 0
         else np.nan
     )
+    
+    if not np.isnan(f1):
+        f1 = min(f1, 1.0)
 
     return f1
 
@@ -141,24 +167,38 @@ def cal_Precision(pred, target):
             "Both pred and target must be 1D arrays with exactly 4 numbers"
         )
 
+    # Extract coordinates
+    px1, py1, px2, py2 = pred
+    tx1, ty1, tx2, ty2 = target
+
+    # Normalize both boxes
+    px1, px2 = sorted([px1, px2])
+    py1, py2 = sorted([py1, py2])
+    tx1, tx2 = sorted([tx1, tx2])
+    ty1, ty2 = sorted([ty1, ty2])
+
     # Calculate intersection coordinates
-    x1 = max(pred[0], target[0])  # max of lower_x values
-    y1 = max(pred[1], target[1])  # max of lower_y values
-    x2 = min(pred[2], target[2])  # min of upper_x values
-    y2 = min(pred[3], target[3])  # min of upper_y values
+    ix1 = max(px1, tx1)
+    iy1 = max(py1, ty1)
+    ix2 = min(px2, tx2)
+    iy2 = min(py2, ty2)
 
     # Check if there is an intersection
-    if x1 >= x2 or y1 >= y2:
+    if ix1 >= ix2 or iy1 >= iy2:
         return 0.0  # No intersection
 
     # Calculate intersection area
-    intersection_area = (x2 - x1) * (y2 - y1)
+    intersection_area = (ix2 - ix1) * (iy2 - iy1)
 
     # Calculate areas of both bounding boxes
-    pred_area = (pred[2] - pred[0]) * (pred[3] - pred[1])
+    pred_area = (px2 - px1) * (py2 - py1)
 
     # Calculate Precision
     Precision = intersection_area / pred_area if pred_area > 0 else np.nan
+    
+    # Robustness clamp
+    if not np.isnan(Precision):
+        Precision = min(Precision, 1.0)
 
     return Precision
 
