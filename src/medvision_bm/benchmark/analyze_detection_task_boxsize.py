@@ -1,10 +1,12 @@
 import argparse
 import glob
 import json
+import multiprocessing
 import os
 import re
 
 import pandas as pd
+from tqdm import tqdm
 
 from medvision_bm.utils.configs import (
     SUMMARY_FILENAME_PER_BOX_IMG_RATIO_GROUP_LABEL_DETECT_MEAN_METRICS,
@@ -261,9 +263,15 @@ def group_data_by_boxSize_label(df):
     return result
 
 
+def _process_wrapper(args):
+    """Result unpacking wrapper for multiprocessing with tqdm"""
+    return process_jsonl_file_detection_task_w_boxSize(*args)
+
+
 def process_parsed_file_in_model_folder(
     model_dir,
     limit=None,
+    processes=None,
 ):
     """
     Process all JSONL files in a model's parsed folder and generate box size analysis metrics.
@@ -280,6 +288,7 @@ def process_parsed_file_in_model_folder(
     Args:
         model_dir: Path to the model folder containing a 'parsed' subdirectory
         limit: Maximum number of samples to process per file (None = process all)
+        processes (int, optional): Number of processes to use for parallel calculation.
     """
     # Find parsed JSONL files
     parsed_files_dir = os.path.join(model_dir, "parsed")
@@ -290,9 +299,19 @@ def process_parsed_file_in_model_folder(
 
     # Collect all data from the parsed JSONL files
     all_data = []
-    for jsonl_file in jsonl_files:
-        file_data = process_jsonl_file_detection_task_w_boxSize(jsonl_file, limit)
-        all_data.extend(file_data)
+
+    if processes is not None and processes > 1:
+        print(f"Processing JSONL files with {processes} processes...")
+        items = [(jsonl_file, limit) for jsonl_file in jsonl_files]
+        with multiprocessing.Pool(processes=processes) as pool:
+            # Use imap to allow tqdm tracking
+            results = pool.imap_unordered(_process_wrapper, items)
+            for file_data in tqdm(results, total=len(items), desc="Processing files"):
+                all_data.extend(file_data)
+    else:
+        for jsonl_file in tqdm(jsonl_files, desc="Processing files"):
+            file_data = process_jsonl_file_detection_task_w_boxSize(jsonl_file, limit)
+            all_data.extend(file_data)
 
     # Early exit if no valid data found
     if not all_data:
@@ -327,7 +346,9 @@ def process_parsed_file_in_model_folder(
     )
 
 
-def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
+def _process_task_directory(
+    task_dir, limit, processes=None, skip_model_wo_parsed_files=False
+):
     """
     Process all model directories within a task directory for box size analysis.
 
@@ -337,6 +358,7 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
     Args:
         task_dir: Path to task directory containing model result folders
         limit: Maximum samples to process per JSONL file (None = all)
+        processes (int, optional): Number of processes to use for parallel calculation
         skip_model_wo_parsed_files: If True, skip models without parsed folders
     """
     # Get list of model folders within task_dir
@@ -354,19 +376,20 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
             continue
 
         print(f"\nProcessing model directory: {model_dir}")
-        process_parsed_file_in_model_folder(model_dir, limit)
+        process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
 
-def _process_single_model_directory(model_dir, limit):
+def _process_single_model_directory(model_dir, limit, processes=None):
     """
     Process a single model directory for box size analysis.
 
     Args:
         model_dir: Path to the model directory containing parsed results
         limit: Maximum number of samples to process per JSONL file (None = all)
+        processes (int, optional): Number of processes to use for parallel calculation
     """
     print(f"\nProcessing model directory: {model_dir}")
-    process_parsed_file_in_model_folder(model_dir, limit)
+    process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
 
 def main(**kwargs):
@@ -383,23 +406,27 @@ def main(**kwargs):
         model_dir: Path to single model directory (mutually exclusive with task_dir)
         limit: Maximum number of samples to process per JSONL file (None = all)
         skip_model_wo_parsed_files: Whether to skip model directories without parsed folders
+        processes: Number of processes to use for parallel calculation
     """
     task_dir = kwargs.get("task_dir")
     model_dir = kwargs.get("model_dir")
     limit = kwargs.get("limit")
     skip_model_wo_parsed_files = kwargs.get("skip_model_wo_parsed_files", False)
+    processes = kwargs.get("processes")
 
     if task_dir is not None:
         print(
             f"Using task_dir: {task_dir}\nModel directories within this folder will be looped over."
         )
-        _process_task_directory(task_dir, limit, skip_model_wo_parsed_files)
+        _process_task_directory(
+            task_dir, limit, processes=processes, skip_model_wo_parsed_files=skip_model_wo_parsed_files
+        )
 
     elif model_dir is not None:
         print(
             f"Using model_dir: {model_dir}\nProcessing all JSONL files within this directory."
         )
-        _process_single_model_directory(model_dir, limit)
+        _process_single_model_directory(model_dir, limit, processes=processes)
 
     else:
         raise ValueError("Either 'task_dir' or 'model_dir' must be provided.")
@@ -440,6 +467,13 @@ def parse_args():
         action="store_true",
         help="Skip model directories that don't have a 'parsed' folder. Only valid with --task_dir.",
     )
+    parser.add_argument(
+        "--processes",
+        "-p",
+        type=int,
+        default=None,
+        help="Number of worker processes for metric calculation.",
+    )
 
     args = parser.parse_args()
 
@@ -453,10 +487,6 @@ def parse_args():
 
     return args
 
-
-if __name__ == "__main__":
-    args_dict = vars(parse_args())
-    main(**args_dict)
 
 if __name__ == "__main__":
     args_dict = vars(parse_args())

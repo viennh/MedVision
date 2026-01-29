@@ -1,6 +1,7 @@
 import argparse
 import glob
 import json
+import multiprocessing
 import os
 import re
 
@@ -219,7 +220,35 @@ def _calculate_final_metrics_AD_task(counters, count_total):
     return task_metrics
 
 
-def calculate_summary_metrics_per_anatomy_AD_task(all_data):
+def process_label_group(label, data):
+    """
+    Helper function to process metrics for a single label group.
+    Used for both sequential and parallel processing.
+    """
+    targets = data["targets"]
+    responses = data["responses"]
+
+    # Skip empty groups
+    if not targets or not responses:
+        return label, None
+
+    # Initialize counters for this group
+    counters = _initialize_metric_counters_AD_task()
+    count_total = len(targets)
+
+    # Process each target-response pair
+    for target, response in zip(targets, responses):
+        mock_results = {"filtered_resps": [response], "target": target}
+        metrics_dict = cal_metrics_AD_task(mock_results)
+        _update_metric_counters_AD_task(metrics_dict, counters)
+
+    # Calculate and store final metrics for this label
+    task_metrics = _calculate_final_metrics_AD_task(counters, count_total)
+
+    return label, task_metrics
+
+
+def calculate_summary_metrics_per_anatomy_AD_task(all_data, processes=None):
     """
     Calculate summary metrics grouped by label (anatomy/metric type).
 
@@ -231,6 +260,7 @@ def calculate_summary_metrics_per_anatomy_AD_task(all_data):
             - 'label' (str): Label identifier (e.g., "FeTA24_distance_BPD")
             - 'targets' (str): Ground truth value
             - 'responses' (list): Model predictions
+        processes (int, optional): Number of processes to use for parallel calculation.
 
     Returns:
         dict: Dictionary mapping each label to its computed metrics:
@@ -255,32 +285,23 @@ def calculate_summary_metrics_per_anatomy_AD_task(all_data):
         grouped_data[label]["responses"].append(response)
     summary_metrics = {}
 
-    # Calculate metrics for each label group
-    for label, data in grouped_data.items():
-        targets = data["targets"]
-        responses = data["responses"]
+    # Prepare items for processing
+    items = list(grouped_data.items())
 
-        # Skip empty groups
-        if not targets or not responses:
-            continue
+    if processes is not None and processes > 1:
+        print(f"Calculating metrics with {processes} processes...")
+        with multiprocessing.Pool(processes=processes) as pool:
+            results = pool.starmap(process_label_group, items)
+    else:
+        results = [process_label_group(label, data) for label, data in items]
 
-        # Initialize counters for this group
-        counters = _initialize_metric_counters_AD_task()
-        count_total = len(targets)
-
-        # Process each target-response pair
-        for target, response in zip(targets, responses):
-            mock_results = {"filtered_resps": [response], "target": target}
-            metrics_dict = cal_metrics_AD_task(mock_results)
-            _update_metric_counters_AD_task(metrics_dict, counters)
-
-        # Calculate and store final metrics for this label
-        task_metrics = _calculate_final_metrics_AD_task(counters, count_total)
-
-        # Initialize the label entry if it doesn't exist
-        if label not in summary_metrics:
-            summary_metrics[label] = {}
-        summary_metrics[label] = task_metrics
+    # Collect results
+    for label, task_metrics in results:
+        if task_metrics is not None:
+            # Initialize the label entry if it doesn't exist
+            if label not in summary_metrics:
+                summary_metrics[label] = {}
+            summary_metrics[label] = task_metrics
 
     return summary_metrics
 
@@ -429,6 +450,7 @@ def process_combined_jsonl_files(jsonl_paths, limit):
 def process_parsed_file_in_model_folder(
     model_dir,
     limit=None,
+    processes=None,
 ):
     """
     Process all JSONL files in a model folder and generate summary metrics.
@@ -445,6 +467,7 @@ def process_parsed_file_in_model_folder(
         model_dir (str): Path to the model folder (must contain a 'parsed' subdirectory)
         limit (int, optional): Maximum number of samples to process per file.
                               None for all samples.
+        processes (int, optional): Number of processes to use for parallel calculation.
 
     Raises:
         AssertionError: If parsed directory doesn't exist
@@ -474,7 +497,9 @@ def process_parsed_file_in_model_folder(
         return
 
     # Calculate summary metrics per anatomy
-    summary_metrics = calculate_summary_metrics_per_anatomy_AD_task(all_data)
+    summary_metrics = calculate_summary_metrics_per_anatomy_AD_task(
+        all_data, processes=processes
+    )
 
     # Save raw values JSON file (targets and predictions for each sample)
     # Output: parsed/summary_AD_values.json
@@ -854,7 +879,9 @@ def print_model_summaries(task_dir, skip_model_wo_parsed_files=False):
     print(f"\nSummary saved to {output_file_path}")
 
 
-def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
+def _process_task_directory(
+    task_dir, limit, processes=None, skip_model_wo_parsed_files=False
+):
     """
     Process all model directories within a task directory.
 
@@ -866,6 +893,7 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
     Args:
         task_dir (str): Path to the task directory containing model folders
         limit (int, optional): Maximum number of samples to process per file
+        processes (int, optional): Number of processes to use for parallel calculation
         skip_model_wo_parsed_files (bool): Whether to skip model directories
                                           without parsed folders
     """
@@ -881,13 +909,13 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
             continue
 
         print(f"\nProcessing model directory: {model_dir}")
-        process_parsed_file_in_model_folder(model_dir, limit)
+        process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
     # Print summary metrics at the end
     print_model_summaries(task_dir, skip_model_wo_parsed_files)
 
 
-def _process_single_model_directory(model_dir, limit):
+def _process_single_model_directory(model_dir, limit, processes=None):
     """
     Process a single model directory.
 
@@ -897,9 +925,10 @@ def _process_single_model_directory(model_dir, limit):
     Args:
         model_dir (str): Path to the model directory
         limit (int, optional): Maximum number of samples to process per file
+        processes (int, optional): Number of processes to use for parallel calculation
     """
     print(f"\nProcessing model directory: {model_dir}")
-    process_parsed_file_in_model_folder(model_dir, limit)
+    process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
 
 def main(**kwargs):
@@ -918,6 +947,7 @@ def main(**kwargs):
                               None for all samples.
         skip_model_wo_parsed_files (bool): Whether to skip model directories without
                                           parsed folders (task_dir mode only)
+        processes (int, optional): Number of processes to use for parallel calculation.
 
     Raises:
         ValueError: If neither task_dir nor model_dir is provided
@@ -926,18 +956,21 @@ def main(**kwargs):
     model_dir = kwargs.get("model_dir")
     limit = kwargs.get("limit")
     skip_model_wo_parsed_files = kwargs.get("skip_model_wo_parsed_files", False)
+    processes = kwargs.get("processes")
 
     if task_dir is not None:
         print(
             f"Using task_dir: {task_dir}\nModel directories within this folder will be looped over."
         )
-        _process_task_directory(task_dir, limit, skip_model_wo_parsed_files)
+        _process_task_directory(
+            task_dir, limit, processes=processes, skip_model_wo_parsed_files=skip_model_wo_parsed_files
+        )
 
     elif model_dir is not None:
         print(
             f"Using model_dir: {model_dir}\nProcessing all JSONL files within this directory."
         )
-        _process_single_model_directory(model_dir, limit)
+        _process_single_model_directory(model_dir, limit, processes=processes)
 
     else:
         raise ValueError("Either 'task_dir' or 'model_dir' must be provided.")
@@ -953,6 +986,7 @@ def parse_args():
             - model_dir: Path to model directory (or None)
             - limit: Sample limit (or None for all samples)
             - skip_model_wo_parsed_files: Boolean flag
+            - processes: Number of worker processes (or None)
 
     Raises:
         SystemExit: If arguments are invalid (via parser.error)
@@ -980,6 +1014,13 @@ def parse_args():
         "--skip_model_wo_parsed_files",
         action="store_true",
         help="Skip model directories that don't have a 'parsed' folder. Only valid with --task_dir.",
+    )
+    parser.add_argument(
+        "--processes",
+        "-p",
+        type=int,
+        default=None,
+        help="Number of worker processes for metric calculation.",
     )
 
     args = parser.parse_args()

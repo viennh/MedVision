@@ -1,6 +1,7 @@
 import argparse
 import glob
 import json
+import multiprocessing
 import os
 import re
 
@@ -163,42 +164,63 @@ def _calculate_final_metrics_TL_task(counters, count_total):
     return task_metrics
 
 
-def calculate_summary_metrics_per_anatomy_TL_task(grouped_data):
+def process_label_group_TL(parent_class, data):
+    """
+    Helper function to process metrics for a single anatomy group (parent_class).
+    Used for both sequential and parallel processing.
+    """
+    if parent_class is None:
+        return parent_class, None
+
+    targets = data["targets"]
+    responses = data["responses"]
+
+    # Skip if targets or responses are empty
+    if not targets or not responses:
+        return parent_class, None
+
+    # Initialize counters
+    counters = _initialize_metric_counters_TL_task()
+    count_total = len(targets)
+
+    # Process each target-response pair
+    for target, response in zip(targets, responses):
+        mock_results = {"filtered_resps": [response], "target": target}
+        metrics_dict = cal_metrics_TL_task(mock_results)
+        _update_metric_counters_TL_task(metrics_dict, counters)
+
+    # Calculate and store final metrics
+    task_metrics = _calculate_final_metrics_TL_task(counters, count_total)
+    return parent_class, task_metrics
+
+
+def calculate_summary_metrics_per_anatomy_TL_task(grouped_data, processes=None):
     """
     Calculate summary metrics for each anatomy group.
 
     Args:
         grouped_data: Dictionary with parent_class as keys and task_data as values
+        processes (int, optional): Number of processes to use for parallel calculation.
 
     Returns:
         Dictionary with summary metrics per parent class and task type
     """
     summary_metrics = {}
 
-    for parent_class, data in grouped_data.items():
-        if parent_class is None:
-            continue
+    # Prepare items for processing
+    items = list(grouped_data.items())
 
-        targets = data["targets"]
-        responses = data["responses"]
+    if processes is not None and processes > 1:
+        print(f"Calculating metrics with {processes} processes...")
+        with multiprocessing.Pool(processes=processes) as pool:
+            results = pool.starmap(process_label_group_TL, items)
+    else:
+        results = [process_label_group_TL(parent_class, data) for parent_class, data in items]
 
-        # Skip if targets or responses are empty
-        if not targets or not responses:
-            continue
-
-        # Initialize counters
-        counters = _initialize_metric_counters_TL_task()
-        count_total = len(targets)
-
-        # Process each target-response pair
-        for target, response in zip(targets, responses):
-            mock_results = {"filtered_resps": [response], "target": target}
-            metrics_dict = cal_metrics_TL_task(mock_results)
-            _update_metric_counters_TL_task(metrics_dict, counters)
-
-        # Calculate and store final metrics
-        task_metrics = _calculate_final_metrics_TL_task(counters, count_total)
-        summary_metrics[parent_class] = task_metrics
+    # Collect results
+    for parent_class, task_metrics in results:
+        if task_metrics is not None:
+            summary_metrics[parent_class] = task_metrics
 
     return summary_metrics
 
@@ -282,6 +304,7 @@ def process_jsonl_file_TL_task(
 def process_parsed_file_in_model_folder(
     model_dir,
     limit=None,
+    processes=None,
 ):
     """
     Process all JSONL files in a model folder and generate summary metrics.
@@ -289,6 +312,7 @@ def process_parsed_file_in_model_folder(
     Args:
         model_dir: Path to the model folder
         limit: Maximum number of samples to process per file (None for no limit)
+        processes (int, optional): Number of processes to use for parallel calculation.
     """
     # Find parsed JSONL files
     parsed_files_dir = os.path.join(model_dir, "parsed")
@@ -317,7 +341,9 @@ def process_parsed_file_in_model_folder(
         return
 
     # Calculate summary metrics per anatomy
-    summary_metrics = calculate_summary_metrics_per_anatomy_TL_task(grouped_data)
+    summary_metrics = calculate_summary_metrics_per_anatomy_TL_task(
+        grouped_data, processes=processes
+    )
 
     # Save values JSON file
     output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_TL_VALUES)
@@ -548,13 +574,16 @@ def print_model_summaries(task_dir, skip_model_wo_parsed_files=False):
     print(f"Summary saved to {output_file_path}")
 
 
-def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
+def _process_task_directory(
+    task_dir, limit, processes=None, skip_model_wo_parsed_files=False
+):
     """
     Process all model directories within a task directory.
 
     Args:
         task_dir: Path to the task directory containing model folders
         limit: Maximum number of samples to process per file
+        processes (int, optional): Number of processes to use for parallel calculation
         skip_model_wo_parsed_files: Whether to skip model directories without parsed folders
     """
     # Get list of model folders within task_dir
@@ -575,22 +604,23 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
             continue
 
         print(f"\nProcessing model directory: {model_dir}")
-        process_parsed_file_in_model_folder(model_dir, limit)
+        process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
     # Print summary metrics at the end
     print_model_summaries(task_dir, skip_model_wo_parsed_files)
 
 
-def _process_single_model_directory(model_dir, limit):
+def _process_single_model_directory(model_dir, limit, processes=None):
     """
     Process a single model directory.
 
     Args:
         model_dir: Path to the model directory
         limit: Maximum number of samples to process per file
+        processes (int, optional): Number of processes to use for parallel calculation
     """
     print(f"\nProcessing model directory: {model_dir}")
-    process_parsed_file_in_model_folder(model_dir, limit)
+    process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
 
 def main(**kwargs):
@@ -602,23 +632,27 @@ def main(**kwargs):
         model_dir: Path to model directory (mutually exclusive with task_dir)
         limit: Maximum number of samples to process per file
         skip_model_wo_parsed_files: Whether to skip model directories without parsed folders
+        processes: Number of processes to use for parallel calculation
     """
     task_dir = kwargs.get("task_dir")
     model_dir = kwargs.get("model_dir")
     limit = kwargs.get("limit")
     skip_model_wo_parsed_files = kwargs.get("skip_model_wo_parsed_files", False)
+    processes = kwargs.get("processes")
 
     if task_dir is not None:
         print(
             f"Using task_dir: {task_dir}\nModel directories within this folder will be looped over."
         )
-        _process_task_directory(task_dir, limit, skip_model_wo_parsed_files)
+        _process_task_directory(
+            task_dir, limit, processes=processes, skip_model_wo_parsed_files=skip_model_wo_parsed_files
+        )
 
     elif model_dir is not None:
         print(
             f"Using model_dir: {model_dir}\nProcessing all JSONL files within this directory."
         )
-        _process_single_model_directory(model_dir, limit)
+        _process_single_model_directory(model_dir, limit, processes=processes)
 
     else:
         raise ValueError("Either 'task_dir' or 'model_dir' must be provided.")
@@ -649,6 +683,13 @@ def parse_args():
         "--skip_model_wo_parsed_files",
         action="store_true",
         help="Skip model directories that don't have a 'parsed' folder. Only valid with --task_dir.",
+    )
+    parser.add_argument(
+        "--processes",
+        "-p",
+        type=int,
+        default=None,
+        help="Number of worker processes for metric calculation.",
     )
 
     args = parser.parse_args()

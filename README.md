@@ -82,13 +82,23 @@ pip show medvision_bm
    # In the container
    git clone https://github.com/YongchengYAO/MedVision.git /root/Documents/MedVision
    cd /root/Documents/MedVision
+
+   # Check existing Conda env and activate 
+   conda env list
+   conda activate <env-name>
+
+   # Install the latest medvision_bm
+   pip install .
+   pip show medvision_bm
+
+   # Install the latest medvision_ds
+   python -m medvision_bm.benchmark.install_medvision_ds --data_dir ./Data
+   pip show medvision_ds
    ```
 
 Next (in the container):
 
-- Check the conda env name and activate: `conda env list`, `conda activate <env>`
-
-- Skip environment setup:
+- Skip environment setup (recommended reading: [how to debug env setup error](https://github.com/YongchengYAO/MedVision/blob/master/docs/debug_env_setup.md)):
 
   - Benchmarking: use `--skip_env_setup` for scripts in ``/root/Documents/MedVision/script/benchmark-*``
 
@@ -144,12 +154,13 @@ Next (in the container):
      # --model_dir: model folder
      # --limit: limit sample size in the parsed files
      # --skip_existing: (store_true arg) skip parsed files
+     # --processes, -p: number of processes
      
      # example 1: parse all models for the T/L task 
-     python -m medvision_bm.benchmark.parse_outputs --task_type TL --task_dir Results/MedVision-TL
+     python -m medvision_bm.benchmark.parse_outputs --task_type TL --task_dir Results/MedVision-TL -p 32
      
      # example 2: parse one model for the detection task and skip existing parsed files
-     python -m medvision_bm.benchmark.parse_outputs --task_type Detection --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct --skip_existing
+     python -m medvision_bm.benchmark.parse_outputs --task_type Detection --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct --skip_existing -p 32
      ```
 
   3. Summarize model performance for each task
@@ -171,18 +182,19 @@ Next (in the container):
       # --task_dir: task folder
       # --model_dir: model folder
       # --skip_model_wo_parsed_files: skip model directories that don't have a 'parsed' folder
+      # --processes, -p: number of processes 
       
       # example 1: summarize all models for the A/D task
-      python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD
+      python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD -p 32
       
       # example 2: summarize one model for the detection task
-      python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct
+      python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct -p 32
       
       # example 3: analyze how target size affect detection performance
-      python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect
+      python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect -p 32
       
       # example 4: compare detection performance with random guessing
-      python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect
+      python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect -p 32
       ```
 
 

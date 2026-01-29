@@ -1,9 +1,11 @@
 import argparse
 import glob
 import json
+import multiprocessing
 import os
 import re
 from collections import defaultdict
+from functools import partial
 
 import numpy as np
 
@@ -452,6 +454,7 @@ def process_jsonl_file_detection_task(
 def process_parsed_file_in_model_folder(
     model_dir,
     limit=None,
+    processes=None,
 ):
     """
     Process all JSONL files in a model's parsed folder and generate summary metrics.
@@ -467,6 +470,7 @@ def process_parsed_file_in_model_folder(
     Args:
         model_dir: Path to the model folder
         limit: Maximum number of samples to process per file (None = all)
+        processes: Number of worker processes to use (None = single process)
     """
     # Find parsed JSONL files
     parsed_files_dir = os.path.join(model_dir, "parsed")
@@ -477,9 +481,18 @@ def process_parsed_file_in_model_folder(
 
     # Collect all data from the parsed JSONL files
     all_data = []
-    for jsonl_file in jsonl_files:
-        file_data = process_jsonl_file_detection_task(jsonl_file, limit)
-        all_data.extend(file_data)
+
+    if processes and processes > 1:
+        print(f"Using {processes} processes for parsing JSONL files...")
+        func = partial(process_jsonl_file_detection_task, limit=limit)
+        with multiprocessing.Pool(processes) as pool:
+            results = pool.map(func, jsonl_files)
+        for res in results:
+            all_data.extend(res)
+    else:
+        for jsonl_file in jsonl_files:
+            file_data = process_jsonl_file_detection_task(jsonl_file, limit)
+            all_data.extend(file_data)
 
     # Early exit if no valid data found
     if not all_data:
@@ -626,7 +639,9 @@ def print_summary_metrics(task_dir, skip_model_wo_parsed_files=False):
     print(f"Table output saved to: {output_file_path}")
 
 
-def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
+def _process_task_directory(
+    task_dir, limit, skip_model_wo_parsed_files=False, processes=None
+):
     """
     Process all model directories within a task directory.
 
@@ -638,6 +653,7 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
         task_dir: Path to task directory containing model folders
         limit: Maximum samples to process per file (None = all)
         skip_model_wo_parsed_files: Skip models without parsed folders
+        processes: Number of worker processes to use
     """
     # Get list of model folders within task_dir
     model_dirs = get_subfolders(task_dir)
@@ -660,22 +676,23 @@ def _process_task_directory(task_dir, limit, skip_model_wo_parsed_files=False):
             continue
 
         print(f"\nProcessing model directory: {model_dir}")
-        process_parsed_file_in_model_folder(model_dir, limit)
+        process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
     # Print summary metrics at the end
     print_summary_metrics(task_dir, skip_model_wo_parsed_files)
 
 
-def _process_single_model_directory(model_dir, limit):
+def _process_single_model_directory(model_dir, limit, processes=None):
     """
     Process a single model directory.
 
     Args:
         model_dir: Path to the model directory
         limit: Maximum number of samples to process per file
+        processes: Number of worker processes to use
     """
     print(f"\nProcessing model directory: {model_dir}")
-    process_parsed_file_in_model_folder(model_dir, limit)
+    process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
 
 def main(**kwargs):
@@ -687,23 +704,27 @@ def main(**kwargs):
         model_dir: Path to model directory (mutually exclusive with task_dir)
         limit: Maximum number of samples to process per file
         skip_model_wo_parsed_files: Whether to skip model directories without parsed folders
+        processes: Number of worker processes to use
     """
     task_dir = kwargs.get("task_dir")
     model_dir = kwargs.get("model_dir")
     limit = kwargs.get("limit")
     skip_model_wo_parsed_files = kwargs.get("skip_model_wo_parsed_files", False)
+    processes = kwargs.get("processes")
 
     if task_dir is not None:
         print(
             f"Using task_dir: {task_dir}\nModel directories within this folder will be looped over."
         )
-        _process_task_directory(task_dir, limit, skip_model_wo_parsed_files)
+        _process_task_directory(
+            task_dir, limit, skip_model_wo_parsed_files, processes=processes
+        )
 
     elif model_dir is not None:
         print(
             f"Using model_dir: {model_dir}\nProcessing all JSONL files within this directory."
         )
-        _process_single_model_directory(model_dir, limit)
+        _process_single_model_directory(model_dir, limit, processes=processes)
 
     else:
         raise ValueError("Either 'task_dir' or 'model_dir' must be provided.")
@@ -743,6 +764,13 @@ def parse_args():
         "--skip_model_wo_parsed_files",
         action="store_true",
         help="Skip model directories that don't have a 'parsed' folder. Only valid with --task_dir.",
+    )
+    parser.add_argument(
+        "--processes",
+        "-p",
+        type=int,
+        default=None,
+        help="Number of worker processes to use for parsing JSONL files. If None, uses single process.",
     )
 
     args = parser.parse_args()
