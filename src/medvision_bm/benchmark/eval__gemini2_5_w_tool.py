@@ -137,7 +137,8 @@ def main():
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        ensure_hf_hub_installed()
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
+        ensure_hf_hub_installed(hf_hub_version="0.36.0")
         install_vendored_lmms_eval(proj_dependency="gemini")
         install_medvision_ds(data_dir)
         if args.env_setup_only:

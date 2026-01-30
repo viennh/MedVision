@@ -35,11 +35,11 @@ def run_pip_install(requirements_path):
     subprocess.run(cmd, env=env, check=True)
 
 
-def ensure_hf_hub_installed():
+def ensure_hf_hub_installed(hf_hub_version="0.35.3"):
     try:
         from huggingface_hub import snapshot_download  # noqa: F401
     except ImportError:
-        subprocess.run("pip install huggingface_hub[cli]", check=True, shell=True)
+        subprocess.run(f"pip install huggingface_hub[cli]=={hf_hub_version}", check=True, shell=True)
 
 
 def _install_lmms_eval(

@@ -171,16 +171,21 @@ def main():
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        ensure_hf_hub_installed()
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
+        ensure_hf_hub_installed(hf_hub_version="0.35.3")
         install_vendored_lmms_eval(proj_dependency="qwen2_5_vl")
         install_medvision_ds(data_dir)
         install_torch_cu124()
 
         # NOTE: vllm version may need to be adjusted based on compatibility of model and transformers version
-        install_vllm(data_dir, version="0.14.0")
+        # install_vllm(data_dir, version="0.14.0")
+        install_vllm(data_dir, version="0.10.0")
+
 
         # NOTE: Reinstall packages to overwrite potentially incompatible versions
-        install_transformers_accelerate_for_qwen25vl(transformers_version="5.0.0.rc2", accelerate_version="1.9.0")
+        # install_transformers_accelerate_for_qwen25vl(transformers_version="5.0.0.rc2", accelerate_version="1.9.0")
+        install_transformers_accelerate_for_qwen25vl(transformers_version="4.54.1", accelerate_version="1.9.0")
+
 
         if args.env_setup_only:
             print(
