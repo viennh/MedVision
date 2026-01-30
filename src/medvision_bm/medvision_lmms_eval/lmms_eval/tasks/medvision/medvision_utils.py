@@ -92,17 +92,17 @@ def doc_to_visual_wBox(doc, lmms_eval_specific_kwargs=None):
     pil_img = pil_img.convert("RGB")
 
     # Read bbox info, considering possibel resizing
-    # NOTE: bbox_*_coords_original is in (idx_dim0, idx_dim1) <=> (height, width) format
-    bbox_min_coords_original = doc["bounding_boxes"]["min_coords"][0]
-    bbox_max_coords_original = doc["bounding_boxes"]["max_coords"][0]
+    # NOTE: bbox_*_coords is in (idx_dim0, idx_dim1) <=> (height, width) format
+    bbox_min_coords = doc["bounding_boxes"]["min_coords"][0]
+    bbox_max_coords = doc["bounding_boxes"]["max_coords"][0]
     # Considering possible resizing, adjust bbox coordinates
     if reshape_image_hw is not None:
         orig_h, orig_w = image_size_2d
         new_h, new_w = reshape_image_hw
         scale_h = new_h / orig_h
         scale_w = new_w / orig_w
-        bbox_min_coords = (int(bbox_min_coords_original[0] * scale_h), int(bbox_min_coords_original[1] * scale_w))
-        bbox_max_coords = (int(bbox_max_coords_original[0] * scale_h), int(bbox_max_coords_original[1] * scale_w))
+        bbox_min_coords = (int(bbox_min_coords[0] * scale_h), int(bbox_min_coords[1] * scale_w))
+        bbox_max_coords = (int(bbox_max_coords[0] * scale_h), int(bbox_max_coords[1] * scale_w))
 
     # Overlay the bounding box on the pil_img
     pil_img = add_bbox_overlay(pil_img, bbox_min_coords, bbox_max_coords)
@@ -441,7 +441,7 @@ def create_doc_to_text_BoxCoordinate_wBox(preprocess_detection_module):
         question = (
             f"Task:\n"
             f"Given the input medical image{image_prompt}, and the highlighted bounding box enclosing the {label_name}, "
-            f"return the coordinates of the lower-left and upper-right corner of the bounding box for the bounding box.\n"
+            f"return the coordinates of the lower-left and upper-right corner of the bounding box.\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_BOX_COORDINATES}"
         )
@@ -917,7 +917,7 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
         # Include pixel size information in question text
-        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
 
         # Question
@@ -1001,7 +1001,7 @@ def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module)
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
         # Include pixel size information in question text
-        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
 
         # Question
@@ -1091,7 +1091,7 @@ def create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry_module
         image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
 
         # Include pixel size information in question text
-        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
 
         # Question
@@ -1186,7 +1186,7 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
 
         # Include pixel size information in question text
-        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
 
         # Question
@@ -1260,7 +1260,7 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
         # Include pixel size information in question text
-        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} (width) x {adjusted_pixel_height:.3f} (height)."
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
 
         # Question
@@ -1271,7 +1271,7 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         question = (
             f"Task:\n"
             f"Given the input medical image{image_prompt}, "
-            f"estimate the physical size of the {label_name}.\n"
+            f"estimate the physical size of the {label_name} in square millimeters.\n"
             f"Additional information:\n" 
             f"{pixel_size_text}\n"
             f"Format requirement:\n" 
@@ -1330,7 +1330,7 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
         # Include pixel size information in question text
-        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} (width) x {adjusted_pixel_height:.3f} (height)."
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
 
         # Question
@@ -1341,7 +1341,7 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
         question = (
             f"Task:\n"
             f"Given the input medical image{image_prompt}, and the segmentation mask of the {label_name}, "
-            f"estimate the physical size of the mask.\n"
+            f"estimate the physical size of the mask in square millimeters.\n"
             f"Additional information:\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"

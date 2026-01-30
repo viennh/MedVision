@@ -18,11 +18,8 @@ import psutil
 import torch
 from accelerate import PartialState
 from datasets import DatasetDict, concatenate_datasets, load_dataset
-from peft import LoraConfig, PeftModel
 from PIL import Image
 from scipy.ndimage import zoom
-from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
-from trl import SFTConfig, SFTTrainer
 
 from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
     get_resized_img_shape,
@@ -1283,59 +1280,79 @@ def _doc_to_text_DetectionTask(doc):
 
 def _doc_to_target_DetectionTask(doc):
     """
-    Get bounding box coordinates.
+     Get bounding box coordinates.
 
-    Definition of the output (target) bounding box coordinates:
-    1.  The origin of the coordinates is at the [lower-left corner] of the image.
-    2.  The first two numbers are the coordinates of the [lower-left] corner and
-        the last two numbers are the coordinates of the [upper-right] corner of the bounding box.
-    3.  The coordinates are expected to be in the format of [coor0_dim1, coor0_dim0, coor1_dim1, coor1_dim0], where:
-        - coor0: lower-left corner of the bounding box
-        - coor1: upper-right corner of the bounding box
-        - dim0: the first dimension of the image (height)
-        - dim1: the second dimension of the image (width)
+     Definition of the output (target) bounding box coordinates:
+     1.  The origin of the coordinates is at the [lower-left corner] of the image.
+     2.  The first two numbers are the coordinates of the [lower-left] corner and
+         the last two numbers are the coordinates of the [upper-right] corner of the bounding box.
+     3.  The coordinates are expected to be in the format of [coor0_dim1, coor0_dim0, coor1_dim1, coor1_dim0], where:
+         - coor0: lower-left corner of the bounding box
+         - coor1: upper-right corner of the bounding box
+         - dim0: the first dimension of the image (height)
+         - dim1: the second dimension of the image (width)
 
-    Definition of bounding box coordinates in the benchmark planner:
-    1. The origin of the coordinates is at the [top-left corner] of the image.
-    2. The first two numbers are the coordinates of the [upper-left] corner and
-       the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
+     Definition of bounding box coordinates in the benchmark planner:
+     1. The origin of the coordinates is at the [top-left corner] of the image.
+     2. The first two numbers are the coordinates of the [upper-left] corner and
+        the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
 
-    That is,
-        - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
-        - target coordinates are in the format of [idx_width, idx_height] in image space
+     That is,
+         - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
+         - target coordinates are in the format of [idx_width, idx_height] in image space
 
-    NOTE: CAVEAT!
-    !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
+     NOTE: CAVEAT!
+     !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
 
-    Warning:
-    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images,
-    such as in _doc_to_visual().
+     Warning:
+     If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images,
+     such as in _doc_to_visual().
 
-    In summary, the conversion involves:
-    Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner, we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
+     In summary, the conversion involves:
+     Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner,
+     we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
 
-        #-----------------------------+
-        |   * (P1)         @ (P2')    |
-        |                             |
-        |                             |
-        |                             |
-        |                             |
-        |                             |
-        |   @ (P1')        * (P2)     |
-        |                             |
-        &-----------------------------+
+         #-----------------------------+
+         |   * (P1)         @ (P2')    |
+         |                             |
+         |                             |
+         |                             |
+         |                             |
+         |                             |
+         |   @ (P1')        * (P2)     |
+         &-----------------------------+
 
-    #: array space origin (upper-left corner)
-    &: image space origin (lower-left corner)
-    P1: upper-left corner in array space (benchmark planner)
-    P2: lower-right corner in array space (benchmark planner)
-    P1': lower-left corner in image space
-    P2': upper-right corner in image space
+         #---------(idx_dim1)----------+
+         |                             |
+         |                             |
+         |                             |
+      (idx_dim0)   array space         |
+         |                             |
+         |                             |
+         |                             |
+         +-----------------------------+
 
-    ------
-    NOTE for developers and future versions:
-    Rotating the image counter-clockwise by 90 degrees would avoid the need for coordinate conversion.
-    ------
+         +---------(idx_width)---------+
+         |                             |
+         |                             |
+         |                             |
+    (idx_height)   image space         |
+         |                             |
+         |                             |
+         |                             |
+         &-----------------------------+
+
+     #: array space origin (upper-left corner)
+     &: image space origin (lower-left corner)
+     P1: the lower corner in array space (the min_coords in benchmark planner)
+     P2: the upper corner in array space (the max_coords in benchmark planner)
+     P1': the lower corner in image space
+     P2': the upper corner in image space
+
+     ------
+     NOTE for developers and future versions:
+     Rotating the image counter-clockwise by 90 degrees would avoid the need for coordinate conversion.
+     ------
     """
     # Read NIfTI image
     img_size = doc["image_size_2d"]
@@ -1914,6 +1931,14 @@ def prepare_trainer(
     dataloader_pin_memory=True,
     push_LoRA=False,
 ):
+    from peft import LoraConfig 
+    from transformers import (
+        AutoModelForImageTextToText,
+        AutoProcessor,
+        BitsAndBytesConfig,
+    )
+    from trl import SFTConfig, SFTTrainer
+
     # Check if GPU supports bfloat16
     if torch.cuda.get_device_capability()[0] < 8:
         raise ValueError(
@@ -2034,6 +2059,8 @@ def merge_models(
     Merge LoRA adapter with base model and optionally save locally and/or push to Hugging Face Hub.
     This function is intended to be called **only on the main process**.
     """
+    from peft import PeftModel
+    from transformers import AutoModelForImageTextToText, AutoProcessor
 
     print("\n[Info] Starting model merge process (CPU-only)...")
 

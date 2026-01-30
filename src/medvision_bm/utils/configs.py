@@ -657,3 +657,56 @@ label_map_rename = {
     "left scapula": "left scapula",
     "right scapula": "right scapula",
 }
+
+
+# Reference: https://github.com/microsoft/BiomedParse?tab=readme-ov-file#recommended-preprocessing-important
+# ---
+# soft tissues (W:400, L:40)
+# lung (W:1500, L:-160)
+# brain (W:80, L:40)
+# bone (W:1800, L:400)
+# ---
+HU_window_WL_map = {
+    "soft_tissue": (400, 40),
+    "lung": (1500, -160),
+    "brain": (80, 40),
+    "bone": (1800, 400),
+}
+
+CT_HU_windows_WL = {
+    'Artery': HU_window_WL_map['soft_tissue'],
+    'Vein': HU_window_WL_map['soft_tissue'],
+    'Brain': HU_window_WL_map['brain'],
+    'Brain Tumor/Lesion': HU_window_WL_map['brain'],
+    'Heart': HU_window_WL_map['soft_tissue'],
+    'Lung': HU_window_WL_map['lung'],
+    'Lung Tumor/Lesion': HU_window_WL_map['lung'],
+    'Liver': HU_window_WL_map['soft_tissue'],
+    'Liver Tumor/Lesion': HU_window_WL_map['soft_tissue'],
+    'Kidney': HU_window_WL_map['soft_tissue'],
+    'Kidney Tumor/Lesion': HU_window_WL_map['soft_tissue'],
+    'Pancreas': HU_window_WL_map['soft_tissue'],
+    'Pancreas Tumor/Lesion': HU_window_WL_map['soft_tissue'],
+    'Gallbladder': HU_window_WL_map['soft_tissue'],
+    'Spleen': HU_window_WL_map['soft_tissue'],
+    'Adrenal Gland': HU_window_WL_map['soft_tissue'],
+    'Colon': HU_window_WL_map['soft_tissue'],
+    'Colon Tumor/Lesion': HU_window_WL_map['soft_tissue'],
+    'Intestine': HU_window_WL_map['soft_tissue'],
+    'Esophagus': HU_window_WL_map['soft_tissue'],
+    'Stomach': HU_window_WL_map['soft_tissue'],
+    'Urinary System': HU_window_WL_map['soft_tissue'],
+    'Uterus': HU_window_WL_map['soft_tissue'],
+    'Prostate': HU_window_WL_map['soft_tissue'],
+    'Head-Neck': HU_window_WL_map['soft_tissue'],
+    'Head-Neck Tumor/Lesion': HU_window_WL_map['soft_tissue'],
+    'Hip': HU_window_WL_map['bone'],
+    'Rib': HU_window_WL_map['bone'],
+    'Spine': HU_window_WL_map['bone'],
+    'Knee': HU_window_WL_map['bone'],
+    'Metastatic Lymph Node': HU_window_WL_map['soft_tissue'],
+    'Miscellaneous Tumor/Lesion': HU_window_WL_map['soft_tissue'],
+    'Jawbone': HU_window_WL_map['bone'],
+    'Tooth': HU_window_WL_map['bone'],
+    'Others': HU_window_WL_map['soft_tissue']
+}
