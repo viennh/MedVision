@@ -209,14 +209,16 @@ COT_TEMPLATE_ANGLE = (
 # ======================================================================================================
 # Prompts used in non-CoT benchmarking
 # ======================================================================================================
+GENERAL_FORMAT_PROMPT = "The reasoning process and the final answer must be enclosed within <think> </think> and <answer> </answer> tags, respectively. For example: <think> reasoning process here </think> <answer> answer here </answer>. "
+
 SYSTEM_PROMPT_LITE = (
     "A conversation between a User and an Assistant. The User asks a question, and the Assistant solves it. "
     "The Assistant first thinks through the reasoning process internally, then provides the User with the answer. "
-    "The reasoning process and the final answer must be enclosed within <think> </think> and <answer> </answer> tags, respectively. For example: <think> reasoning process here </think> <answer> answer here </answer>. "
+    f"{GENERAL_FORMAT_PROMPT}"
 )
 
 FORMAT_PROMPT_BOX_COORDINATES = (
-    f"{SYSTEM_PROMPT_LITE}"
+    f"{GENERAL_FORMAT_PROMPT}"
     "The answer should be four decimal numbers separated by commas without any units or additional text. "
     "The first two numbers are the coordinates of the lower-left corner and the last two numbers are the coordinates of the upper-right corner of the bounding box. "
     "Use relative coordinates in the image space, where the origin is at the lower-left corner of the image. "
@@ -224,23 +226,23 @@ FORMAT_PROMPT_BOX_COORDINATES = (
 )
 
 FORMAT_PROMPT_MASK_SIZE = (
-    f"{SYSTEM_PROMPT_LITE}"
+    f"{GENERAL_FORMAT_PROMPT}"
     "The answer should be a single decimal number."
 )
 
 FORMAT_PROMPT_TUMOR_LESION_SIZE = (
-    f"{SYSTEM_PROMPT_LITE}"
+    f"{GENERAL_FORMAT_PROMPT}"
     "The answer should be two decimal numbers separated by a comma. "
     "The first is the major axis length, and the second is the minor axis length."
 )
 
 FORMAT_PROMPT_BIOMETRICS = (
-    f"{SYSTEM_PROMPT_LITE}"
+    f"{GENERAL_FORMAT_PROMPT}"
     "The answer should be a single decimal number."
 )
 
 FORMAT_PROMPT_1_DECIMAL_NUMBER = (
-    f"{SYSTEM_PROMPT_LITE}"
+    f"{GENERAL_FORMAT_PROMPT}"
     "The answer should be a single decimal number."
 )
 # ======================================================================================================
