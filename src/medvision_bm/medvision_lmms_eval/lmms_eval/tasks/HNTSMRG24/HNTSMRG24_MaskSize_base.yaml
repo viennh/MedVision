@@ -1,4 +1,4 @@
-tag: MedVision-BoxCoordinate,HNTSMRG24
+tag: MedVision-MaskSize,HNTSMRG24
 dataset_path: YongchengYAO/MedVision
 dataset_kwargs:
   token: True
