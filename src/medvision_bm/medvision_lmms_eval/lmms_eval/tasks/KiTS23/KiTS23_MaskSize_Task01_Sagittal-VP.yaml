@@ -1,0 +1,3 @@
+include: KiTS23_MaskSize_base-VP.yaml
+task: KiTS23_MaskSize_Task01_Sagittal-VP
+dataset_name: KiTS23_MaskSize_Task01_Sagittal_Test

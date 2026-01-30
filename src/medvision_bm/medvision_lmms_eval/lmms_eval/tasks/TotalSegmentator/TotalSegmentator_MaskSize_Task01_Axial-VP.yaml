@@ -1,0 +1,3 @@
+include: TotalSegmentator_MaskSize_base-VP.yaml
+task: TotalSegmentator_MaskSize_Task01_Axial-VP 
+dataset_name: TotalSegmentator_MaskSize_Task01_Axial_Test

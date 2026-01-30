@@ -1,0 +1,3 @@
+include: AMOS22_MaskSize_base-VP.yaml
+task: AMOS22_MaskSize_Task02_Sagittal-VP
+dataset_name: AMOS22_MaskSize_Task02_Sagittal_Test

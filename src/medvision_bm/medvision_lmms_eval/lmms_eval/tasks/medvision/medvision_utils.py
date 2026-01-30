@@ -1,3 +1,4 @@
+import importlib
 import os
 import re
 import sys
@@ -6,6 +7,11 @@ import nibabel as nib
 import numpy as np
 import PIL.Image
 import torch
+from medvision_ds.utils.doc_to_visual_utils import (
+    add_bbox_overlay,
+    add_landmarks_and_line_overlay,
+    add_mask_overlay_contour,
+)
 from PIL import Image
 from scipy.ndimage import zoom
 from transformers import AutoImageProcessor
@@ -26,7 +32,10 @@ from medvision_bm.sft.sft_prompts import (
 
 
 def doc_to_visual(doc, lmms_eval_specific_kwargs=None):
-    """Convert document to image with scale bar added."""
+    """
+    Read NIfTI image, normalize, and convert to PIL Image.
+    """
+
     # Read NIfTI image
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
@@ -44,10 +53,334 @@ def doc_to_visual(doc, lmms_eval_specific_kwargs=None):
         img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
     else:
         img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
     # Convert to RGB mode
     pil_img = pil_img.convert("RGB")
+
+    return [pil_img]
+
+
+def doc_to_visual_wBox(doc, lmms_eval_specific_kwargs=None):
+    """
+    Read NIfTI image, normalize, and convert to PIL Image with bounding box overlay.
+    """
+
+    # Read NIfTI image
+    img_path = doc["image_file"]
+    slice_dim = doc["slice_dim"]
+    slice_idx = doc["slice_idx"]
+    image_size_2d = doc["image_size_2d"]
+
+    # Load 2D slice from NIfTI file, with optional resizing
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    if reshape_image_hw is not None:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+    else:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+    # Normalize the image to 0-255 range
+    if img_2d.max() > img_2d.min():
+        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
+    else:
+        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+
+    # Convert to PIL Image in grayscale mode
+    pil_img = Image.fromarray(img_2d_normalized, mode="L")
+    # Convert to RGB mode
+    pil_img = pil_img.convert("RGB")
+
+    # Read bbox info, considering possibel resizing
+    # NOTE: bbox_*_coords_original is in (idx_dim0, idx_dim1) <=> (height, width) format
+    bbox_min_coords_original = doc["bounding_boxes"]["min_coords"][0]
+    bbox_max_coords_original = doc["bounding_boxes"]["max_coords"][0]
+    # Considering possible resizing, adjust bbox coordinates
+    if reshape_image_hw is not None:
+        orig_h, orig_w = image_size_2d
+        new_h, new_w = reshape_image_hw
+        scale_h = new_h / orig_h
+        scale_w = new_w / orig_w
+        bbox_min_coords = (int(bbox_min_coords_original[0] * scale_h), int(bbox_min_coords_original[1] * scale_w))
+        bbox_max_coords = (int(bbox_max_coords_original[0] * scale_h), int(bbox_max_coords_original[1] * scale_w))
+
+    # Overlay the bounding box on the pil_img
+    pil_img = add_bbox_overlay(pil_img, bbox_min_coords, bbox_max_coords)
+
+    return [pil_img]
+
+
+def doc_to_visual_wMask(doc, lmms_eval_specific_kwargs=None):
+    """
+    Read NIfTI image, normalize, and convert to PIL Image with mask overlay.
+    """
+
+    # Read NIfTI image
+    img_path = doc["image_file"]
+    mask_path = doc["mask_file"]
+    slice_dim = doc["slice_dim"]
+    slice_idx = doc["slice_idx"]
+
+    # [Image] Load 2D slice from NIfTI file, with optional resizing
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    if reshape_image_hw is not None:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+    else:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+    # [Mask] Load 2D slice from NIfTI file, with optional resizing
+    if reshape_image_hw is not None:
+        _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+    else:
+        _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx)
+
+    # Normalize the image to 0-255 range
+    if img_2d.max() > img_2d.min():
+        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
+    else:
+        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+
+    # Convert to PIL Image in grayscale mode
+    pil_img = Image.fromarray(img_2d_normalized, mode="L")
+    # Convert to RGB mode
+    pil_img = pil_img.convert("RGB")
+
+    # Overlay the mask contour on the pil_img
+    pil_img = add_mask_overlay_contour(pil_img, mask_2d)
+
+    return [pil_img]
+
+
+def doc_to_visual_wVisualPrompt_TLTask(doc, lmms_eval_specific_kwargs=None):
+    """
+    Read NIfTI image, normalize, and convert to PIL Image with visual prompt overlay for tumor/lesion size estimation task.
+    The visual prompt includes 2 lines representing the longest and its perpendicular distances of an ellipse enclosing the tumor/lesion.
+    """
+    from medvision_bm.sft.sft_utils import _get_landmarks_coords
+
+    # Read NIfTI image
+    img_path = doc["image_file"]
+    slice_dim = doc["slice_dim"]
+    slice_idx = doc["slice_idx"]
+    image_size_2d = doc["image_size_2d"]
+
+    # [Image] Load 2D slice from NIfTI file, with optional resizing
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    if reshape_image_hw is not None:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+    else:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+    # Normalize the image to 0-255 range
+    if img_2d.max() > img_2d.min():
+        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
+    else:
+        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+
+    # Convert to PIL Image in grayscale mode
+    pil_img = Image.fromarray(img_2d_normalized, mode="L")
+    # Convert to RGB mode
+    pil_img = pil_img.convert("RGB")
+
+    # Get endpoint coordinates for the 2 lines, considering possible resizing
+    # ------
+    # Gather landmark coordinates in (idx_dim0, idx_dim1) <=> (height, width) format
+    landmarks_coords = _get_landmarks_coords(doc, ["P1", "P2", "P3", "P4"])
+    coords_p1 = landmarks_coords["landmark_P1"]
+    coords_p2 = landmarks_coords["landmark_P2"]
+    coords_p3 = landmarks_coords["landmark_P3"]
+    coords_p4 = landmarks_coords["landmark_P4"]
+
+    # Considering possible resizing, adjust landmark coordinates
+    if reshape_image_hw is not None:
+        orig_h, orig_w = image_size_2d
+        new_h, new_w = reshape_image_hw
+        scale_h = new_h / orig_h
+        scale_w = new_w / orig_w
+        coords_p1 = (int(coords_p1[0] * scale_h), int(coords_p1[1] * scale_w))
+        coords_p2 = (int(coords_p2[0] * scale_h), int(coords_p2[1] * scale_w))
+        coords_p3 = (int(coords_p3[0] * scale_h), int(coords_p3[1] * scale_w))
+        coords_p4 = (int(coords_p4[0] * scale_h), int(coords_p4[1] * scale_w))
+    # ------
+
+    # Overlay the major and minor axes of the ellipse fitted to the tumor/lesion on the pil_img
+    # Major axis line: green (#00FF00); Minor axis line: blue (#0000FF); Landmarks: red (#FF0000)
+    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#00FF00", point_color="#FF0000")
+    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p3, coords_p4, line_color="#0000FF", point_color="#FF0000")
+
+    return [pil_img]
+
+
+def doc_to_visual_wVisualPrompt_distanceTask(doc, lmms_eval_specific_kwargs=None):
+    """
+    Read NIfTI image, normalize, and convert to PIL Image with visual prompt overlay for distance estimation task.
+    The visual prompt includes one line representing the target distance.
+    """
+    from medvision_bm.sft.sft_utils import _get_landmarks_coords
+    from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE
+
+    # Read NIfTI image
+    img_path = doc["image_file"]
+    slice_dim = doc["slice_dim"]
+    slice_idx = doc["slice_idx"]
+    image_size_2d = doc["image_size_2d"]
+
+    # [Image] Load 2D slice from NIfTI file, with optional resizing
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    if reshape_image_hw is not None:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+    else:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+    # Normalize the image to 0-255 range
+    if img_2d.max() > img_2d.min():
+        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
+    else:
+        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+
+    # Convert to PIL Image in grayscale mode
+    pil_img = Image.fromarray(img_2d_normalized, mode="L")
+    # Convert to RGB mode
+    pil_img = pil_img.convert("RGB")
+
+    # Get endpoint coordinates for the target line, considering possible resizing
+    # ------
+    # Import the dataset-specific module from medvision_ds.datasets
+    dataset_name = doc["dataset_name"]
+    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
+    if dataset_module is None:
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+    preprocess_biometry_module = importlib.import_module(f"medvision_ds.datasets.{dataset_module}.preprocess_biometry")
+
+    # Get task info
+    taskID = doc["taskID"]
+    bm_plan = preprocess_biometry_module.benchmark_plan
+    task_info = bm_plan["tasks"][int(taskID) - 1]
+
+    # Get biometrics profile for this case
+    biometric_profile = doc["biometric_profile"]
+    metric_type = biometric_profile["metric_type"]
+    metric_map_name = biometric_profile["metric_map_name"]
+    metric_key = biometric_profile["metric_key"]
+
+    # Gather landmark coordinates in (idx_dim0, idx_dim1) <=> (height, width) format
+    lines_map = task_info[metric_map_name]
+    line_dict = lines_map[metric_key]
+    lms = line_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
+    landmarks_coords = _get_landmarks_coords(doc, lms)
+    coords_p1 = landmarks_coords["landmark_" + lms[0]]
+    coords_p2 = landmarks_coords["landmark_" + lms[1]]
+
+    # Considering possible resizing, adjust landmark coordinates
+    if reshape_image_hw is not None:
+        orig_h, orig_w = image_size_2d
+        new_h, new_w = reshape_image_hw
+        scale_h = new_h / orig_h
+        scale_w = new_w / orig_w
+        coords_p1 = (int(coords_p1[0] * scale_h), int(coords_p1[1] * scale_w))
+        coords_p2 = (int(coords_p2[0] * scale_h), int(coords_p2[1] * scale_w))
+    # ------
+
+    # Overlay the target line and its endpoints (landmarks) on the pil_img
+    # Target line: green (#00FF00); Landmarks: red (#FF0000)
+    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#00FF00", point_color="#FF0000")
+
+    return [pil_img]
+
+
+def doc_to_visual_wVisualPrompt_angleTask(doc, lmms_eval_specific_kwargs=None):
+    """
+    Read NIfTI image, normalize, and convert to PIL Image with visual prompt overlay for angle estimation task.
+    The visual prompt includes 2 lines representing the two lines forming the target angle.
+    """
+    from medvision_bm.sft.sft_utils import _get_landmarks_coords
+    from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE
+
+    # Read NIfTI image
+    img_path = doc["image_file"]
+    slice_dim = doc["slice_dim"]
+    slice_idx = doc["slice_idx"]
+    image_size_2d = doc["image_size_2d"]
+
+    # [Image] Load 2D slice from NIfTI file, with optional resizing
+    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+    if reshape_image_hw is not None:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+    else:
+        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+    # Normalize the image to 0-255 range
+    if img_2d.max() > img_2d.min():
+        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
+    else:
+        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+
+    # Convert to PIL Image in grayscale mode
+    pil_img = Image.fromarray(img_2d_normalized, mode="L")
+    # Convert to RGB mode
+    pil_img = pil_img.convert("RGB")
+
+    # Get endpoint coordinates for the target line, considering possible resizing
+    # ------
+    # Import the dataset-specific module from medvision_ds.datasets
+    dataset_name = doc["dataset_name"]
+    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
+    if dataset_module is None:
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+    preprocess_biometry_module = importlib.import_module(f"medvision_ds.datasets.{dataset_module}.preprocess_biometry")
+
+    # Get task info
+    taskID = doc["taskID"]
+    bm_plan = preprocess_biometry_module.benchmark_plan
+    task_info = bm_plan["tasks"][int(taskID) - 1]
+
+    # Get biometrics profile for this case
+    biometric_profile = doc["biometric_profile"]
+    metric_type = biometric_profile["metric_type"]
+    metric_map_name = biometric_profile["metric_map_name"]
+    metric_key = biometric_profile["metric_key"]
+
+    # Get line 1 and line 2 coordinates in (idx_dim0, idx_dim1) <=> (height, width) format
+    angles_map = task_info[metric_map_name]
+    angle_dict = angles_map[metric_key]
+    lines_map_name = angle_dict["element_map_name"]
+    line_keys = angle_dict["element_keys"]
+    lines_map = task_info[lines_map_name]
+    line1_dict = lines_map[line_keys[0]]
+    line1_lms = line1_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
+    line1_lms_map_name = line1_dict["element_map_name"]
+    line1_lms_map = task_info[line1_lms_map_name]
+    line1_p1_name = line1_lms_map[line1_lms[0]]
+    line1_p2_name = line1_lms_map[line1_lms[1]]
+    line2_dict = lines_map[line_keys[1]]
+    line2_lms = line2_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
+    line1_landmarks_coords = _get_landmarks_coords(doc, line1_lms)
+    line2_landmarks_coords = _get_landmarks_coords(doc, line2_lms)
+
+    # Mark line 1 endpoints as P1 and P2
+    coords_p1 = line1_landmarks_coords["landmark_" + line1_lms[0]]
+    coords_p2 = line1_landmarks_coords["landmark_" + line1_lms[1]]
+    # Mark line 2 endpoints as P3 and P4
+    coords_p3 = line2_landmarks_coords["landmark_" + line2_lms[0]]
+    coords_p4 = line2_landmarks_coords["landmark_" + line2_lms[1]]
+
+    # Considering possible resizing, adjust landmark coordinates
+    if reshape_image_hw is not None:
+        orig_h, orig_w = image_size_2d
+        new_h, new_w = reshape_image_hw
+        scale_h = new_h / orig_h
+        scale_w = new_w / orig_w
+        coords_p1 = (int(coords_p1[0] * scale_h), int(coords_p1[1] * scale_w))
+        coords_p2 = (int(coords_p2[0] * scale_h), int(coords_p2[1] * scale_w))
+        coords_p3 = (int(coords_p3[0] * scale_h), int(coords_p3[1] * scale_w))
+        coords_p4 = (int(coords_p4[0] * scale_h), int(coords_p4[1] * scale_w))
+    # ------
+
+    # Overlay the 2 lines forming the target angle
+    # Line 1: green (#00FF00); Line 2: blue (#0000FF); Landmarks: red (#FF0000)
+    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#00FF00", point_color="#FF0000")
+    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p3, coords_p4, line_color="#0000FF", point_color="#FF0000")
+
     return [pil_img]
 
 
@@ -82,6 +415,39 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
         return question
 
     return doc_to_text_BoxCoordinate
+
+
+def create_doc_to_text_BoxCoordinate_wBox(preprocess_detection_module):
+    def doc_to_text_BoxCoordinate_wBox(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_detection_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+        # Get label info
+        label = str(doc["label"])
+        labels_map = task_info["labels_map"]
+        if label not in labels_map:
+            raise ValueError(f"Label {label} not found in labels_map.")
+        else:
+            label_name = labels_map.get(label)
+        # Get image info
+        image_description = task_info["image_description"]
+        # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+        question = (
+            f"Task:\n"
+            f"Given the input medical image{image_prompt}, and the highlighted bounding box enclosing the {label_name}, "
+            f"return the coordinates of the lower-left and upper-right corner of the bounding box for the bounding box.\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_BOX_COORDINATES}"
+        )
+        return question
+
+    return doc_to_text_BoxCoordinate_wBox
 
 
 def _process_img_qwen25vl(img_2d_raw, extra_kwargs):
@@ -573,12 +939,94 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
     return doc_to_text_TumorLesionSize
 
 
+def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module):
+    def doc_to_text_TumorLesionSize_wVisualPrompt(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_biometry_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+
+        # Get label info
+        label = str(doc["label"])
+        labels_map = task_info["labels_map"]
+        if label not in labels_map:
+            raise ValueError(f"Label {label} not found in labels_map.")
+        else:
+            label_name = labels_map.get(label)
+
+        # Get 2D image info
+        image_description = task_info["image_description"]
+
+        # Read NIfTI image
+        img_path = doc["image_file"]
+        slice_dim = doc["slice_dim"]
+        slice_idx = doc["slice_idx"]
+
+        # Load 2D slice from NIfTI file, with optional resizing
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        if reshape_image_hw is not None:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        else:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+        img_shape_hw = img_2d_raw.shape
+
+        # Get biometrics profile for this case
+        biometric_profile = doc["biometric_profile"]
+        metric_unit = biometric_profile["metric_unit"]
+        if isinstance(metric_unit, list):
+            assert len(metric_unit) == 1, "metric_unit list should have only one element."
+            metric_unit = metric_unit[0]
+        elif isinstance(metric_unit, str):
+            if metric_unit == "mm":
+                metric_unit = "millimeters"
+            elif metric_unit == "cm":
+                metric_unit = "centimeters"
+        else:
+            raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
+
+        # -------------
+        # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
+        # -------------
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
+
+        # Adjust pixel size based on the resize ratio
+        original_height, original_width = img_shape_hw
+        pixel_height, pixel_width = pixel_size_hw
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        adjusted_pixel_height = pixel_height / resize_ratio_h
+        adjusted_pixel_width = pixel_width / resize_ratio_w
+        # Include pixel size information in question text
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
+        # -------------
+
+        # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+        question = (
+            f"Task:\n"
+            f"Given the input medical image{image_prompt}, and the two lines indicating the major and minor axes of the ellipse enclosing the {label_name}, "
+            f"estimate the major and minor axis lengths in {metric_unit}.\n"
+            f"Additional information:\n"
+            f"{pixel_size_text}\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
+        )
+        return question
+
+    return doc_to_text_TumorLesionSize_wVisualPrompt
+
+
 def create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry_module):
     def doc_to_text_TumorLesionSize_CoT_woInstruct(doc, lmms_eval_specific_kwargs=None):
         """Convert document to text."""
-        from medvision_bm.sft.sft_prompts import (
-            FORMAT_PROMPT_TL_REASONING,
-        )
+        from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TL_REASONING
 
         # Get task info
         taskID = doc["taskID"]
@@ -821,11 +1269,11 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         else:
             image_prompt = ""
         question = (
-            f"Task:\n" 
-            f"Given the input medical image{image_prompt}, " 
-            f"estimate the physical size of the {label_name}.\n" 
+            f"Task:\n"
+            f"Given the input medical image{image_prompt}, "
+            f"estimate the physical size of the {label_name}.\n"
             f"Additional information:\n" 
-            f"{pixel_size_text}\n" 
+            f"{pixel_size_text}\n"
             f"Format requirement:\n" 
             f"{FORMAT_PROMPT_MASK_SIZE}"
         )
@@ -834,21 +1282,91 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
     return doc_to_text_MaskSize
 
 
+def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
+    def doc_to_text_MaskSize_wMask(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_segmentation_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+
+        # Get label info
+        label = str(doc["label"])
+        labels_map = task_info["labels_map"]
+        if label not in labels_map:
+            raise ValueError(f"Label {label} not found in labels_map.")
+        else:
+            label_name = labels_map.get(label)
+
+        # Get 2D image info
+        image_description = task_info["image_description"]
+
+        # Read NIfTI image
+        img_path = doc["image_file"]
+        slice_dim = doc["slice_dim"]
+        slice_idx = doc["slice_idx"]
+
+        # Load 2D slice from NIfTI file, with optional resizing
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        if reshape_image_hw is not None:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        else:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+        img_shape_hw = img_2d_raw.shape
+
+        # -------------
+        # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
+        # -------------
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
+
+        # Adjust pixel size based on the resize ratio
+        original_height, original_width = img_shape_hw
+        pixel_height, pixel_width = pixel_size_hw
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        adjusted_pixel_height = pixel_height / resize_ratio_h
+        adjusted_pixel_width = pixel_width / resize_ratio_w
+        # Include pixel size information in question text
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} (width) x {adjusted_pixel_height:.3f} (height)."
+        # -------------
+
+        # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+        question = (
+            f"Task:\n"
+            f"Given the input medical image{image_prompt}, and the segmentation mask of the {label_name}, "
+            f"estimate the physical size of the mask.\n"
+            f"Additional information:\n"
+            f"{pixel_size_text}\n"
+            f"Format requirement:\n"
+            f"{FORMAT_PROMPT_MASK_SIZE}"
+        )
+        return question
+
+    return doc_to_text_MaskSize_wMask
+
+
 def _get_biometric_prompt_angle(biometrics_name, l1p1, l1p2, l2p1, l2p2, metric_unit):
     """Prepare prompt for angle estimate VQA. Inputs are names."""
     if biometrics_name is not None and biometrics_name != "":
-        return f"estimate the angle of {biometrics_name} in {metric_unit}, " f"which is the angle between 2 lines: " f"(line 1) the line connecting {l1p1} and {l1p2}, " f"(line 2) the line connecting {l2p1} and {l2p2}.\n"
+        return f"estimate the angle of {biometrics_name} in {metric_unit}, which is the angle between 2 lines: (line 1) the line connecting {l1p1} and {l1p2}, (line 2) the line connecting {l2p1} and {l2p2}.\n"
     else:
-        return f"estimate the angle between 2 lines in {metric_unit}: " f"(line 1) the line connecting {l1p1} and {l1p2}, " f"(line 2) the line connecting {l2p1} and {l2p2}.\n"
+        return f"estimate the angle between 2 lines in {metric_unit}: (line 1) the line connecting {l1p1} and {l1p2}, (line 2) the line connecting {l2p1} and {l2p2}.\n"
 
 
 def _get_biometric_prompt_distance(biometrics_name, p1, p2, metric_unit):
     """Prepare prompt for distance estimate VQA. Inputs are names."""
     metric_unit = metric_unit.strip().replace("mm", "millimeters")
     if biometrics_name is not None and biometrics_name != "":
-        return f"estimate the distance of {biometrics_name} in {metric_unit}, " f"which is the distance between 2 landmark points: " f"(landmark 1) {p1}, " f"(landmark 2) {p2}.\n"
+        return f"estimate the distance of {biometrics_name} in {metric_unit}, which is the distance between 2 landmark points: (landmark 1) {p1}, (landmark 2) {p2}.\n"
     else:
-        return f"estimate the distance between 2 landmark points in {metric_unit}: " f"(landmark 1) {p1}, " f"(landmark 2) {p2}.\n"
+        return f"estimate the distance between 2 landmark points in {metric_unit}: (landmark 1) {p1}, (landmark 2) {p2}.\n"
 
 
 def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
@@ -941,25 +1459,127 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             image_prompt = ": " + image_description
         else:
             image_prompt = ""
-        question = (
-            f"Task:\n" 
-            f"Given the input medical image{image_prompt}, " 
-            f"{task_prompt}" 
-            f"Additional information:\n" 
-            f"{pixel_size_text}\n" 
-            f"Format requirement:\n" 
-            f"{FORMAT_PROMPT_BIOMETRICS}")
+        question = f"Task:\n" f"Given the input medical image{image_prompt}, " f"{task_prompt}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
         return question
 
     return doc_to_text_BiometricsFromLandmarks
 
 
+def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry_module):
+    def doc_to_text_BiometricsFromLandmarks_wVisualPrompt(doc, lmms_eval_specific_kwargs=None):
+        """Convert document to text."""
+        # Get task info
+        taskID = doc["taskID"]
+        bm_plan = preprocess_biometry_module.benchmark_plan
+        task_info = bm_plan["tasks"][int(taskID) - 1]
+
+        # Get biometrics profile for this case
+        biometric_profile = doc["biometric_profile"]
+        metric_type = biometric_profile["metric_type"]
+        metric_map_name = biometric_profile["metric_map_name"]
+        metric_key = biometric_profile["metric_key"]
+        metric_unit = biometric_profile["metric_unit"]
+
+        # Get 2D image info
+        image_description = task_info["image_description"]
+
+        # Read NIfTI image
+        img_path = doc["image_file"]
+        slice_dim = doc["slice_dim"]
+        slice_idx = doc["slice_idx"]
+
+        # Load 2D slice from NIfTI file, with optional resizing
+        reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
+        if reshape_image_hw is not None:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
+        else:
+            pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
+
+        img_shape_hw = img_2d_raw.shape
+
+        # -------------
+        # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
+        # -------------
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
+        img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
+
+        # Adjust pixel size based on the resize ratio
+        original_height, original_width = img_shape_hw
+        pixel_height, pixel_width = pixel_size_hw
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        adjusted_pixel_height = pixel_height / resize_ratio_h
+        adjusted_pixel_width = pixel_width / resize_ratio_w
+        # Include pixel size information in question text
+        pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
+        # -------------
+
+        # Question
+        if image_description != "" and image_description is not None:
+            image_prompt = ": " + image_description
+        else:
+            image_prompt = ""
+
+        if metric_type == "distance":
+            lines_map = task_info[metric_map_name]
+            line_dict = lines_map[metric_key]
+            lms_map_name = line_dict["element_map_name"]
+            lms_map = task_info[lms_map_name]
+            # list of 2 strings -- names of points (landmarks)
+            lms = line_dict["element_keys"]
+            p1_name = lms_map[lms[0]]
+            p2_name = lms_map[lms[1]]
+            # Task description for distance measurement with visual prompt
+            task_description = (
+                f"Task:\n" 
+                f"Given the input medical image{image_prompt}, and a line connecting {p1_name} and {p2_name}, " 
+                f"estimate the physical distance of the line in {metric_unit}.\n" 
+            )
+        if metric_type == "angle":
+            angles_map = task_info[metric_map_name]
+            angle_dict = angles_map[metric_key]
+            lines_map_name = angle_dict["element_map_name"]
+            # list of 2 strings -- names of lines
+            line_keys = angle_dict["element_keys"]
+            lines_map = task_info[lines_map_name]
+            line1_dict = lines_map[line_keys[0]]
+            # list of 2 strings -- names of points (landmarks)
+            line1_lms = line1_dict["element_keys"]
+            line1_lms_map_name = line1_dict["element_map_name"]
+            line1_lms_map = task_info[line1_lms_map_name]
+            line1_p1_name = line1_lms_map[line1_lms[0]]
+            line1_p2_name = line1_lms_map[line1_lms[1]]
+            line2_dict = lines_map[line_keys[1]]
+            # list of 2 strings -- names of points (landmarks)
+            line2_lms = line2_dict["element_keys"]
+            line2_lms_map_name = line2_dict["element_map_name"]
+            line2_lms_map = task_info[line2_lms_map_name]
+            line2_p1_name = line2_lms_map[line2_lms[0]]
+            line2_p2_name = line2_lms_map[line2_lms[1]]
+            # Task description for angle measurement with visual prompt
+            task_description = (
+                f"Task:\n" 
+                f"Given the input medical image{image_prompt}, a line connecting {line1_p1_name} and {line1_p2_name}, and another line connecting {line2_p1_name} and {line2_p2_name}, " 
+                f"estimate the angle between the two lines in {metric_unit}.\n" 
+            )
+
+        question = (
+            f"{task_description}" 
+            f"Additional information:\n" 
+            f"{pixel_size_text}\n" 
+            f"Format requirement:\n" 
+            f"{FORMAT_PROMPT_BIOMETRICS}"
+        )
+        return question
+
+    return doc_to_text_BiometricsFromLandmarks_wVisualPrompt
+
+
 def create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(preprocess_biometry_module):
     def doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(doc, lmms_eval_specific_kwargs=None):
         """Convert document to text."""
-        from medvision_bm.sft.sft_prompts import (
-            FORMAT_PROMPT_AD_REASONING,
-        )
+        from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_AD_REASONING
 
         # Get task info
         taskID = doc["taskID"]
@@ -1212,59 +1832,79 @@ def create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry_module):
 
 def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
     """
-    Get bounding box coordinates.
+     Get bounding box coordinates.
 
-    Definition of the output (target) bounding box coordinates:
-    1.  The origin of the coordinates is at the [lower-left corner] of the image.
-    2.  The first two numbers are the coordinates of the [lower-left] corner and
-        the last two numbers are the coordinates of the [upper-right] corner of the bounding box.
-    3.  The coordinates are expected to be in the format of [coor0_dim1, coor0_dim0, coor1_dim1, coor1_dim0], where:
-        - coor0: lower-left corner of the bounding box
-        - coor1: upper-right corner of the bounding box
-        - dim0: the first dimension of the image (height)
-        - dim1: the second dimension of the image (width)
+     Definition of the output (target) bounding box coordinates:
+     1.  The origin of the coordinates is at the [lower-left corner] of the image.
+     2.  The first two numbers are the coordinates of the [lower-left] corner and
+         the last two numbers are the coordinates of the [upper-right] corner of the bounding box.
+     3.  The coordinates are expected to be in the format of [coor0_dim1, coor0_dim0, coor1_dim1, coor1_dim0], where:
+         - coor0: lower-left corner of the bounding box
+         - coor1: upper-right corner of the bounding box
+         - dim0: the first dimension of the image (height)
+         - dim1: the second dimension of the image (width)
 
-    Definition of bounding box coordinates in the benchmark planner:
-    1. The origin of the coordinates is at the [top-left corner] of the image.
-    2. The first two numbers are the coordinates of the [upper-left] corner and
-       the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
+     Definition of bounding box coordinates in the benchmark planner:
+     1. The origin of the coordinates is at the [top-left corner] of the image.
+     2. The first two numbers are the coordinates of the [upper-left] corner and
+        the last two numbers are the coordinates of the [lower-right] corner of the bounding box.
 
-    That is,
-        - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
-        - target coordinates are in the format of [idx_width, idx_height] in image space
+     That is,
+         - in the benchmark planner, corrdinates are: [idx_dim0, idx_dim1]
+         - target coordinates are in the format of [idx_width, idx_height] in image space
 
-    NOTE: CAVEAT!
-    !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
+     NOTE: CAVEAT!
+     !!! We need to convert the coordinates from the benchmark planner format to the output format. !!!
 
-    Warning:
-    If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images,
-    such as in _doc_to_visual().
+     Warning:
+     If you use this function, make sure you do not rotate the image when extracting 2D slices from 3D NIfTI images,
+     such as in _doc_to_visual().
 
-    In summary, the conversion involves:
-    Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner, we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
+     In summary, the conversion involves:
+     Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner,
+     we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
 
-        #-----------------------------+
-        |   * (P1)         @ (P2')    |
-        |                             |
-        |                             |
-        |                             |
-        |                             |
-        |                             |
-        |   @ (P1')        * (P2)     |
-        |                             |
-        &-----------------------------+
+         #-----------------------------+
+         |   * (P1)         @ (P2')    |
+         |                             |
+         |                             |
+         |                             |
+         |                             |
+         |                             |
+         |   @ (P1')        * (P2)     |
+         &-----------------------------+
 
-    #: array space origin (upper-left corner)
-    @: image space origin (lower-left corner)
-    P1: upper-left corner in array space (benchmark planner)
-    P2: lower-right corner in array space (benchmark planner)
-    P1': lower-left corner in image space
-    P2': upper-right corner in image space
+         #---------(idx_dim1)----------+
+         |                             |
+         |                             |
+         |                             |
+      (idx_dim0)   array space         |
+         |                             |
+         |                             |
+         |                             |
+         +-----------------------------+
 
-    ------
-    NOTE for developers and future versions:
-    Rotating the image counter-clockwise by 90 degrees would avoid the need for coordinate conversion.
-    ------
+         +---------(idx_width)---------+
+         |                             |
+         |                             |
+         |                             |
+    (idx_height)   image space         |
+         |                             |
+         |                             |
+         |                             |
+         &-----------------------------+
+
+     #: array space origin (upper-left corner)
+     &: image space origin (lower-left corner)
+     P1: the lower corner in array space (the min_coords in benchmark planner)
+     P2: the upper corner in array space (the max_coords in benchmark planner)
+     P1': the lower corner in image space
+     P2': the upper corner in image space
+
+     ------
+     NOTE for developers and future versions:
+     Rotating the image counter-clockwise by 90 degrees would avoid the need for coordinate conversion.
+     ------
     """
     # Read NIfTI image
     img_path = doc["image_file"]
@@ -1536,9 +2176,13 @@ def _load_nifti_2d(nii_path, slice_dim, slice_idx, new_shape_hw=None):
         original_shape_hw = image_2d.shape
         # Calculate zoom factors for each dimension
         zoom_factors = (new_shape_hw[0] / original_shape_hw[0], new_shape_hw[1] / original_shape_hw[1])
-        # Use scipy.ndimage.zoom for resizing
-        # order=1 for bilinear interpolation
-        image_2d = zoom(image_2d, zoom_factors, order=1)
+
+        # Check if image is binary to use nearest neighbor interpolation
+        is_binary = len(np.unique(image_2d)) <= 2
+        order = 0 if is_binary else 1
+
+        # order=1 for bilinear interpolation, order=0 for nearest neighbor
+        image_2d = zoom(image_2d, zoom_factors, order=order)
 
         # Update pixel size based on zoom factors
         pixel_size_hw = (pixel_size_hw[0] / zoom_factors[0], pixel_size_hw[1] / zoom_factors[1])

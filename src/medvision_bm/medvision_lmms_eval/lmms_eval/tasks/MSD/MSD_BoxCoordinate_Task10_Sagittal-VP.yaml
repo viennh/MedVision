@@ -1,0 +1,3 @@
+include: MSD_BoxCoordinate_base-VP.yaml
+task: MSD_BoxCoordinate_Task10_Sagittal-VP
+dataset_name: MSD_BoxSize_Task10_Sagittal_Test

@@ -1,0 +1,3 @@
+include: HNTSMRG24_TumorLesionSize_base-VP.yaml
+task: HNTSMRG24_TumorLesionSize_Task02_Axial-VP
+dataset_name: HNTSMRG24_TumorLesionSize_Task02_Axial_Test 
