@@ -114,6 +114,11 @@
 
 3. Add new functions to `medvision_utils.py ` and import in  `utils.py`
 
+## New Tasks on New Datasets
+
+If you wish to add new tasks on new datasets, refer to the [New Datasets Guide](https://huggingface.co/datasets/YongchengYAO/MedVision#new-datasets-guide) from HF dataset `YongchengYAO/MedVision`.
+
+
 ## Reference
 
 - [New tasks guide](https://github.com/EvolvingLMMs-Lab/lmms-eval/blob/main/docs/task_guide.md) from `EvolvingLMMs-Lab/lmms-eval `

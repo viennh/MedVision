@@ -260,26 +260,405 @@ Next (in the container):
 
 <br/>
 
+# 📖 Essential Dataset Concept
+
+We cover some essential concepts that help we use the MedVision dataset with ease.
+
+## Concepts: Dataset & Data Configuration
+
+- `MedVision`: the collection of public imaging data and our annotations
+- `dataset`: name of the public datasets, such `BraTS24`, `MSD`, `OAIZIB-CM`
+- `data-config`: name of predefined subsets
+  - naming convention: `{dataset}_{annotation-type}_{task-ID}_{slice}_{split}`
+    - `dataset`: [details](https://huggingface.co/datasets/YongchengYAO/MedVision#datasets)
+    - `annotation-type`: 
+      - `BoxSize`: detection annotations (bounding box)
+      - `TumorLesionSize`: tumor/lesion size annotations
+      - `BiometricsFromLandmarks`: angle/distance annotations
+    - `task-ID`: `Task[xx]` (Note, this is a local ID in the dataset, not a glocal ID in MedVision.)
+      - For datasets with multiple image-mask pairs, we defined tasks in `medvision_ds/datasets/*/preprocess_*.py`
+      - source: [medvision_ds](https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/src)
+      - e.g., detection tasks for the `BraTS24` dataset is defined in the `benchmark_plan` in `medvision_ds/datasets/BraTS24/preprocess_detection.py`
+    - `slice`: [`Sagittal`, `Coronal`, `Axial`]
+    - `split`: [`Train`, `Test`]
+
+## What's returned from MedVision Dataset?
+
+We only share the annotations (https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/Datasets). The data loading script [`MedVision.py`](https://huggingface.co/datasets/YongchengYAO/MedVision/blob/main/MedVision.py) will handle raw image downloading and processing. The returned fields in each sample is defined as followed.
+
+In `MedVision.py`, the class `MedVision(GeneratorBasedBuilder)` defines the feature dict and the method `_generate_examples()` builds the dataset.
+
+
+<details>
+<summary>Code block in `MedVision(GeneratorBasedBuilder)` (Click to expand)</summary>
+
+  ``` python
+  """
+  MedVision dataset.
+
+  NOTE: To update the features returned by the load_dataset() method, the followings should be updated:
+          - the feature dict in this class 
+          - the dict yielded by the _generate_examples() method 
+  """
+
+  # The feature dict for the task:
+  # - Mask-Size
+  features_dict_MaskSize = {
+      "dataset_name": Value("string"),
+      "taskID": Value("string"),
+      "taskType": Value("string"),
+      "image_file": Value("string"),
+      "mask_file": Value("string"),
+      "slice_dim": Value("uint8"),
+      "slice_idx": Value("uint16"),
+      "label": Value("uint16"),
+      "image_size_2d": Sequence(Value("uint16"), length=2),
+      "pixel_size": Sequence(Value("float16"), length=2),
+      "image_size_3d": Sequence(Value("uint16"), length=3),
+      "voxel_size": Sequence(Value("float16"), length=3),
+      "pixel_count": Value("uint32"),
+      "ROI_area": Value("float16"),
+  }
+
+  # The feature dict for the task:
+  # - Box-Size
+  features_dict_BoxSize = {
+      "dataset_name": Value("string"),
+      "taskID": Value("string"),
+      "taskType": Value("string"),
+      "image_file": Value("string"),
+      "mask_file": Value("string"),
+      "slice_dim": Value("uint8"),
+      "slice_idx": Value("uint16"),
+      "label": Value("uint16"),
+      "image_size_2d": Sequence(Value("uint16"), length=2),
+      "pixel_size": Sequence(Value("float16"), length=2),
+      "image_size_3d": Sequence(Value("uint16"), length=3),
+      "voxel_size": Sequence(Value("float16"), length=3),
+      "bounding_boxes": Sequence(
+          {
+              "min_coords": Sequence(Value("uint16"), length=2),
+              "max_coords": Sequence(Value("uint16"), length=2),
+              "center_coords": Sequence(Value("uint16"), length=2),
+              "dimensions": Sequence(Value("uint16"), length=2),
+              "sizes": Sequence(Value("float16"), length=2),
+          },
+      ),
+  }
+
+  features_dict_BiometricsFromLandmarks = {
+      "dataset_name": Value("string"),
+      "taskID": Value("string"),
+      "taskType": Value("string"),
+      "image_file": Value("string"),
+      "landmark_file": Value("string"),
+      "slice_dim": Value("uint8"),
+      "slice_idx": Value("uint16"),
+      "image_size_2d": Sequence(Value("uint16"), length=2),
+      "pixel_size": Sequence(Value("float16"), length=2),
+      "image_size_3d": Sequence(Value("uint16"), length=3),
+      "voxel_size": Sequence(Value("float16"), length=3),
+      "biometric_profile": {
+          "metric_type": Value("string"),
+          "metric_map_name": Value("string"),
+          "metric_key": Value("string"),
+          "metric_value": Value("float16"),
+          "metric_unit": Value("string"),
+          "slice_dim": Value("uint8"),
+      },
+  }
+
+  features_dict_TumorLesionSize = {
+      "dataset_name": Value("string"),
+      "taskID": Value("string"),
+      "taskType": Value("string"),
+      "image_file": Value("string"),
+      "landmark_file": Value("string"),
+      "mask_file": Value("string"),
+      "slice_dim": Value("uint8"),
+      "slice_idx": Value("uint16"),
+      "label": Value("uint16"),
+      "image_size_2d": Sequence(Value("uint16"), length=2),
+      "pixel_size": Sequence(Value("float16"), length=2),
+      "image_size_3d": Sequence(Value("uint16"), length=3),
+      "voxel_size": Sequence(Value("float16"), length=3),
+      "biometric_profile": Sequence(
+          {
+              "metric_type": Value("string"),
+              "metric_map_name": Value("string"),
+              "metric_key_major_axis": Value("string"),
+              "metric_value_major_axis": Value("float16"),
+              "metric_key_minor_axis": Value("string"),
+              "metric_value_minor_axis": Value("float16"),
+              "metric_unit": Value("string"),
+          },
+      ),
+  }
+  ```
+
+</details>
+
+
+<details>
+<summary>Code block in `_generate_examples` (Click to expand)</summary>
+
+  ```python
+  # Task type: Mask-Size
+  if taskType == "Mask-Size":
+      flatten_slice_profiles = (
+          MedVision_BenchmarkPlannerSegmentation.flatten_slice_profiles_2d
+      )
+      if imageSliceType.lower() == "sagittal":
+          slice_dim = 0
+      elif imageSliceType.lower() == "coronal":
+          slice_dim = 1
+      elif imageSliceType.lower() == "axial":
+          slice_dim = 2
+      slice_profile_flattened = flatten_slice_profiles(biometricData, slice_dim)
+      for idx, case in enumerate(slice_profile_flattened):
+          # Skip cases with a mask size smaller than 200 pixels
+          if case["pixel_count"] < 200:
+              continue
+          else:
+              yield idx, {
+                  "dataset_name": dataset_name,
+                  "taskID": taskID,
+                  "taskType": taskType,
+                  "image_file": os.path.join(dataset_dir, case["image_file"]),
+                  "mask_file": os.path.join(dataset_dir, case["mask_file"]),
+                  "slice_dim": case["slice_dim"],
+                  "slice_idx": case["slice_idx"],
+                  "label": case["label"],
+                  "image_size_2d": case["image_size_2d"],
+                  "pixel_size": case["pixel_size"],
+                  "image_size_3d": case["image_size_3d"],
+                  "voxel_size": case["voxel_size"],
+                  "pixel_count": case["pixel_count"],
+                  "ROI_area": case["ROI_area"],
+              }
+
+  # Task type: Box-Size
+  if taskType == "Box-Size":
+      if imageType.lower() == "2d":
+          flatten_slice_profiles = (
+              MedVision_BenchmarkPlannerDetection.flatten_slice_profiles_2d
+          )
+          if imageSliceType.lower() == "sagittal":
+              slice_dim = 0
+          elif imageSliceType.lower() == "coronal":
+              slice_dim = 1
+          elif imageSliceType.lower() == "axial":
+              slice_dim = 2
+          slice_profile_flattened = flatten_slice_profiles(
+              biometricData, slice_dim
+          )
+          for idx, case in enumerate(slice_profile_flattened):
+              # Skip cases with multiple bounding boxes in the same slice
+              if len(case["bounding_boxes"]) > 1:
+                  continue
+              # Skip cases with a bounding box size smaller than 10 pixels in any dimension
+              elif (
+                  case["bounding_boxes"][0]["dimensions"][0] < 10
+                  or case["bounding_boxes"][0]["dimensions"][1] < 10
+              ):
+                  continue
+              else:
+                  yield idx, {
+                      "dataset_name": dataset_name,
+                      "taskID": taskID,
+                      "taskType": taskType,
+                      "image_file": os.path.join(dataset_dir, case["image_file"]),
+                      "mask_file": os.path.join(dataset_dir, case["mask_file"]),
+                      "slice_dim": case["slice_dim"],
+                      "slice_idx": case["slice_idx"],
+                      "label": case["label"],
+                      "image_size_2d": case["image_size_2d"],
+                      "pixel_size": case["pixel_size"],
+                      "image_size_3d": case["image_size_3d"],
+                      "voxel_size": case["voxel_size"],
+                      "bounding_boxes": case["bounding_boxes"],
+                  }
+
+  # Task type: Biometrics-From-Landmarks
+  if taskType == "Biometrics-From-Landmarks":
+      if imageType.lower() == "2d":
+          flatten_slice_profiles = (
+              MedVision_BenchmarkPlannerBiometry.flatten_slice_profiles_2d
+          )
+          if imageSliceType.lower() == "sagittal":
+              slice_dim = 0
+          elif imageSliceType.lower() == "coronal":
+              slice_dim = 1
+          elif imageSliceType.lower() == "axial":
+              slice_dim = 2
+          slice_profile_flattened = flatten_slice_profiles(
+              biometricData, slice_dim
+          )
+          for idx, case in enumerate(slice_profile_flattened):
+              yield idx, {
+                  "dataset_name": dataset_name,
+                  "taskID": taskID,
+                  "taskType": taskType,
+                  "image_file": os.path.join(dataset_dir, case["image_file"]),
+                  "landmark_file": os.path.join(
+                      dataset_dir, case["landmark_file"]
+                  ),
+                  "slice_dim": case["slice_dim"],
+                  "slice_idx": case["slice_idx"],
+                  "image_size_2d": case["image_size_2d"],
+                  "pixel_size": case["pixel_size"],
+                  "image_size_3d": case["image_size_3d"],
+                  "voxel_size": case["voxel_size"],
+                  "biometric_profile": case["biometric_profile"],
+              }
+
+  # Task type: Biometrics-From-Landmarks-Distance
+  if taskType == "Biometrics-From-Landmarks-Distance":
+      if imageType.lower() == "2d":
+          flatten_slice_profiles = (
+              MedVision_BenchmarkPlannerBiometry.flatten_slice_profiles_2d
+          )
+          if imageSliceType.lower() == "sagittal":
+              slice_dim = 0
+          elif imageSliceType.lower() == "coronal":
+              slice_dim = 1
+          elif imageSliceType.lower() == "axial":
+              slice_dim = 2
+          slice_profile_flattened = flatten_slice_profiles(
+              biometricData, slice_dim
+          )
+          for idx, case in enumerate(slice_profile_flattened):
+              if case["biometric_profile"]["metric_type"] == "distance":
+                  yield idx, {
+                      "dataset_name": dataset_name,
+                      "taskID": taskID,
+                      "taskType": taskType,
+                      "image_file": os.path.join(dataset_dir, case["image_file"]),
+                      "landmark_file": os.path.join(
+                          dataset_dir, case["landmark_file"]
+                      ),
+                      "slice_dim": case["slice_dim"],
+                      "slice_idx": case["slice_idx"],
+                      "image_size_2d": case["image_size_2d"],
+                      "pixel_size": case["pixel_size"],
+                      "image_size_3d": case["image_size_3d"],
+                      "voxel_size": case["voxel_size"],
+                      "biometric_profile": case["biometric_profile"],
+                  }
+
+  # Task type: Biometrics-From-Landmarks-Angle
+  if taskType == "Biometrics-From-Landmarks-Angle":
+      if imageType.lower() == "2d":
+          flatten_slice_profiles = (
+              MedVision_BenchmarkPlannerBiometry.flatten_slice_profiles_2d
+          )
+          if imageSliceType.lower() == "sagittal":
+              slice_dim = 0
+          elif imageSliceType.lower() == "coronal":
+              slice_dim = 1
+          elif imageSliceType.lower() == "axial":
+              slice_dim = 2
+          slice_profile_flattened = flatten_slice_profiles(
+              biometricData, slice_dim
+          )
+          for idx, case in enumerate(slice_profile_flattened):
+              if case["biometric_profile"]["metric_type"] == "angle":
+                  yield idx, {
+                      "dataset_name": dataset_name,
+                      "taskID": taskID,
+                      "taskType": taskType,
+                      "image_file": os.path.join(dataset_dir, case["image_file"]),
+                      "landmark_file": os.path.join(
+                          dataset_dir, case["landmark_file"]
+                      ),
+                      "slice_dim": case["slice_dim"],
+                      "slice_idx": case["slice_idx"],
+                      "image_size_2d": case["image_size_2d"],
+                      "pixel_size": case["pixel_size"],
+                      "image_size_3d": case["image_size_3d"],
+                      "voxel_size": case["voxel_size"],
+                      "biometric_profile": case["biometric_profile"],
+                  }
+
+  # Task type: Tumor-Lesion-Size
+  if taskType == "Tumor-Lesion-Size":
+      if imageType.lower() == "2d":
+          # Get the target label for the task
+          target_label = benchmark_plan["tasks"][int(taskID) - 1]["target_label"]
+
+          flatten_slice_profiles = (
+              MedVision_BenchmarkPlannerBiometry_fromSeg.flatten_slice_profiles_2d
+          )
+          if imageSliceType.lower() == "sagittal":
+              slice_dim = 0
+          elif imageSliceType.lower() == "coronal":
+              slice_dim = 1
+          elif imageSliceType.lower() == "axial":
+              slice_dim = 2
+          slice_profile_flattened = flatten_slice_profiles(
+              biometricData, slice_dim
+          )
+          for idx, case in enumerate(slice_profile_flattened):
+              # Skip cases with multiple fitted ellipses in the same slice
+              if len(case["biometric_profile"]) > 1:
+                  continue
+              else:
+                  yield idx, {
+                      "dataset_name": dataset_name,
+                      "taskID": taskID,
+                      "taskType": taskType,
+                      "image_file": os.path.join(dataset_dir, case["image_file"]),
+                      "mask_file": os.path.join(dataset_dir, case["mask_file"]),
+                      "landmark_file": os.path.join(
+                          dataset_dir, case["landmark_file"]
+                      ),
+                      "slice_dim": case["slice_dim"],
+                      "slice_idx": case["slice_idx"],
+                      "label": target_label,
+                      "image_size_2d": case["image_size_2d"],
+                      "pixel_size": case["pixel_size"],
+                      "image_size_3d": case["image_size_3d"],
+                      "voxel_size": case["voxel_size"],
+                      "biometric_profile": case["biometric_profile"],
+                  }
+
+  ```
+</details>
+
+## Dataset Building Workflow
+
+<details>
+<summary> MedVision Dataset Building Workflow (Black) </summary>
+<img src="fig/medvision-dataset-flow-b.png" alt="MedVision Dataset Building Workflow (Black)" /><br>
+</details>
+
+<details>
+<summary> MedVision Dataset Building Workflow (White) </summary>
+<img src="fig/medvision-dataset-flow-w.png" alt="MedVision Dataset Building Workflow (White)" /><br>
+</details>
+
+</br>
+
+There are a few venues to control the dataset loading and building behavior:
+
+- **Rebuild Dataset (Arrow files)**: Use the `download_mode` argument in `load_dataset()` ([docs](https://huggingface.co/docs/datasets/v3.6.0/en/package_reference/builder_classes#datasets.DownloadMode)).
+  - [1] Set `download_mode="force_redownload"` to ignore the cached Arrow files and trigger the data loading script `MedVision.py` to rebuild the dataset.
+- **Redownload Raw Data**:
+  - [2] `MedVision_FORCE_DOWNLOAD_DATA`: Set this environment variable to `True` to force re-downloading raw images and annotations.
+  - [3] `.downloaded_datasets.json`: This tracker file records downloaded status. Removing a dataset's entry here will trigger a re-download of the raw data for that dataset.
+  
+> [!Note] ⚠️ 
+> Using `download_mode="force_redownload"` does **not** automatically re-download raw images.
+> 
+>  If you notice updates of raw data (images, masks, landmarks), use [2] or [3] to get the new data.
+>
+> If there are changes in our annotation file (i.e., benchmark planner) or in the data loading script (`MedVision.py`) that affects the returned dataset, use [1].
+>
+> 🔥 We will maintain a [change log](https://huggingface.co/datasets/YongchengYAO/MedVision/blob/main/doc/changelog.md) for essential updates.
+
+<br/>
+
 # 💿 Data Downloading (Optional)
-
-About the **MedVision** dataset:
-
-- Concepts
-  - `MedVision`: the collection of public imaging data and our annotations
-  - `dataset`: name of the public datasets, such `BraTS24`, `MSD`, `OAIZIB-CM`
-  - `data-config`: name of predefined subsets
-    - naming convention: `{dataset}_{annotation-type}_{task-ID}_{slice}_{split}`
-      - `dataset`: [details](https://huggingface.co/datasets/YongchengYAO/MedVision#datasets)
-      - `annotation-type`: 
-        - `BoxSize`: detection annotations (bounding box)
-        - `TumorLesionSize`: tumor/lesion size annotations
-        - `BiometricsFromLandmarks`: angle/distance annotations
-      - `task-ID`: `Task[xx]`
-        - For datasets with multiple image-mask pairs, we defined tasks in `medvision_ds/datasets/*/preprocess_*.py`
-        - source: [medvision_ds](https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/src)
-        - e.g., detection tasks for the `BraTS24` dataset is defined in the `benchmark_plan` in `medvision_ds/datasets/BraTS24/preprocess_detection.py`
-      - `slice`: [`Sagittal`, `Coronal`, `Axial`]
-      - `split`: [`Train`, `Test`]
 
 Since data downloading and processing takes time, you can download datasets from the tasks list (example [here](https://github.com/YongchengYAO/MedVision/tree/master/tasks_list)) or configs list (example [here](https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/info)) in advance.
 
@@ -327,7 +706,11 @@ If you encounter "missing package" error when using modules in `src/medvision_bm
 python -m medvision_bm.sft.env_setup --data_dir <local-data-folder>
 ```
 
+<br/>
+
 # 🩵 Acknowledgement
 MedVision is based on some open-source projects:
 - [EvolvingLMMs-Lab/lmms-eval](https://github.com/EvolvingLMMs-Lab/lmms-eval): VLM evaluation framework
 - [EleutherAI/lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness): LLM evaluation framework
+
+<br/>
