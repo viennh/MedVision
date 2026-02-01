@@ -894,12 +894,22 @@ class ConfigurableTask(Task):
                 if accelerator.is_main_process:
                     dataset_kwargs.pop("From_YouTube")
                     assert "load_from_disk" not in dataset_kwargs, "load_from_disk must not be True when From_YouTube is True"
-                    self.all_dataset = datasets.load_dataset(
-                        path=self.DATASET_PATH,
-                        name=self.DATASET_NAME,
-                        download_mode=datasets.DownloadMode.REUSE_DATASET_IF_EXISTS,
-                        **dataset_kwargs if dataset_kwargs is not None else {},
-                    )
+
+                    # TODO: debugging
+                    if "download_mode" not in dataset_kwargs:
+                        self.all_dataset = datasets.load_dataset(
+                            path=self.DATASET_PATH,
+                            name=self.DATASET_NAME,
+                            download_mode=datasets.DownloadMode.REUSE_DATASET_IF_EXISTS,
+                            **dataset_kwargs if dataset_kwargs is not None else {},
+                        )
+                    else:
+                        self.all_dataset = datasets.load_dataset(
+                            path=self.DATASET_PATH,
+                            name=self.DATASET_NAME,
+                            **dataset_kwargs if dataset_kwargs is not None else {},
+                        )
+
                     dataset_kwargs["From_YouTube"] = True
                     cache_path = snapshot_download(repo_id=self.DATASET_PATH, repo_type="dataset")  # download_parquet
                     split = vars(self.config)["test_split"]
@@ -1040,13 +1050,22 @@ class ConfigurableTask(Task):
             # using local task in offline environment, need to process the online dataset into local format via
             self.dataset = datasets.load_from_disk(dataset_path=self.DATASET_PATH)
         else:
-            self.dataset = datasets.load_dataset(
-                path=self.DATASET_PATH,
-                name=self.DATASET_NAME,
-                download_mode=datasets.DownloadMode.REUSE_DATASET_IF_EXISTS,
-                download_config=download_config,
-                **dataset_kwargs if dataset_kwargs is not None else {},
-            )
+            # TODO: debugging
+            if "download_mode" not in dataset_kwargs:
+                self.dataset = datasets.load_dataset(
+                    path=self.DATASET_PATH,
+                    name=self.DATASET_NAME,
+                    download_mode=datasets.DownloadMode.REUSE_DATASET_IF_EXISTS,
+                    download_config=download_config,
+                    **dataset_kwargs if dataset_kwargs is not None else {},
+                )
+            else:
+                self.dataset = datasets.load_dataset(
+                    path=self.DATASET_PATH,
+                    name=self.DATASET_NAME,
+                    download_config=download_config,
+                    **dataset_kwargs if dataset_kwargs is not None else {},
+                )
 
         if self.config.process_docs is not None:
             for split in self.dataset:
