@@ -1434,8 +1434,21 @@ def _format_data_DetectionTask_CoT():
     )
 
 
-def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None):
-    """Load a single dataset configuration with improved error handling."""
+def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None, download_mode="reuse_dataset_if_exists"):
+    """
+    Load a single dataset configuration with improved error handling.
+
+    Args:
+        dataset_hf_id (str): Hugging Face dataset ID.
+        dataset_name (str | None): Name to assign to the dataset (added as a column).
+        config (str): Configuration name.
+        split (str): Dataset split to load.
+        limit (int | None): If specified, limit the number of samples to this number.
+        download_mode (str): "reuse_dataset_if_exists" (default), "reuse_cache_if_exists", "force_redownload"
+
+    Returns:
+        Dataset: Loaded Hugging Face dataset.
+    """
     try:
         print(
             f"\n[Info] Loading dataset:\nHF Dataset ID: {dataset_hf_id}\nConfiguration:{config}"
@@ -1451,6 +1464,7 @@ def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None)
                     trust_remote_code=True,
                     split=split,
                     streaming=False,
+                    download_mode=download_mode, 
                 )
                 if limit is not None and limit > 0 and len(ds) > limit:
                     ds = ds.select(range(limit))
@@ -1464,7 +1478,8 @@ def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None)
                     time.sleep(wait_time)
                 else:
                     raise
-
+        
+        # Add dataset_name column for tracking
         if dataset_name is not None:
             ds = ds.add_column("dataset_name", [dataset_name] * len(ds))
 
@@ -1637,6 +1652,7 @@ def load_split_limit_dataset(
     limit_val_sample,
     num_workers_concat_datasets=4,
     tag_ds=None,
+    download_mode="reuse_dataset_if_exists",
 ):
     # NOTE:
     # - limit_val_sample must be greater than 0 to ensure validation set is not empty.
@@ -1698,6 +1714,9 @@ def load_split_limit_dataset(
         # - Config name for training set is in the format of "{task}_Train", while the test set is "{task}_Test"
         # - Dataset name can be extracted from task name (e.g., part before f"_{tag_ds}"): task.split(f"_{tag_ds}")[0]
         # ------
+
+        # NOTE: Although we have arg "limit" in _load_single_dataset(), we do not use it here to limit samples per task.
+        # Instead, we limit the total number of training samples after combining all datasets.
         future_to_task = {
             executor.submit(
                 _load_single_dataset,
@@ -1705,6 +1724,7 @@ def load_split_limit_dataset(
                 task.split(f"_{tag_ds}")[0],
                 task + "_Train",
                 "train",
+                download_mode=download_mode,
             ): task
             for task in tasks
         }
@@ -1822,6 +1842,7 @@ def prepare_dataset(
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
+    download_mode="reuse_dataset_if_exists",
 ):
     # Load and split dataset
     dataset = load_split_limit_dataset(
@@ -1830,6 +1851,7 @@ def prepare_dataset(
         limit_val_sample=limit_val_sample,
         num_workers_concat_datasets=num_workers_concat_datasets,
         tag_ds=tag_ds,
+        download_mode=download_mode,
     )
 
     # Format dataset
@@ -2192,41 +2214,7 @@ def train_resume_from_checkpoint(trainer, last_checkpoint):
 
 def parse_args_multiTask():
     """
-    Add this block to add sample limit fallbacks: when task-specific limit is not set (default to -1), fallback to use
-    the --val_sample_limit_per_task (default to 100) and --train_sample_limit_per_task (default to -1 meaning no limit).
-
-    # Get command-line arguments
-    args = parse_args_Qwen25VL_multiTask()
-    kwargs = vars(args)
-
-    # Determine sample limits for each task
-    if kwargs.get("train_sample_limit_task_AD") > 0:
-        train_limit_AD = kwargs.get("train_sample_limit_task_AD")
-    else:
-        train_limit_AD = kwargs.get("train_sample_limit_per_task")
-    if kwargs.get("val_sample_limit_task_AD") > 0:
-        val_limit_AD = kwargs.get("val_sample_limit_task_AD")
-    else:
-        val_limit_AD = kwargs.get("val_sample_limit_per_task")
-    if kwargs.get("train_sample_limit_task_Detection") > 0:
-        train_limit_detect = kwargs.get(
-            "train_sample_limit_task_Detection")
-    else:
-        train_limit_detect = kwargs.get("train_sample_limit_per_task")
-    if kwargs.get("val_sample_limit_task_Detection") > 0:
-        val_limit_detect = kwargs.get(
-            "val_sample_limit_task_Detection")
-    else:
-        val_limit_detect = kwargs.get("val_sample_limit_per_task")
-    if kwargs.get("train_sample_limit_task_TL") > 0:
-        train_limit_TL = kwargs.get("train_sample_limit_task_TL")
-    else:
-        train_limit_TL = kwargs.get("train_sample_limit_per_task")
-    if kwargs.get("val_sample_limit_task_TL") > 0:
-        val_limit_TL = kwargs.get("val_sample_limit_task_TL")
-    else:
-        val_limit_TL = kwargs.get("val_sample_limit_per_task")
-    train_limit_total = kwargs.get("train_sample_limit")
+    Parse command-line arguments for SFT on the MedVision dataset.
     """
 
     parser = argparse.ArgumentParser(description="SFT on the MedVision dataset")
@@ -2350,6 +2338,12 @@ def parse_args_multiTask():
         type=int,
         nargs=2,
         help="Target resize shape as (height, width). Example: --new_shape_hw 1080 1920. Result: args.new_shape_hw → [1080, 1920]",
+    )
+    parser.add_argument(
+        "--ds_download_mode",
+        type=str,
+        default="reuse_dataset_if_exists",
+        help="Dataset download mode: 'reuse_dataset_if_exists' (default), 'reuse_cache_if_exists', 'force_redownload'",
     )
 
     # -- Training arguments

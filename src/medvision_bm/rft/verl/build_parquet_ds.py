@@ -40,6 +40,13 @@ def parse_arguments():
         type=str,
         help="Path to the prepared dataset directory to load from disk",
     )
+    # -- Dataset download mode
+    parser.add_argument(
+        "--ds_download_mode",
+        type=str,
+        default="reuse_dataset_if_exists",
+        help="Dataset download mode: 'reuse_dataset_if_exists' (default), 'reuse_cache_if_exists', 'force_redownload'",
+    )
     # -- Data processing
     parser.add_argument(
         "--new_shape_hw",
@@ -218,6 +225,7 @@ def build_parquet_dataset(**kwargs):
             # MedVision dataset specific, used to extract dataset name from AD task configs
             tag_ds="BiometricsFromLandmarks",
             new_shape_hw=kwargs.get("new_shape_hw"),
+            download_mode=kwargs.get("ds_download_mode"),
         )
         train_ds_list.append(dataset_AD["train"])
         val_ds_list.append(dataset_AD["validation"])
@@ -234,6 +242,7 @@ def build_parquet_dataset(**kwargs):
             # MedVision dataset specific, used to extract dataset name from AD task configs
             tag_ds="TumorLesionSize",
             new_shape_hw=kwargs.get("new_shape_hw"),
+            download_mode=kwargs.get("ds_download_mode"),
         )
         train_ds_list.append(dataset_TL["train"])
         val_ds_list.append(dataset_TL["validation"])
@@ -251,6 +260,7 @@ def build_parquet_dataset(**kwargs):
             # MedVision dataset specific, used to extract dataset name from AD task configs
             tag_ds="BoxSize",
             new_shape_hw=kwargs.get("new_shape_hw"),
+            download_mode=kwargs.get("ds_download_mode"),
         )
         train_ds_list.append(dataset_detect["train"])
         val_ds_list.append(dataset_detect["validation"])

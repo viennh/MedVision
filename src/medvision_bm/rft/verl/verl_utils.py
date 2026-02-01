@@ -400,6 +400,7 @@ def prepare_dataset_for_verl(
     num_workers_format_dataset=32,
     tag_ds=None,
     new_shape_hw=None,
+    download_mode="reuse_dataset_if_exists",
 ):
     # Load and split dataset
     dataset = load_split_limit_dataset(
@@ -408,6 +409,7 @@ def prepare_dataset_for_verl(
         limit_val_sample=limit_val_sample,
         num_workers_concat_datasets=num_workers_concat_datasets,
         tag_ds=tag_ds,
+        download_mode=download_mode,
     )
 
     # Format dataset
