@@ -627,6 +627,8 @@ In `MedVision.py`, the class `MedVision(GeneratorBasedBuilder)` defines the feat
 
 ## Dataset Building Workflow
 
+### Workflow
+
 <details>
 <summary> MedVision Dataset Building Workflow (Black) </summary>
 <img src="fig/medvision-dataset-flow-b.png" alt="MedVision Dataset Building Workflow (Black)" /><br>
@@ -642,19 +644,159 @@ In `MedVision.py`, the class `MedVision(GeneratorBasedBuilder)` defines the feat
 There are a few venues to control the dataset loading and building behavior:
 
 - **Rebuild Dataset (Arrow files)**: Use the `download_mode` argument in `load_dataset()` ([docs](https://huggingface.co/docs/datasets/v3.6.0/en/package_reference/builder_classes#datasets.DownloadMode)).
-  - [1] Set `download_mode="force_redownload"` to ignore the cached Arrow files and trigger the data loading script `MedVision.py` to rebuild the dataset.
+  - **[1]** Set `download_mode="force_redownload"` to ignore the cached Arrow files and trigger the data loading script `MedVision.py` to rebuild the dataset.
 - **Redownload Raw Data**:
-  - [2] `MedVision_FORCE_DOWNLOAD_DATA`: Set this environment variable to `True` to force re-downloading raw images and annotations.
-  - [3] `.downloaded_datasets.json`: This tracker file records downloaded status. Removing a dataset's entry here will trigger a re-download of the raw data for that dataset.
+  - **[2]** `MedVision_FORCE_DOWNLOAD_DATA`: Set this environment variable to `True` to force re-downloading raw images and annotations.
+  - **[3]** `.downloaded_datasets.json`: This tracker file records downloaded status. Removing a dataset's entry here will trigger a re-download of the raw data for that dataset.
   
 > [!Note] ⚠️ 
-> Using `download_mode="force_redownload"` does **not** automatically re-download raw images.
-> 
->  If you notice updates of raw data (images, masks, landmarks), use [2] or [3] to get the new data.
+> **How to properly update/redownload raw data?**
 >
-> If there are changes in our annotation file (i.e., benchmark planner) or in the data loading script (`MedVision.py`) that affects the returned dataset, use [1].
+> If you need to update raw data (images, masks, landmarks) using [2] or [3], you **MUST ALSO** use [1] (`download_mode="force_redownload"`).
+>
+> Why? Because if Hugging Face finds a valid cached dataset (Arrow files), it will load it directly and **skip running the script entirely**. Without running the script, the environment variable [2] or tracker file [3] will never be checked.
+>
+> **Summary:**
+> - Update Arrow/Fields only: Use [1].
+> - Update Raw Data: Use [1] **AND** ([2] or [3]).
 >
 > 🔥 We will maintain a [change log](https://huggingface.co/datasets/YongchengYAO/MedVision/blob/main/doc/changelog.md) for essential updates.
+
+
+### Examples
+
+<details>
+<summary> Run this for the first time will download the raw data and build the dataset </summary>
+
+```python
+import os
+from datasets import load_dataset
+
+# Set data folder
+wd = os.path.join(os.getcwd(), "Data-testing")
+os.makedirs(wd, exist_ok=True)
+os.environ["MedVision_DATA_DIR"] = wd
+
+# Pick a dataset config name and split
+config = "OAIZIB-CM_BoxSize_Task01_Axial_Test"
+split_name = "test" # use "test" for testing set config; use "train" for training set config 
+
+# Get dataset
+ds = load_dataset(
+        "YongchengYAO/MedVision",
+        name=config,
+        trust_remote_code=True,
+        split=split_name,
+    )
+```
+</details>
+
+<details>
+<summary> Run the same script again will use the cached dataset </summary>
+
+```python
+import os
+from datasets import load_dataset
+
+# Set data folder
+wd = os.path.join(os.getcwd(), "Data-testing")
+os.makedirs(wd, exist_ok=True)
+os.environ["MedVision_DATA_DIR"] = wd
+
+# Pick a dataset config name and split
+config = "OAIZIB-CM_BoxSize_Task01_Axial_Test"
+split_name = "test" # use "test" for testing set config; use "train" for training set config 
+
+# Get dataset
+ds = load_dataset(
+        "YongchengYAO/MedVision",
+        name=config,
+        trust_remote_code=True,
+        split=split_name,
+    )
+```
+</details>
+
+<details>
+<summary> Adding `download_mode="force_redownload"` will skip raw data downloading and rebuild the dataset </summary>
+
+```python
+import os
+from datasets import load_dataset
+
+# Set data folder
+wd = os.path.join(os.getcwd(), "Data-testing")
+os.makedirs(wd, exist_ok=True)
+os.environ["MedVision_DATA_DIR"] = wd
+
+# Pick a dataset config name and split
+config = "OAIZIB-CM_BoxSize_Task01_Axial_Test"
+split_name = "test" # use "test" for testing set config; use "train" for training set config 
+
+# Get dataset
+ds = load_dataset(
+        "YongchengYAO/MedVision",
+        name=config,
+        trust_remote_code=True,
+        split=split_name,
+        download_mode="force_redownload",
+    )
+```
+</details>
+
+<details>
+<summary> Adding `download_mode="force_redownload"` and `os.environ["MedVision_FORCE_DOWNLOAD_DATA"] = "True"` will redownload raw data and rebuild the dataset </summary>
+
+```python
+import os
+from datasets import load_dataset
+
+# Set data folder
+wd = os.path.join(os.getcwd(), "Data-testing")
+os.makedirs(wd, exist_ok=True)
+os.environ["MedVision_DATA_DIR"] = wd
+
+# Pick a dataset config name and split
+config = "OAIZIB-CM_BoxSize_Task01_Axial_Test"
+split_name = "test" # use "test" for testing set config; use "train" for training set config 
+
+# Force redownload
+os.environ["MedVision_FORCE_DOWNLOAD_DATA"] = "True"
+
+# Get dataset
+ds = load_dataset(
+        "YongchengYAO/MedVision",
+        name=config,
+        trust_remote_code=True,
+        split=split_name,
+        download_mode="force_redownload",
+    )
+```
+</details>
+
+
+### Download Mode in MedVision Dataset
+
+<details>
+<summary> (Advanced) Understand how the customized dataset loading script `MedVision.py` changes the behavior of `download_mode` in `load_dataset()` </summary>
+
+- `download_mode` can be one of these: `"reuse_dataset_if_exists"` (default), `"reuse_cache_if_exists"`, `"force_redownload"`
+
+- Default behavior of `download_mode` in `load_dataset()`:
+    |                                   | Downloads | Dataset |
+    | :-------------------------------- | :-------- | :------ |
+    | reuse_dataset_if_exists (default) | Reuse     | Reuse   |
+    | reuse_cache_if_exists             | Reuse     | Fresh   |
+    | force_redownload                  | Fresh     | Fresh   |
+
+- `download_mode` in MedVision dataset:
+    |                                                        | Downloads | Dataset |
+    | :----------------------------------------------------- | :-------- | :------ |
+    | reuse_dataset_if_exists (default)                      | Reuse     | Reuse   |
+    | reuse_cache_if_exists                                  | Reuse     | Fresh   |
+    | force_redownload (MedVision_FORCE_DOWNLOAD_DATA=False) | Reuse     | Fresh   |
+    | force_redownload (MedVision_FORCE_DOWNLOAD_DATA=True)  | Fresh     | Fresh   |
+</details>
 
 <br/>
 

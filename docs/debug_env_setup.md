@@ -67,7 +67,7 @@ Note that dependencies are installed in a specific order; some have specified ve
 
     > ⚠️
     > Match `--lmms_eval_opt_deps` with model:
-    > - Choose from [`meddr`, `lingshu`, `huatuogpt_vision`, `llava_med`, `qwen2_5_vl`, `gemini`] – defined [here](https://github.com/YongchengYAO/MedVision/blob/master/src/medvision_bm/medvision_lmms-eval/pyproject.toml)
+    > - Choose from [`meddr`, `lingshu`, `huatuogpt_vision`, `llava_med`, `qwen2_5_vl`, `gemini`] – defined in the `[project.optional-dependencies]` [here](https://github.com/YongchengYAO/MedVision/blob/master/src/medvision_bm/medvision_lmms_eval/pyproject.toml)
     > - If model is not one of these, ignore `--lmms_eval_opt_deps` 
 
     ```bash
