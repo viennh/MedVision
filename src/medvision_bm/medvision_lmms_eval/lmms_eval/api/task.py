@@ -895,7 +895,6 @@ class ConfigurableTask(Task):
                     dataset_kwargs.pop("From_YouTube")
                     assert "load_from_disk" not in dataset_kwargs, "load_from_disk must not be True when From_YouTube is True"
 
-                    # TODO: debugging
                     if "download_mode" not in dataset_kwargs:
                         self.all_dataset = datasets.load_dataset(
                             path=self.DATASET_PATH,
@@ -1050,7 +1049,6 @@ class ConfigurableTask(Task):
             # using local task in offline environment, need to process the online dataset into local format via
             self.dataset = datasets.load_from_disk(dataset_path=self.DATASET_PATH)
         else:
-            # TODO: debugging
             if "download_mode" not in dataset_kwargs:
                 self.dataset = datasets.load_dataset(
                     path=self.DATASET_PATH,

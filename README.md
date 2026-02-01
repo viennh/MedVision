@@ -1,4 +1,4 @@
-*<div align="center">
+<div align="center">
   <img src="fig/medvision-logo.png" alt="MedVision Logo" /><br>
 
   # MedVision: Dataset and Benchmark for Quantitative Medical Image Analysis

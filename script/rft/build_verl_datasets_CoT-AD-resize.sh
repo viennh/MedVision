@@ -55,7 +55,7 @@ new_shape_hw=(256 256)  # explicitly reshape images to size (height, width)
 
 # Install medvision_bm
 rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
-pip install -e "${benchmark_dir}"
+pip install "${benchmark_dir}"
 
 # Setup environment for SFT since we import SFT-related modules
 # Note: we can use "requirements_sft_qwen25vl.txt" for all  

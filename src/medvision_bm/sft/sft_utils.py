@@ -1479,9 +1479,10 @@ def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None,
                 else:
                     raise
         
-        # Add dataset_name column for tracking
-        if dataset_name is not None:
-            ds = ds.add_column("dataset_name", [dataset_name] * len(ds))
+        # TODO: This part can be removed since we have dataset_name in each example doc
+        # # Add dataset_name column for tracking
+        # if dataset_name is not None:
+        #     ds = ds.add_column("dataset_name", [dataset_name] * len(ds))
 
         print(
             f"\n[Info] Successfully loaded {len(ds)} samples from config {config} (dataset: {dataset_name})"
