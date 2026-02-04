@@ -22,6 +22,8 @@ from medvision_bm.sft.sft_prompts import (
     FORMAT_PROMPT_MASK_SIZE,
     FORMAT_PROMPT_TUMOR_LESION_SIZE,
 )
+from medvision_bm.sft.sft_utils import normalize_img
+from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE
 
 # NOTE:
 # For all tasks in the MedVision-Bench, we use these units for tasks:
@@ -49,10 +51,7 @@ def doc_to_visual(doc, lmms_eval_specific_kwargs=None):
         _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d)
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
@@ -81,10 +80,7 @@ def doc_to_visual_wBox(doc, lmms_eval_specific_kwargs=None):
         _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d) 
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
@@ -135,10 +131,7 @@ def doc_to_visual_wMask(doc, lmms_eval_specific_kwargs=None):
         _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d)
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
@@ -172,10 +165,7 @@ def doc_to_visual_wVisualPrompt_TLTask(doc, lmms_eval_specific_kwargs=None):
         _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d)
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
@@ -217,7 +207,6 @@ def doc_to_visual_wVisualPrompt_distanceTask(doc, lmms_eval_specific_kwargs=None
     The visual prompt includes one line representing the target distance.
     """
     from medvision_bm.sft.sft_utils import _get_landmarks_coords
-    from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE
 
     # Read NIfTI image
     img_path = doc["image_file"]
@@ -233,10 +222,7 @@ def doc_to_visual_wVisualPrompt_distanceTask(doc, lmms_eval_specific_kwargs=None
         _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d) 
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
@@ -294,7 +280,6 @@ def doc_to_visual_wVisualPrompt_angleTask(doc, lmms_eval_specific_kwargs=None):
     The visual prompt includes 2 lines representing the two lines forming the target angle.
     """
     from medvision_bm.sft.sft_utils import _get_landmarks_coords
-    from medvision_bm.utils.configs import DATASETS_NAME2PACKAGE
 
     # Read NIfTI image
     img_path = doc["image_file"]
@@ -310,10 +295,7 @@ def doc_to_visual_wVisualPrompt_angleTask(doc, lmms_eval_specific_kwargs=None):
         _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
 
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = ((img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d)
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
@@ -1272,9 +1254,9 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
             f"Task:\n"
             f"Given the input medical image{image_prompt}, "
             f"estimate the physical size of the {label_name} in square millimeters.\n"
-            f"Additional information:\n" 
+            f"Additional information:\n"
             f"{pixel_size_text}\n"
-            f"Format requirement:\n" 
+            f"Format requirement:\n"
             f"{FORMAT_PROMPT_MASK_SIZE}"
         )
         return question
@@ -1531,11 +1513,7 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
             p1_name = lms_map[lms[0]]
             p2_name = lms_map[lms[1]]
             # Task description for distance measurement with visual prompt
-            task_description = (
-                f"Task:\n" 
-                f"Given the input medical image{image_prompt}, and a line connecting {p1_name} and {p2_name}, " 
-                f"estimate the physical distance of the line in {metric_unit}.\n" 
-            )
+            task_description = f"Task:\n" f"Given the input medical image{image_prompt}, and a line connecting {p1_name} and {p2_name}, " f"estimate the physical distance of the line in {metric_unit}.\n"
         if metric_type == "angle":
             angles_map = task_info[metric_map_name]
             angle_dict = angles_map[metric_key]
@@ -1559,18 +1537,12 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
             line2_p2_name = line2_lms_map[line2_lms[1]]
             # Task description for angle measurement with visual prompt
             task_description = (
-                f"Task:\n" 
-                f"Given the input medical image{image_prompt}, a line connecting {line1_p1_name} and {line1_p2_name}, and another line connecting {line2_p1_name} and {line2_p2_name}, " 
-                f"estimate the angle between the two lines in {metric_unit}.\n" 
+                f"Task:\n"
+                f"Given the input medical image{image_prompt}, a line connecting {line1_p1_name} and {line1_p2_name}, and another line connecting {line2_p1_name} and {line2_p2_name}, "
+                f"estimate the angle between the two lines in {metric_unit}.\n"
             )
 
-        question = (
-            f"{task_description}" 
-            f"Additional information:\n" 
-            f"{pixel_size_text}\n" 
-            f"Format requirement:\n" 
-            f"{FORMAT_PROMPT_BIOMETRICS}"
-        )
+        question = f"{task_description}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
         return question
 
     return doc_to_text_BiometricsFromLandmarks_wVisualPrompt

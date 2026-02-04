@@ -302,16 +302,16 @@ label_map_regroup = {
     "intervertebral discs": "Spine",
     "spinal cord": "Spine",
     # knee
-    "femur": "Knee",
-    "tibia": "Knee",
-    "left femur": "Knee",
-    "right femur": "Knee",
-    "femoral cartilage": "Knee",
-    "lateral tibial cartilage": "Knee",
-    "medial tibial cartilage": "Knee",
-    "patellar cartilage": "Knee",
-    "lateral meniscus": "Knee",
-    "medial meniscus": "Knee",
+    "femur": "Knee Bone",
+    "tibia": "Knee Bone",
+    "left femur": "Knee Bone",
+    "right femur": "Knee Bone",
+    "femoral cartilage": "Knee Soft Tissue",
+    "lateral tibial cartilage": "Knee Soft Tissue",
+    "medial tibial cartilage": "Knee Soft Tissue",
+    "patellar cartilage": "Knee Soft Tissue",
+    "lateral meniscus": "Knee Soft Tissue",
+    "medial meniscus": "Knee Soft Tissue",
     # lymphatics
     "metastatic lymph node": "Metastatic Lymph Node",
     # miscellaneous pathology (non-organ specific)
@@ -659,16 +659,9 @@ label_map_rename = {
 }
 
 
-# Reference: https://github.com/microsoft/BiomedParse?tab=readme-ov-file#recommended-preprocessing-important
-# ---
-# soft tissues (W:400, L:40)
-# lung (W:1500, L:-160)
-# brain (W:80, L:40)
-# bone (W:1800, L:400)
-# ---
 HU_window_WL_map = {
     "soft_tissue": (400, 40),
-    "lung": (1500, -160),
+    "lung": (1500, -600),
     "brain": (80, 40),
     "bone": (1800, 400),
 }
@@ -703,10 +696,10 @@ CT_HU_windows_WL = {
     'Hip': HU_window_WL_map['bone'],
     'Rib': HU_window_WL_map['bone'],
     'Spine': HU_window_WL_map['bone'],
-    'Knee': HU_window_WL_map['bone'],
+    'Knee Bone': HU_window_WL_map['bone'],
+    'Knee Soft Tissue': HU_window_WL_map['soft_tissue'],
     'Metastatic Lymph Node': HU_window_WL_map['soft_tissue'],
     'Miscellaneous Tumor/Lesion': HU_window_WL_map['soft_tissue'],
     'Jawbone': HU_window_WL_map['bone'],
     'Tooth': HU_window_WL_map['bone'],
-    'Others': HU_window_WL_map['soft_tissue']
 }

@@ -21,9 +21,6 @@ from datasets import DatasetDict, concatenate_datasets, load_dataset
 from PIL import Image
 from scipy.ndimage import zoom
 
-from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
-    get_resized_img_shape,
-)
 from medvision_bm.sft.config import check_model_supported, load_model_info
 from medvision_bm.sft.sft_prompts import (
     _get_prompt_angle,
@@ -149,6 +146,136 @@ def _load_resize_nifti_2d(nii_path, slice_dim, slice_idx, new_shape_hw=None):
     return (pixel_size_hw, image_2d)
 
 
+# NOTE: This function only works for MedVision dataset
+def get_image_info_for_medvision_dataset(doc):
+    """
+    Get image modality and label name from the document.
+
+    :param
+    doc: data sample of MedVision dataset
+
+    - taskType is defined in MedVision.py (https://huggingface.co/datasets/YongchengYAO/MedVision/blob/main/MedVision.py)
+    - Validate taskType:
+        valid_task_types = [
+            "Mask-Size",
+            "Box-Size",
+            "Tumor-Lesion-Size",
+            "Biometrics-From-Landmarks",
+            "Biometrics-From-Landmarks-Distance",
+            "Biometrics-From-Landmarks-Angle",
+        ]
+    """
+    # Validate taskType
+    valid_task_types = [
+        "Mask-Size",
+        "Box-Size",
+        "Tumor-Lesion-Size",
+        "Biometrics-From-Landmarks",
+        "Biometrics-From-Landmarks-Distance",
+        "Biometrics-From-Landmarks-Angle",
+    ]
+    task_type = doc["taskType"]
+    if task_type not in valid_task_types:
+        raise ValueError(f"Invalid taskType: {task_type}. Must be one of {valid_task_types}.")
+
+    # Get data info
+    dataset_name = doc["dataset_name"]
+
+    # Import the dataset-specific module from medvision_ds.datasets
+    if task_type in ["Box-Size"]:
+        processor_module_name = "preprocess_detection"
+    elif task_type in ["Mask-Size"]:
+        processor_module_name = "preprocess_segmentation"
+    elif task_type in [
+        "Tumor-Lesion-Size",
+        "Biometrics-From-Landmarks",
+        "Biometrics-From-Landmarks-Distance",
+        "Biometrics-From-Landmarks-Angle",
+    ]:
+        processor_module_name = "preprocess_biometry"
+    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
+    if dataset_module is None:
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+    processor_module = importlib.import_module(f"medvision_ds.datasets.{dataset_module}.{processor_module_name}")
+
+    # Get task info
+    taskID = doc["taskID"]
+    bm_plan = processor_module.benchmark_plan
+    task_info = bm_plan["tasks"][int(taskID) - 1]
+
+    # Get label_name from label and labels_map
+    # NOTE: Biometrics-From-Landmarks* (A/D) tasks do not have "label", check class MedVision(GeneratorBasedBuilder) in MedVision.py (https://huggingface.co/datasets/YongchengYAO/MedVision/blob/main/MedVision.py)
+    # NOTE: Biometrics-From-Landmarks* (A/D) tasks do not have "labels_map" in task_info, check preprocess_biometry.py in dataset folder at https://huggingface.co/datasets/YongchengYAO/MedVision/tree/main/src/medvision_ds/datasets
+    if "label" in doc and "labels_map" in task_info:
+        label = str(doc["label"])
+        labels_map = task_info["labels_map"]
+        assert label in labels_map, f"Label {label} not found in labels_map."
+        label_name = labels_map.get(label)
+    else:
+        label_name = None
+
+    # Get image modality
+    image_modality = task_info["image_modality"]
+
+    return image_modality, label_name
+
+
+def normalize_ct_img(img, window_width, window_level):
+    """
+    Normalizes CT Hounsfield Units to [0, 255] based on W and L.
+    """
+    v_min = window_level - (window_width / 2)
+    v_max = window_level + (window_width / 2)
+
+    # Clip values to the window range
+    img_normalized = np.clip(img, v_min, v_max)
+
+    # Map to [0, 255]
+    img_normalized = ((img_normalized - v_min) / (v_max - v_min)) * 255.0
+    return img_normalized.astype(np.uint8)
+
+
+def normalize_general_img(img):
+    """
+    Standard min-max normalization to [0, 255] for MR, PET, etc.
+    """
+    v_min = np.percentile(img, 0.5)
+    v_max = np.percentile(img, 99.5)
+
+    if v_max - v_min == 0:
+        return img.astype(np.uint8)
+
+    img_normalized = np.clip(img, v_min, v_max)
+    img_normalized = ((img_normalized - v_min) / (v_max - v_min)) * 255.0
+    return img_normalized.astype(np.uint8)
+
+
+def normalize_img(doc, img_2d):
+    """Convert document to image with scale bar added."""
+    from medvision_bm.utils.configs import CT_HU_windows_WL, label_map_regroup
+
+    # Get image info
+    # NOTE: For Biometrics-From-Landmarks* (A/D) tasks, label_name would be None
+    image_modality, label_name = get_image_info_for_medvision_dataset(doc)
+
+    # Adaptive normalization
+    if image_modality.lower() in ["ct"]:
+        if label_name is not None:
+            hu_window_WL = CT_HU_windows_WL.get(label_map_regroup[label_name], None)
+            assert hu_window_WL is not None, f"Fail to set HU window for label_name {label_name}. Check CT_HU_windows_WL in medvision_bm/utils/configs.py"
+            img_2d_normalized = normalize_ct_img(img_2d, hu_window_WL[0], hu_window_WL[1])
+        else:
+            # NOTE: A/D tasks in CT image do not have the optimal image normalization due to missing label_name used to decide the HU window
+            # TODO: Could be improved by adding label_name or HU window info for A/D tasks in MedVision
+            # Use general normalization if label_name is not available
+            print("Warning: label_name is None, using general normalization (which does not use HU windows) for CT image.")
+            img_2d_normalized = normalize_general_img(img_2d)
+    else:
+        img_2d_normalized = normalize_general_img(img_2d)
+
+    return img_2d_normalized
+
+
 def _doc_to_visual(doc, new_shape_hw=None):
     """Convert document to image with scale bar added."""
     # Read NIfTI image
@@ -158,14 +285,9 @@ def _doc_to_visual(doc, new_shape_hw=None):
     # Load and maybe resize
     _, img_2d = _load_resize_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw)
     # Normalize the image to 0-255 range
-    if img_2d.max() > img_2d.min():
-        img_2d_normalized = (
-            (img_2d - img_2d.min()) / (img_2d.max() - img_2d.min()) * 255
-        ).astype(np.uint8)
-    else:
-        img_2d_normalized = np.zeros_like(img_2d, dtype=np.uint8)
+    img_2d_normalized = normalize_img(doc, img_2d)
     # Convert to PIL Image
-    pil_img = Image.fromarray(img_2d_normalized)
+    pil_img = Image.fromarray(img_2d_normalized, mode="L")
     # Convert to RGB mode
     pil_img = pil_img.convert("RGB")
     return [pil_img]
@@ -174,6 +296,9 @@ def _doc_to_visual(doc, new_shape_hw=None):
 def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
+    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+        get_resized_img_shape,
+    )
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -295,6 +420,9 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, new_shape_hw=None):
         COT_INSTRUCT_ANGLE,
         COT_INSTRUCT_DISTANCE,
         FORMAT_PROMPT_AD_REASONING,
+    )
+    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+        get_resized_img_shape,
     )
 
     # Import the dataset-specific module from medvision_ds.datasets
@@ -746,6 +874,9 @@ def _format_data_AngleDistanceTask_CoT(
 def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
     """Convert document to text."""
     from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
+    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+        get_resized_img_shape,
+    )
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -950,6 +1081,9 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_TL_NORM,
         FORMAT_PROMPT_TL_REASONING,
+    )
+    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+        get_resized_img_shape,
     )
 
     # Import the dataset-specific module from medvision_ds.datasets
