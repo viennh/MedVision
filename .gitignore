@@ -198,6 +198,9 @@ pyrightconfig.json
 .DS_Store
 .build.lock
 
+# model file
+*.bin
+
 # For MedVision
 Data
 Results

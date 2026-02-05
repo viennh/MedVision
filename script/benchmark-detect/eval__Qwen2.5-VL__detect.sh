@@ -45,7 +45,6 @@ python -m  medvision_bm.benchmark.eval__qwen2_5_vl \
 --batch_size_per_gpu $batch_size_per_gpu \
 --gpu_memory_utilization $gpu_memory_utilization \
 --sample_limit $sample_limit \
-2>&1 | tee eval__Qwen2.5-VL__detect.log
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y

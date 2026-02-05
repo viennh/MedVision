@@ -44,7 +44,6 @@ python -m  medvision_bm.benchmark.eval__gemini2_5_wo_tool \
 --task_status_json_path $task_status_json_path \
 --batch_size $batch_size \
 --sample_limit $sample_limit \
-2>&1 | tee eval__gemini2_5_pro_wo_tool__detect.log
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y
