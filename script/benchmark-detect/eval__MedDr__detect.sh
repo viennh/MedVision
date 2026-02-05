@@ -29,13 +29,18 @@ sample_limit=1000
 rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
 pip install "${benchmark_dir}"
 
-# Run
-# Add these arguments for debugging:
-# --env_setup_only \
-# --skip_env_setup \
-# --skip_update_status \
+# (Method 1) Manually install requirements before running the eval script (more robust)
+# ---
+python -m medvision_bm.benchmark.install_medvision_ds --data_dir "${data_dir}"
+python -m medvision_bm.benchmark.install_vendored_lmms_eval
+pip install -r "${benchmark_dir}/requirements/requirements_eval_meddr.txt" --no-deps
+
+# Important: Fix module import failure in distributed subprocess
+export PYTHONPATH="${dir_third_party}/MedDr:$PYTHONPATH"
+
 CUDA_VISIBLE_DEVICES=0 \
-python -m  medvision_bm.benchmark.eval__meddr \
+python -m medvision_bm.benchmark.eval__meddr \
+--skip_env_setup \
 --model_hf_id $model_hf_id \
 --model_name $model_name \
 --results_dir $result_dir \
@@ -45,7 +50,24 @@ python -m  medvision_bm.benchmark.eval__meddr \
 --task_status_json_path $task_status_json_path \
 --batch_size_per_gpu $batch_size_per_gpu \
 --sample_limit $sample_limit \
-2>&1 | tee eval__MedDr__detect.log
+# ---
+
+# # (Method 2) Automatically install requirements in the eval script (simpler, but may incur package version conflicts or bugs introduced by new versions of packages)
+# # Add these arguments for debugging:
+# # --env_setup_only \
+# # --skip_env_setup \
+# # --skip_update_status \
+# CUDA_VISIBLE_DEVICES=0 \
+# python -m  medvision_bm.benchmark.eval__meddr \
+# --model_hf_id $model_hf_id \
+# --model_name $model_name \
+# --results_dir $result_dir \
+# --dir_third_party $dir_third_party \
+# --data_dir $data_dir \
+# --tasks_list_json_path $tasks_list_json_path \
+# --task_status_json_path $task_status_json_path \
+# --batch_size_per_gpu $batch_size_per_gpu \
+# --sample_limit $sample_limit \
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y

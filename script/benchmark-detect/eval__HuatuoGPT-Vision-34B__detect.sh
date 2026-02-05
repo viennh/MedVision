@@ -29,6 +29,9 @@ sample_limit=1000
 rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
 pip install "${benchmark_dir}"
 
+# Important: Fix module import failure in distributed subprocess
+export PYTHONPATH="${dir_third_party}/HuatuoGPT-Vision:$PYTHONPATH"
+
 # Run
 # Add these arguments for debugging:
 # --env_setup_only \
@@ -45,7 +48,6 @@ python -m  medvision_bm.benchmark.eval__huatuogpt-vision \
 --task_status_json_path $task_status_json_path \
 --batch_size_per_gpu $batch_size_per_gpu \
 --sample_limit $sample_limit \
-2>&1 | tee eval__HuatuoGPT-Vision-34B__detect.log
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y
