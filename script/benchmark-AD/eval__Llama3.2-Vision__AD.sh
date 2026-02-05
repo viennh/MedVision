@@ -29,13 +29,19 @@ sample_limit=1000
 rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
 pip install "${benchmark_dir}"
 
-# Run
-# Add these arguments for debugging:
-# --env_setup_only \
-# --skip_env_setup \
-# --skip_update_status \
+# (Method 1) Manually install requirements before running the eval script (more robust)
+# ---
+# - use requirements_*.txt
+# - install medvision_ds and vendored_lmms_eval, since they are not included in the requirements file
+# - use '--skip_env_setup' in the eval__medgemma script to skip re-installing packages
+# ---
+python -m medvision_bm.benchmark.install_medvision_ds --data_dir "${data_dir}"
+python -m medvision_bm.benchmark.install_vendored_lmms_eval
+pip install -r "${benchmark_dir}/requirements/requirements_eval_llama3_vision.txt" --no-deps
+
 CUDA_VISIBLE_DEVICES=0 \
 python -m  medvision_bm.benchmark.eval__llama3_2_vision \
+--skip_env_setup \
 --model_hf_id $model_hf_id \
 --model_name $model_name \
 --results_dir $result_dir \
@@ -45,7 +51,24 @@ python -m  medvision_bm.benchmark.eval__llama3_2_vision \
 --batch_size_per_gpu $batch_size_per_gpu \
 --gpu_memory_utilization $gpu_memory_utilization \
 --sample_limit $sample_limit \
-2>&1 | tee eval__Llama3.2-Vision__AD.log
+# ---
+
+# # (Method 2) Automatically install requirements in the eval script (simpler, but may incur package version conflicts or bugs introduced by new versions of packages)
+# # Add these arguments for debugging:
+# # --env_setup_only \
+# # --skip_env_setup \
+# # --skip_update_status \
+# CUDA_VISIBLE_DEVICES=0 \
+# python -m  medvision_bm.benchmark.eval__llama3_2_vision \
+# --model_hf_id $model_hf_id \
+# --model_name $model_name \
+# --results_dir $result_dir \
+# --data_dir $data_dir \
+# --tasks_list_json_path $tasks_list_json_path \
+# --task_status_json_path $task_status_json_path \
+# --batch_size_per_gpu $batch_size_per_gpu \
+# --gpu_memory_utilization $gpu_memory_utilization \
+# --sample_limit $sample_limit \
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y
