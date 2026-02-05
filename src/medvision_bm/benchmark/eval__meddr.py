@@ -5,7 +5,6 @@ import subprocess
 from medvision_bm.utils import (
     ensure_hf_hub_installed,
     install_flash_attention_torch_and_deps_py39_v2,
-    install_flash_attention_torch_and_deps_py310,
     install_medvision_ds,
     install_vendored_lmms_eval,
     load_tasks,
@@ -238,8 +237,7 @@ def main():
         ensure_hf_hub_installed(hf_hub_version="0.35.3")
         install_vendored_lmms_eval(proj_dependency="meddr")
         install_medvision_ds(data_dir)
-        # install_flash_attention_torch_and_deps_py39_v2()
-        install_flash_attention_torch_and_deps_py310()
+        install_flash_attention_torch_and_deps_py39_v2()
         install_meddr_dependencies(dir_third_party)
         if args.env_setup_only:
             print(

@@ -1,16 +1,16 @@
---index-url https://download.pytorch.org/whl/cu124
+# --index-url https://download.pytorch.org/whl/cu124
 torch==2.6.0
 torchaudio==2.6.0
 torchvision==0.21.0
 accelerate==0.34.2
 aiohappyeyeballs==2.6.1
-aiohttp==3.13.1
+aiohttp==3.9.5
 aiosignal==1.4.0
 annotated-types==0.7.0
 antlr4-python3-runtime==4.7.2
 anyio==4.11.0
 async-lru==2.0.5
-async-timeout==5.0.1
+async-timeout<5.0
 asyncio-atexit==1.0.1
 attrs==25.4.0
 av==15.1.0
