@@ -243,7 +243,8 @@ def normalize_general_img(img):
     v_max = np.percentile(img, 99.5)
 
     if v_max - v_min == 0:
-        return img.astype(np.uint8)
+        # If the image is flat/uniform, return black image
+        return np.zeros_like(img, dtype=np.uint8)
 
     img_normalized = np.clip(img, v_min, v_max)
     img_normalized = ((img_normalized - v_min) / (v_max - v_min)) * 255.0
@@ -252,15 +253,26 @@ def normalize_general_img(img):
 
 def normalize_img(doc, img_2d):
     """Convert document to image with scale bar added."""
-    from medvision_bm.utils.configs import CT_HU_windows_WL, label_map_regroup
+    from medvision_bm.utils.configs import CT_HU_windows_WL, label_map_regroup, TASK_LIST_FORCE_STANDARD_IMAGE_NORMALIZATION
 
     # Get image info
     # NOTE: For Biometrics-From-Landmarks* (A/D) tasks, label_name would be None
     image_modality, label_name = get_image_info_for_medvision_dataset(doc)
 
+    # Check if this task requires standard image normalization (i.e., skip HU-based CT normalization)
+    is_standard_normalization_required = False
+    for task in TASK_LIST_FORCE_STANDARD_IMAGE_NORMALIZATION:
+        if (
+            task["dataset_name"] == doc["dataset_name"] and
+            task["taskID"] == doc["taskID"] and
+            task["taskType"] == doc["taskType"]
+        ):
+            is_standard_normalization_required = True
+            break
+
     # Adaptive normalization
     if image_modality.lower() in ["ct"]:
-        if label_name is not None:
+        if label_name is not None and not is_standard_normalization_required:
             hu_window_WL = CT_HU_windows_WL.get(label_map_regroup[label_name], None)
             assert hu_window_WL is not None, f"Fail to set HU window for label_name {label_name}. Check CT_HU_windows_WL in medvision_bm/utils/configs.py"
             img_2d_normalized = normalize_ct_img(img_2d, hu_window_WL[0], hu_window_WL[1])

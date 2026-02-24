@@ -106,6 +106,17 @@ DATASETS_NAME2PACKAGE = {
 # ----------------------------------------------------------------
 
 
+# ----------------------------------------------------------------
+# NOTE: A list of dictionaries specifying tasks that require standard image normalization.
+# This is mainly designed to skip HU-based CT image normalization for contrast CT scans, such as KiPA22.
+TASK_LIST_FORCE_STANDARD_IMAGE_NORMALIZATION = [
+    {"dataset_name": "KiPA22", "taskID": "01", "taskType": "Tumor-Lesion-Size"}, # TL task 
+    {"dataset_name": "KiPA22", "taskID": "01", "taskType": "Box-Size"}, # Detection task
+    {"dataset_name": "KiPA22", "taskID": "01", "taskType": "Mask-Size"}, # Mask-Size task 
+]
+# ----------------------------------------------------------------
+
+
 label_map_regroup = {
     # ───────────────────────────── VASCULATURE ─────────────────────────────
     # arteries
