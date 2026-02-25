@@ -271,16 +271,21 @@ def normalize_img(doc, img_2d):
             break
 
     # Adaptive normalization
+    # NOTE: A/D tasks in CT image do not have the optimal image normalization due to missing label_name used to decide the HU window
+    # TODO: Could be improved by adding label_name or HU window info for A/D tasks in MedVision
     if image_modality.lower() in ["ct"]:
-        if label_name is not None and not is_standard_normalization_required:
+        # Use HU window-based normalization if: 1) label_name is not None, 2) label is not regrouped to "others", and 3) standard image normalization is not forced in this task
+        if label_name is not None and not is_standard_normalization_required and label_map_regroup[label_name].lower() != "others":
             hu_window_WL = CT_HU_windows_WL.get(label_map_regroup[label_name], None)
             assert hu_window_WL is not None, f"Fail to set HU window for label_name {label_name}. Check CT_HU_windows_WL in medvision_bm/utils/configs.py"
             img_2d_normalized = normalize_ct_img(img_2d, hu_window_WL[0], hu_window_WL[1])
         else:
-            # NOTE: A/D tasks in CT image do not have the optimal image normalization due to missing label_name used to decide the HU window
-            # TODO: Could be improved by adding label_name or HU window info for A/D tasks in MedVision
-            # Use general normalization if label_name is not available
-            print("Warning: label_name is None, using general normalization (which does not use HU windows) for CT image.")
+            if label_name is None:
+                print("[Info] label_name is None, using general normalization (which does not use HU windows) for CT image.")
+            if is_standard_normalization_required:
+                print("[Info] standard image normalization is forced for this task, using general normalization (which does not use HU windows)")
+            if label_map_regroup[label_name].lower() == "others":
+                print(f"[Info] label_name {label_name} is regrouped to 'others', using general normalization (which does not use HU windows)") 
             img_2d_normalized = normalize_general_img(img_2d)
     else:
         img_2d_normalized = normalize_general_img(img_2d)
