@@ -194,6 +194,8 @@ class InternVL3(lmms):
         self._model = AutoModel.from_pretrained(self.path, torch_dtype=torch.bfloat16, low_cpu_mem_usage=True, trust_remote_code=True, device_map=self.device_map).eval()
         self._tokenizer = AutoTokenizer.from_pretrained(self.path, trust_remote_code=True, device_map=self.device_map)
 
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
             # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
@@ -214,17 +216,11 @@ class InternVL3(lmms):
             self.accelerator = accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
         elif accelerator.num_processes == 1 and device_map == "auto":
             eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
-            self._rank = 0
-            self._world_size = 1
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self.model.to(self._device)
-            self._rank = 0
-            self._world_size = 1
 
         self.modality = modality
 

@@ -140,6 +140,8 @@ class Llava_OneVision(lmms):
         self.truncate_context = truncate_context
         assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
 
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
             # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
@@ -160,19 +162,11 @@ class Llava_OneVision(lmms):
             self.accelerator = accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
-
         elif accelerator.num_processes == 1 and device_map == "auto":
             eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
-            self._rank = 0
-            self._world_size = 1
-
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self.model.to(self._device)
-            self._rank = 0
-            self._world_size = 1
 
     @property
     def config(self):

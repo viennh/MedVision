@@ -110,23 +110,20 @@ class Qwen2_5_VL(lmms):
         self.batch_size_per_gpu = int(batch_size)
         self.use_cache = use_cache
 
-        if accelerator.num_processes > 1:
-            assert accelerator.distributed_type in [
-                DistributedType.FSDP,
-                DistributedType.MULTI_GPU,
-            ], "Unsupported distributed type provided. Only DDP and FSDP are supported."
-            if accelerator.distributed_type == DistributedType.FSDP:
-                self._model = accelerator.prepare(self.model)
-            else:
-                self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
-            self.accelerator = accelerator
-            if self.accelerator.is_local_main_process:
-                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
+
+        assert accelerator.distributed_type in [
+            DistributedType.FSDP,
+            DistributedType.MULTI_GPU,
+        ], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+        if accelerator.distributed_type == DistributedType.FSDP:
+            self._model = accelerator.prepare(self.model)
         else:
-            self._rank = 0
-            self._world_size = 1
+            self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
+        self.accelerator = accelerator
+        if self.accelerator.is_local_main_process:
+            eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
 
     @property
     def config(self):

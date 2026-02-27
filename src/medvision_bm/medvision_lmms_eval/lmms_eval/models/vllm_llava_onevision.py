@@ -174,17 +174,12 @@ class VLLM_Llava_OneVision(lmms):
         )
 
         accelerator = Accelerator()
-        if accelerator.num_processes > 1:
-            assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
-            self.accelerator = accelerator
-            if self.accelerator.is_local_main_process:
-                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
-        else:
-            self.accelerator = accelerator
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
+        self.accelerator = accelerator
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
+        assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+        if self.accelerator.is_local_main_process:
+            eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
 
         self.device = self.accelerator.device
         self.batch_size_per_gpu = int(batch_size)

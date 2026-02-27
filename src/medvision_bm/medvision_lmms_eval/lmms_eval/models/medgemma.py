@@ -89,17 +89,16 @@ class MedGemma(lmms):
 
     def _get_model_kwargs(self):
         # Set the device string for multi-gpu training using accelerate's PartialState
-        # ref: https://github.com/huggingface/trl/blob/main/docs/source/sft_trainer.md#multi-gpu-training
         if self.use_flash_attention_2:
             model_kwargs = dict(
                 torch_dtype=self.model_dtype,
-                device_map={"": PartialState().process_index},
+                device_map={"": PartialState().local_process_index},
                 attn_implementation="flash_attention_2",
             )
         else:
             model_kwargs = dict(
                 torch_dtype=self.model_dtype,
-                device_map={"": PartialState().process_index},
+                device_map={"": PartialState().local_process_index},
                 attn_implementation="eager",
             )
         return model_kwargs
@@ -126,6 +125,9 @@ class MedGemma(lmms):
         else:
             self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
             self.device_map = f"cuda:{self.accelerator.local_process_index}"
+
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
         # --------------------------------------
 
         # Load model
@@ -153,18 +155,18 @@ class MedGemma(lmms):
 
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {self.accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
-            self._rank = 0
-            self._world_size = 1
 
     def prepare_pipeline(self):
         """
         By setting device_map to "auto", the pipeline will let Accelerate choose the device.
         """
+        self.accelerator = Accelerator()
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
+
         # Load pipeline
         model_kwargs = self._get_model_kwargs()
         self.pipe = pipeline(

@@ -87,23 +87,19 @@ class Llama4(lmms):
             )
 
         # Only move model to device if not using a device_map
-        if accelerator.num_processes > 1:
-            assert accelerator.distributed_type in [
-                DistributedType.FSDP,
-                DistributedType.MULTI_GPU,
-            ], "Unsupported distributed type provided. Only DDP and FSDP are supported."
-            if accelerator.distributed_type == DistributedType.FSDP:
-                self._model = accelerator.prepare(self.model)
-            else:
-                self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
-            self.accelerator = accelerator
-            if self.accelerator.is_local_main_process:
-                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
+        assert accelerator.distributed_type in [
+            DistributedType.FSDP,
+            DistributedType.MULTI_GPU,
+        ], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+        if accelerator.distributed_type == DistributedType.FSDP:
+            self._model = accelerator.prepare(self.model)
         else:
-            self._rank = 0
-            self._world_size = 1
+            self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
+        self.accelerator = accelerator
+        if self.accelerator.is_local_main_process:
+            eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
 
         self._batch_size = batch_size
 

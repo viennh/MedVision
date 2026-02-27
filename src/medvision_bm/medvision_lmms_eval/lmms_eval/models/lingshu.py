@@ -5,6 +5,7 @@ from io import BytesIO
 from typing import List, Optional, Tuple, Union
 
 import torch
+from accelerate import Accelerator
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
@@ -79,26 +80,27 @@ class Lingshu(lmms):
         return next(self._model.parameters()).device
 
     def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
+        self.accelerator = Accelerator()
+        if self.accelerator.num_processes > 1:
+            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
+            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+        elif self.accelerator.num_processes == 1 and device_map == "auto":
+            self._device = torch.device(device)
+            self.device_map = device_map
+        else:
+            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
+            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+
         self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.model_hf,
             torch_dtype=self.model_dtype,
             attn_implementation="flash_attention_2" if self.use_flash_attention_2 else "eager",
-            device_map=device_map,
+            device_map=self.device_map,
         )
         self._processor = AutoProcessor.from_pretrained(self.model_hf)
         self._processor.tokenizer.padding_side = "left"
-
-        self._device = torch.device(device)
-        self.device_map = device_map
-
-        if device_map == "auto":
-            eval_logger.info("Initialized with model parallelism (device_map='auto').")
-        else:
-            eval_logger.info(f"Using single device: {self._device}")
-            self._model.to(self._device)
-
-        self._rank = 0
-        self._world_size = 1
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
 
     def __pil_img_to_base64(self, pil_img: Image.Image) -> str:
         base64_image = pil_img.convert("RGB")

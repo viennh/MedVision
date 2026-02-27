@@ -86,6 +86,9 @@ class MedDr(lmms):
             self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
             self.device_map = f"cuda:{self.accelerator.local_process_index}"
 
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
+
         self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Add loading progress information
@@ -131,13 +134,9 @@ class MedDr(lmms):
                 self._model = self.accelerator.prepare_model(self._model, evaluation_mode=True)
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {self.accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
-            self._rank = 0
-            self._world_size = 1
 
     def flatten(self, input):
         new_list = []
