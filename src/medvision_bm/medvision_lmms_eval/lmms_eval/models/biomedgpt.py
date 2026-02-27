@@ -52,6 +52,8 @@ class BiomedGPT(lmms):
         # NOTE: USE this model with caution, as discussed here: https://github.com/taokz/BiomedGPT/issues/39#issuecomment-2374711794
         self._model = OFAModel.from_pretrained(pretrained, ignore_mismatched_sizes=True)
 
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -64,13 +66,9 @@ class BiomedGPT(lmms):
             self.accelerator = accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-            self._rank = self.accelerator.local_process_index
-            self._world_size = self.accelerator.num_processes
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
-            self._rank = 0
-            self._world_size = 1
 
         # Set up image processor
         mean, std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]

@@ -79,6 +79,9 @@ class HuatuoGPT_Vision(lmms):
             self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
             self.device_map = f"cuda:{self.accelerator.local_process_index}"
 
+        self._rank = self.accelerator.process_index
+        self._world_size = self.accelerator.num_processes
+
         self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Load model
