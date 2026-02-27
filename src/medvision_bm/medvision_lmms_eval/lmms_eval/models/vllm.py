@@ -177,7 +177,7 @@ class VLLM(lmms):
         self.accelerator = accelerator
         self._rank = self.accelerator.process_index
         self._world_size = self.accelerator.num_processes
-        assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+        assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED, DistributedType.NO], "Unsupported distributed type provided. Only DDP, FSDP, and NO (for vLLM tensor parallelism) are supported."
         if self.accelerator.is_local_main_process:
             eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
 
