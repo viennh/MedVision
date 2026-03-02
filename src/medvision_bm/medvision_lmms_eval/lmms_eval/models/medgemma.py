@@ -52,7 +52,7 @@ class MedGemma(lmms):
         self.model_dtype = torch.bfloat16
 
         if self.use_pipeline:
-            self.prepare_pipeline()
+            self.prepare_pipeline(device, device_map)
         else:
             self.prepare_model(device, device_map)
 
@@ -89,46 +89,40 @@ class MedGemma(lmms):
 
     def _get_model_kwargs(self):
         # Set the device string for multi-gpu training using accelerate's PartialState
-        if self.use_flash_attention_2:
-            model_kwargs = dict(
-                torch_dtype=self.model_dtype,
-                device_map={"": PartialState().local_process_index},
-                attn_implementation="flash_attention_2",
-            )
-        else:
-            model_kwargs = dict(
-                torch_dtype=self.model_dtype,
-                device_map={"": PartialState().local_process_index},
-                attn_implementation="eager",
-            )
+        model_kwargs = dict(
+            torch_dtype=self.model_dtype,
+            device_map=self.device_map,
+            attn_implementation="flash_attention_2" if self.use_flash_attention_2 else "eager",
+        )
         return model_kwargs
 
-    def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
+    def _setup_distributed_inference(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
         # Set up accelerator
-        # --------------------------------------
-        # NOTE: to be confirmed
         if self.distributed_type == "fsdp":
             fsdp_plugin = FullyShardedDataParallelPlugin(
                 state_dict_config=FullStateDictConfig(offload_to_cpu=False, rank0_only=False),
                 optim_state_dict_config=FullOptimStateDictConfig(offload_to_cpu=False, rank0_only=False),
             )
             self.accelerator = Accelerator(fsdp_plugin=fsdp_plugin)
-        elif self.distributed_type == "multi-gpu":
+        else:
+            if self.distributed_type != "multi-gpu":
+                eval_logger.warning(f"Unknown distributed_type '{self.distributed_type}', falling back to multi-gpu.")
             self.accelerator = Accelerator()
 
         if self.accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-        elif self.accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
+            # Pin the entire model to this process's GPU
+            self.device_map = {"":  self.accelerator.local_process_index}
         else:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+            # Single-process: respect user's device_map (e.g., "auto", "cpu", etc.)
+            self.device_map = device_map
 
         self._rank = self.accelerator.process_index
         self._world_size = self.accelerator.num_processes
-        # --------------------------------------
+        self._device = self.accelerator.device
+
+    def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
+        # Set up distributed training if necessary
+        self._setup_distributed_inference(device=device, device_map=device_map)
 
         # Load model
         model_kwargs = self._get_model_kwargs()
@@ -159,13 +153,12 @@ class MedGemma(lmms):
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
 
-    def prepare_pipeline(self):
+    def prepare_pipeline(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
         """
         By setting device_map to "auto", the pipeline will let Accelerate choose the device.
         """
-        self.accelerator = Accelerator()
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
+        # Set up distributed training if necessary
+        self._setup_distributed_inference(device=device, device_map=device_map)
 
         # Load pipeline
         model_kwargs = self._get_model_kwargs()
