@@ -4,6 +4,7 @@ import json
 import multiprocessing
 import os
 import re
+import shutil
 from functools import partial
 
 import numpy as np
@@ -44,7 +45,11 @@ def _load_results_file(jsonl_file, verbose=True):
 
     try:
         with open(results_json_path, "r") as rf:
-            print(f"[Info] Successfully loaded results file for {task_id}") if verbose else None
+            (
+                print(f"[Info] Successfully loaded results file for {task_id}")
+                if verbose
+                else None
+            )
             return json.load(rf), results_json_file
     except Exception as e:
         raise ValueError(f"Failed to parse results file for {task_id}: {str(e)}")
@@ -241,23 +246,33 @@ def _process_jsonl_file(jsonl_file, temp_file, task_type, limit, verbose=True):
 
             # Limit the number of processed samples if limit is set
             if limit is not None and count_total == limit:
-                print(
-                    f"[Warning] Reached limit of {limit} samples for file {jsonl_file}. Stopping processing."
-                ) if verbose else None
+                (
+                    print(
+                        f"[Warning] Reached limit of {limit} samples for file {jsonl_file}. Stopping processing."
+                    )
+                    if verbose
+                    else None
+                )
                 break
 
     return metrics, count_total
 
 
-def _process_single_jsonl_item(jsonl_file, model_dir, task_type, limit, skip_existing, verbose=True):
+def _process_single_jsonl_item(
+    jsonl_file, model_dir, task_type, limit, skip_existing, verbose=True
+):
     # Get parsed file path: model_dir/parsed/*.jsonl
     parsed_file_path = _get_parsed_file_path(model_dir, jsonl_file)
     os.makedirs(os.path.dirname(parsed_file_path), exist_ok=True)
 
     if skip_existing and os.path.exists(parsed_file_path):
-        print(
-            f"[Info] Parsed file already exists at {parsed_file_path}. Skipping as per 'skip_existing' flag."
-        ) if verbose else None
+        (
+            print(
+                f"[Info] Parsed file already exists at {parsed_file_path}. Skipping as per 'skip_existing' flag."
+            )
+            if verbose
+            else None
+        )
         return
 
     # Load existing results summary file for the jsonl_file
@@ -265,7 +280,9 @@ def _process_single_jsonl_item(jsonl_file, model_dir, task_type, limit, skip_exi
 
     # Process JSONL file and save parsed results
     temp_file = jsonl_file + ".temp"
-    metrics, count_total = _process_jsonl_file(jsonl_file, temp_file, task_type, limit, verbose)
+    metrics, count_total = _process_jsonl_file(
+        jsonl_file, temp_file, task_type, limit, verbose
+    )
     os.replace(temp_file, parsed_file_path)
     print(f"[Info] Saved parsed data to {parsed_file_path}") if verbose else None
 
@@ -278,15 +295,25 @@ def _process_single_jsonl_item(jsonl_file, model_dir, task_type, limit, skip_exi
     )
     with open(parsed_results_json_path, "w") as f:
         json.dump(results_summary_data, f, indent=2)
-    print(f"[Info] Saved updated results summary to {parsed_results_json_path}") if verbose else None
+    (
+        print(f"[Info] Saved updated results summary to {parsed_results_json_path}")
+        if verbose
+        else None
+    )
 
 
 def _process_model_directory(
-    model_dir, task_type, limit, skip_existing, processes=None
+    model_dir, task_type, limit, skip_existing, processes=None, rm_old=False
 ):
     # For loop to open all *.jsonl files in model_dir
     jsonl_files = glob.glob(os.path.join(model_dir, "*.jsonl"))
     print(f"Found {len(jsonl_files)} JSONL files in {model_dir}")
+
+    if rm_old:
+        parsed_file_dir = os.path.join(model_dir, "parsed")
+        if os.path.exists(parsed_file_dir):
+            print(f"[Info] Removing old parsed directory: {parsed_file_dir}")
+            shutil.rmtree(parsed_file_dir)
 
     if processes and processes > 1:
         print(f"Using {processes} processes for parsing JSONL files...")
@@ -317,6 +344,7 @@ def main(**kwargs):
     limit = kwargs.get("limit")
     skip_existing = kwargs.get("skip_existing", False)
     processes = kwargs.get("processes")
+    rm_old = kwargs.get("rm_old", False)
 
     if task_dir is not None:
         print(
@@ -330,7 +358,12 @@ def main(**kwargs):
         for model_dir in model_dirs:
             print(f"\nProcessing model directory: {model_dir}")
             _process_model_directory(
-                model_dir, task_type, limit, skip_existing, processes=processes
+                model_dir,
+                task_type,
+                limit,
+                skip_existing,
+                processes=processes,
+                rm_old=rm_old,
             )
 
     elif model_dir is not None:
@@ -338,7 +371,12 @@ def main(**kwargs):
             f"Using model_dir: {model_dir}\nProcessing all JSONL files within this directory."
         )
         _process_model_directory(
-            model_dir, task_type, limit, skip_existing, processes=processes
+            model_dir,
+            task_type,
+            limit,
+            skip_existing,
+            processes=processes,
+            rm_old=rm_old,
         )
 
     else:
@@ -381,6 +419,11 @@ def parse_args():
         type=int,
         default=None,
         help="Number of worker processes to use for processing JSONL files. If None, uses single process.",
+    )
+    parser.add_argument(
+        "--rm_old",
+        action="store_true",
+        help="Remove the old parsed directory before processing.",
     )
 
     args = parser.parse_args()
