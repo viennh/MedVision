@@ -1,0 +1,3 @@
+include: CAMUS_MaskSize_base-VP-woMedImg.yaml
+task: CAMUS_MaskSize_Task01_Axial-VP-woMedImg 
+dataset_name: CAMUS_MaskSize_Task01_Axial_Test

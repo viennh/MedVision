@@ -1,0 +1,3 @@
+include: SKM-TEA_MaskSize_base-VP-woMedImg.yaml
+task: SKM-TEA_MaskSize_Task02_Coronal-VP-woMedImg
+dataset_name: SKM-TEA_MaskSize_Task02_Coronal_Test
