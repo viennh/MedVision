@@ -197,10 +197,13 @@ def _process_jsonl_file(jsonl_file, temp_file, task_type, limit, verbose=True):
         metrics["count_valid_RE"] = "N/A"
         metrics["count_RE_ls"] = "N/A"
 
-    with open(jsonl_file, "r") as f, open(temp_file, "w") as temp:
-        for line in f:
-            # Read and parse each line as JSON
-            data = json.loads(line)
+    with open(jsonl_file, "r") as f:
+        all_lines = [json.loads(line) for line in f]
+    # Sort by doc_id in ascending order
+    all_lines.sort(key=lambda x: x.get("doc_id", 0))
+
+    with open(temp_file, "w") as temp:
+        for data in all_lines:
             doc = data["doc"]
             resps = _extract_response(data)
             data["filtered_resps"] = [extract_last_k_nums(resps, target_nums)]
