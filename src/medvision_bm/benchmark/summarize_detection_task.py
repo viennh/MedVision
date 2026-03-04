@@ -474,9 +474,17 @@ def process_parsed_file_in_model_folder(
     """
     # Find parsed JSONL files
     parsed_files_dir = os.path.join(model_dir, "parsed")
-    assert os.path.exists(
-        parsed_files_dir
-    ), f"Parsed files directory does not exist: {parsed_files_dir}"
+
+    # # [Option 1] Early exit if parsed directory does not exist
+    # assert os.path.exists(
+    #     parsed_files_dir
+    # ), f"Parsed files directory does not exist: {parsed_files_dir}"
+
+    # [Option 2] Warning and skip if parsed directory does not exist
+    if not os.path.exists(parsed_files_dir):
+        print(f"Parsed files directory does not exist: {parsed_files_dir}, skipping...")
+        return
+
     jsonl_files = glob.glob(os.path.join(parsed_files_dir, "*.jsonl"))
 
     # Collect all data from the parsed JSONL files
@@ -569,11 +577,7 @@ def print_summary_metrics(task_dir, skip_model_wo_parsed_files=False):
             print(f"\nSkipping model directory (no parsed folder): {model_dir}")
             continue
 
-        metrics_file = os.path.join(
-            model_dir,
-            "parsed",
-            SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS,
-        )
+        metrics_file = os.path.join(parsed_dir, SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS)
 
         if os.path.exists(metrics_file):
             with open(metrics_file, "r") as f:

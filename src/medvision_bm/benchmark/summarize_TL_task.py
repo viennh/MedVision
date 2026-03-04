@@ -316,9 +316,17 @@ def process_parsed_file_in_model_folder(
     """
     # Find parsed JSONL files
     parsed_files_dir = os.path.join(model_dir, "parsed")
-    assert os.path.exists(
-        parsed_files_dir
-    ), f"Parsed files directory does not exist: {parsed_files_dir}"
+
+    # # Option 1: Early exit if parsed directory does not exist
+    # assert os.path.exists(
+    #     parsed_files_dir
+    # ), f"Parsed files directory does not exist: {parsed_files_dir}"
+
+    # Option 2: Warning and skip if parsed directory does not exist
+    if not os.path.exists(parsed_files_dir):
+        print(f"Parsed files directory does not exist: {parsed_files_dir}, skipping...")
+        return
+
     jsonl_files = glob.glob(os.path.join(parsed_files_dir, "*.jsonl"))
 
     # Collect all data from the parsed JSONL files
