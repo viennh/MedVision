@@ -155,11 +155,15 @@ Next (in the container):
      # --limit: limit sample size in the parsed files
      # --skip_existing: (store_true arg) skip parsed files
      # --processes, -p: number of processes
+     # --rm_old: remove existing "parsed" folder for each model
      
      # example 1: parse all models for the T/L task 
      python -m medvision_bm.benchmark.parse_outputs --task_type TL --task_dir Results/MedVision-TL -p 32
+
+     # example 2: parse all models for the A/D task (remove existing `parsed` folder) 
+     python -m medvision_bm.benchmark.parse_outputs --task_type AD --task_dir Results/MedVision-AD -p 32 --rm_old
      
-     # example 2: parse one model for the detection task and skip existing parsed files
+     # example 3: parse one model for the detection task and skip existing parsed files
      python -m medvision_bm.benchmark.parse_outputs --task_type Detection --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct --skip_existing -p 32
      ```
 
@@ -224,7 +228,7 @@ Next (in the container):
   │   │   │   ├── summary_TL_task.txt                 # <== [step 3] summary
   ```
 
-- **[Debug]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
+- **[Troubleshooting]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
 
 <br/>
 
@@ -246,7 +250,7 @@ Next (in the container):
   >   - `CUDA_VISIBLE_DEVICES=0,1,2,3` and `--num_processes=4`
 
 
-- **[Debug]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
+- **[Troubleshooting]** [here](https://github.com/YongchengYAO/MedVision/tree/master/docs/debug_env_setup.md)
 
 - **[Blog]** [Supervised Fine-Tuning (SFT) for VLMs on Medical Image Data](https://huggingface.co/blog/YongchengYAO/medvision-sft-guide)
 
@@ -775,7 +779,7 @@ ds = load_dataset(
 </details>
 
 
-### Download Mode in MedVision Dataset
+## Download Mode in MedVision Dataset
 
 <details>
 <summary> (Advanced) Understand how the customized dataset loading script `MedVision.py` changes the behavior of `download_mode` in `load_dataset()` </summary>
@@ -797,6 +801,8 @@ ds = load_dataset(
     | force_redownload (MedVision_FORCE_DOWNLOAD_DATA=False) | Reuse     | Fresh   |
     | force_redownload (MedVision_FORCE_DOWNLOAD_DATA=True)  | Fresh     | Fresh   |
 </details>
+
+🔥 Summary: [Understanding the download mode of MedVision dataset](https://github.com/YongchengYAO/MedVision/issues/11)
 
 <br/>
 
