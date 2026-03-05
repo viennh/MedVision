@@ -9,6 +9,7 @@ from accelerate import Accelerator
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from lmms_eval.utils import eval_logger
 from PIL import Image
 from qwen_vl_utils import process_vision_info
@@ -31,8 +32,6 @@ class Lingshu(lmms):
         use_flash_attention_2: Optional[bool] = False,
         max_new_tokens: int = 300,
         num_workers: int = 8,
-        device: Optional[str] = "cuda",
-        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -42,7 +41,7 @@ class Lingshu(lmms):
         self.max_new_tokens = max_new_tokens
         self.num_workers = num_workers
         self.model_dtype = torch.bfloat16
-        self.prepare_model(device, device_map)
+        self.prepare_model()
 
     @property
     def model(self):
@@ -79,17 +78,10 @@ class Lingshu(lmms):
         # Compatible with DP & MP (device_map)
         return next(self._model.parameters()).device
 
-    def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
+    def prepare_model(self):
+        # Set up accelerator and device assignment using standard practice
         self.accelerator = Accelerator()
-        if self.accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-        elif self.accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
 
         self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.model_hf,
@@ -99,8 +91,6 @@ class Lingshu(lmms):
         )
         self._processor = AutoProcessor.from_pretrained(self.model_hf)
         self._processor.tokenizer.padding_side = "left"
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
 
     def __pil_img_to_base64(self, pil_img: Image.Image) -> str:
         base64_image = pil_img.convert("RGB")

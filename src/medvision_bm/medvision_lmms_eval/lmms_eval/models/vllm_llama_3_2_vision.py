@@ -6,7 +6,6 @@ from io import BytesIO
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from accelerate import Accelerator, DistributedType
 from decord import VideoReader, cpu
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
@@ -137,7 +136,7 @@ class VLLM_Llama_3_2_Vision(lmms):
 
     def __init__(
         self,
-        model_version: str = "Qwen/Qwen2.5-VL-3B-Instruct",
+        model_version: str = "meta-llama/Llama-3.2-11B-Vision-Instruct",
         tensor_parallel_size: int = 1,
         gpu_memory_utilization: float = 0.8,
         batch_size: int = 1,
@@ -173,15 +172,6 @@ class VLLM_Llama_3_2_Vision(lmms):
             **kwargs,
         )
 
-        accelerator = Accelerator()
-        self.accelerator = accelerator
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
-        assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED, DistributedType.NO], "Unsupported distributed type provided. Only DDP, FSDP, and NO (for vLLM tensor parallelism) are supported."
-        if self.accelerator.is_local_main_process:
-            eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-
-        self.device = self.accelerator.device
         self.batch_size_per_gpu = int(batch_size)
 
     # Function to encode the image
@@ -231,7 +221,9 @@ class VLLM_Llama_3_2_Vision(lmms):
 
     def generate_until(self, requests) -> List[str]:
         res = []
-        pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
+
+        # Always show progress - vLLM runs as single process with internal GPU distribution
+        pbar = tqdm(total=len(requests), desc="Model Responding")
 
         batch_size = self.batch_size_per_gpu
         batched_requests = [requests[i : i + batch_size] for i in range(0, len(requests), batch_size)]

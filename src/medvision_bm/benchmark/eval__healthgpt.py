@@ -170,12 +170,6 @@ def parse_args():
     )
     # resource-specific arguments
     parser.add_argument(
-        "--minimum_gpu",
-        default=1,
-        type=int,
-        help="Minimum number of GPUs to use.",
-    )
-    parser.add_argument(
         "--batch_size_per_gpu",
         default=20,
         type=int,
@@ -246,7 +240,7 @@ def main():
     data_dir = args.data_dir
     sample_limit = args.sample_limit
 
-    num_processes = set_cuda_num_processes(minimum_gpu=args.minimum_gpu)
+    num_processes = set_cuda_num_processes()
 
     # NOTE: DO NOT change the order of these calls
     # ------
@@ -294,7 +288,6 @@ def main():
             f"hlora_alpha={hlora_alpha},"
             f"hlora_nums={hlora_nums},"
             f"vq_idx_nums={vq_idx_nums},"
-            "device_map=auto,"
             "dtype=FP16"  # ["FP16", "FP32", "BF16"]
         )
 

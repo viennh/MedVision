@@ -287,7 +287,7 @@ class InternVL3(lmms):
             visuals = self.flatten(visuals)
             if self.modality == "image":
                 if visuals:
-                    visuals = [load_image(visual).to(torch.bfloat16).cuda() for visual in visuals]
+                    visuals = [load_image(visual).to(torch.bfloat16).to(self.device) for visual in visuals]
                     pixel_values = torch.cat(visuals, dim=0)
                     num_patches_list = [visual.size(0) for visual in visuals]
                     image_tokens = ["<image>"] * len(visuals)
@@ -301,7 +301,7 @@ class InternVL3(lmms):
                 assert len(visuals) == 1, f"Only one video is supported, but got {len(visuals)} videos."
                 video_path = visuals[0]
                 pixel_values, num_patches_list = load_video(video_path, num_segments=self.num_frame)
-                pixel_values = pixel_values.to(torch.bfloat16).cuda()
+                pixel_values = pixel_values.to(torch.bfloat16).to(self.device)
                 video_prefix = "".join([f"Frame{i+1}: <image>\n" for i in range(len(num_patches_list))])
                 question = video_prefix + contexts
                 response, history = self.model.chat(self.tokenizer, pixel_values, question, gen_kwargs, num_patches_list=num_patches_list, history=None, return_history=True)

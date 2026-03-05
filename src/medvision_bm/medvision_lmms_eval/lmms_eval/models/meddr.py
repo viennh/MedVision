@@ -14,6 +14,7 @@ logging.set_verbosity_error()
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 
 # NOTE: This is a workaround for the issue with the import of the MedDr module
 dir_meddr = os.environ.get("MedDr_DIR")
@@ -35,15 +36,13 @@ class MedDr(lmms):
         model_path: str = "Sunanhe/MedDr_0401",
         dtype: str = "FP16",
         attn_implementation: str = "flash_attention_2",
-        device: Optional[str] = "cuda",
-        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
         self.model_path = model_path
         self.dtype = dtype
         self.attn_implementation = attn_implementation
-        self.prepare_model(device, device_map)
+        self.prepare_model()
 
     @property
     def tokenizer(self):
@@ -73,21 +72,10 @@ class MedDr(lmms):
     def world_size(self):
         return self._world_size
 
-    def prepare_model(self, device, device_map):
-        # Set up accelerator
+    def prepare_model(self):
+        # Set up accelerator and device assignment using standard practice
         self.accelerator = Accelerator()
-        if self.accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-        elif self.accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
 
         self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
@@ -101,13 +89,8 @@ class MedDr(lmms):
             "attn_implementation": self.attn_implementation,
             "torch_dtype": self.model_dtype,
         }
-        if self.device_map == "auto":
-            load_config["device_map"] = "auto"
-        elif self.accelerator.num_processes > 1:
-            # For distributed training, use local device
-            load_config["device_map"] = {"": self.device}
-        else:
-            load_config["device_map"] = {"": self.device}
+        # Always load to the specific device to avoid cross-device issues
+        load_config["device_map"] = {"":  self.device}
 
         # Load model
         self._tokenizer = LlamaTokenizer.from_pretrained(self.model_path, **load_config)
@@ -118,11 +101,8 @@ class MedDr(lmms):
         self._model.img_context_token_id = img_context_token_id
         self._image_processor = build_transform(is_train=False, input_size=image_size, pad2square=pad2square)
 
-        # Set up model
-        if self.device_map == "auto":
-            self._model.to(self.model_dtype).to("cuda")
-        else:
-            self._model.to(self.model_dtype).to(self.device)
+        # Set up model and move to device
+        self._model.to(self.model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,

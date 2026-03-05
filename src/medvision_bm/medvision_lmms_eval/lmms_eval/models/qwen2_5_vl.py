@@ -11,6 +11,7 @@ from lmms_eval import utils
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from lmms_eval.models.model_utils.reasoning_model_utils import (
     parse_reasoning_model_answer,
 )
@@ -39,8 +40,6 @@ class Qwen2_5_VL(lmms):
     def __init__(
         self,
         pretrained: str = "Qwen/Qwen2.5-VL-3B-Instruct",
-        device: Optional[str] = "cuda",
-        device_map: Optional[str] = "auto",
         batch_size: Optional[Union[int, str]] = 1,
         use_cache=True,
         attn_implementation: Optional[str] = None,
@@ -72,14 +71,10 @@ class Qwen2_5_VL(lmms):
         if self.max_image_size and not self.use_custom_video_loader:
             raise ValueError("max_image_size is only applicable if use_custom_video_loader is True")
 
+        # Prepare device
         accelerator = Accelerator()
         self.accelerator = accelerator
-        if accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
-        else:
-            self._device = torch.device(device)
-            self.device_map = device_map if device_map else device
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(accelerator)
 
         # Prepare model loading arguments
         model_kwargs = {
@@ -109,9 +104,6 @@ class Qwen2_5_VL(lmms):
         self._max_length = kwargs.get("max_length", 2048)
         self.batch_size_per_gpu = int(batch_size)
         self.use_cache = use_cache
-
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
 
         assert accelerator.distributed_type in [
             DistributedType.FSDP,
@@ -289,10 +281,7 @@ class Qwen2_5_VL(lmms):
                 video_inputs[0] = video_inputs[0][indices]
             inputs = self.processor(text=texts, images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt")
 
-            if self.device_map == "auto":
-                inputs = inputs.to("cuda")
-            else:
-                inputs = inputs.to(self.device)
+            inputs = inputs.to(self.device)
 
             # Set default generation kwargs
             default_gen_kwargs = {

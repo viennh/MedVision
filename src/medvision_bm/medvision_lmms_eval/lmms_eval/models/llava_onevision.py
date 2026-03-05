@@ -15,6 +15,7 @@ from lmms_eval import utils
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from lmms_eval.models.model_utils.load_video import read_video_pyav
 from packaging import version
 from tqdm import tqdm
@@ -71,7 +72,6 @@ class Llava_OneVision(lmms):
         batch_size: Optional[Union[int, str]] = 1,
         model_name: Optional[str] = None,
         attn_implementation: Optional[str] = best_fit_attn_implementation,
-        device_map: Optional[str] = "cuda:0",
         conv_template: Optional[str] = "qwen_1_5",
         use_cache: Optional[bool] = True,
         truncate_context: Optional[bool] = False,  # whether to truncate the context in generation, set it False for LLaVA-1.6
@@ -89,15 +89,7 @@ class Llava_OneVision(lmms):
 
         accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
         accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
-        if accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
-        elif accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(accelerator)
 
         llava_model_args = {
             "multimodal": True,
@@ -140,8 +132,6 @@ class Llava_OneVision(lmms):
         self.truncate_context = truncate_context
         assert self.batch_size_per_gpu == 1, "Llava currently does not support batched generation. See https://github.com/haotian-liu/LLaVA/issues/754. HF Llava also has this issue."
 
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
             # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
@@ -162,11 +152,11 @@ class Llava_OneVision(lmms):
             self.accelerator = accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
-        elif accelerator.num_processes == 1 and device_map == "auto":
-            eval_logger.info(f"Using {accelerator.num_processes} devices with tensor parallelism")
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self.model.to(self._device)
+        
+        self.accelerator = accelerator
 
     @property
     def config(self):
@@ -286,7 +276,7 @@ class Llava_OneVision(lmms):
                             frames = self.load_video(visual, self.max_frames_num)
                         elif self.video_decode_backend == "pyav":
                             frames = read_video_pyav(visual[0], num_frm=self.max_frames_num)
-                        frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().cuda()
+                        frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().to(self.device)
                         image_tensor.append(frames)
                     except Exception as e:
                         eval_logger.error(f"Error {e} in loading video")
@@ -458,7 +448,7 @@ class Llava_OneVision(lmms):
                                 frames = self.load_video(visual, self.max_frames_num)
                             elif self.video_decode_backend == "pyav":
                                 frames = read_video_pyav(visual[0], num_frm=self.max_frames_num)
-                            frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().cuda()
+                            frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().to(self.device)
                             image_tensor.append(frames)
                         except Exception as e:
                             eval_logger.error(f"Error {e} in loading video")
@@ -669,7 +659,7 @@ class Llava_OneVision(lmms):
                                     frames = self.load_video(visual, self.max_frames_num)
                                 elif self.video_decode_backend == "pyav":
                                     frames = read_video_pyav(visual[0], num_frm=self.max_frames_num)
-                                frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().cuda()
+                                frames = self._image_processor.preprocess(frames, return_tensors="pt")["pixel_values"].half().to(self.device)
                                 image_tensor.append(frames)
                             except Exception as e:
                                 eval_logger.error(f"Error {e} in loading video")

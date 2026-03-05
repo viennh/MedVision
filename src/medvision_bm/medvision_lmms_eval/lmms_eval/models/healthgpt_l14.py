@@ -16,6 +16,7 @@ from accelerate import Accelerator, DistributedType
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 
 # NOTE: This is a workaround to import package from local folders
 dir_healthgpt = os.environ.get("HEALTHGPT_DIR")
@@ -84,8 +85,6 @@ class HealthGPT_L14(lmms):
         top_p: float = None,
         num_beams: int = 1,
         max_new_tokens: int = 1024,
-        device: Optional[str] = "cuda",
-        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -106,7 +105,7 @@ class HealthGPT_L14(lmms):
         self.top_p = top_p
         self.num_beams = num_beams
         self.max_new_tokens = max_new_tokens
-        self.prepare_model(device, device_map)
+        self.prepare_model()
 
     @property
     def tokenizer(self):
@@ -136,21 +135,10 @@ class HealthGPT_L14(lmms):
     def world_size(self):
         return self._world_size
 
-    def prepare_model(self, device, device_map):
-        # Set up accelerator
+    def prepare_model(self):
+        # Set up accelerator and device assignment using standard practice
         self.accelerator = Accelerator()
-        if self.accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-        elif self.accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
 
         assert self.dtype in ["FP16", "FP32", "BF16"], ValueError(f"Unsupported dtype: {self.dtype}, should be one of [FP16, FP32, BF16]")
         if self.dtype == "BF16":
@@ -167,13 +155,8 @@ class HealthGPT_L14(lmms):
             "attn_implementation": self.attn_implementation,
             "torch_dtype": model_dtype,
         }
-        if self.device_map == "auto":
-            load_config["device_map"] = "auto"
-        elif self.accelerator.num_processes > 1:
-            # For distributed training, use local device
-            load_config["device_map"] = {"": self.device}
-        else:
-            load_config["device_map"] = {"": self.device}
+        # Always load to the specific device to avoid cross-device issues
+        load_config["device_map"] = {"": self.device}
 
         # Add loading progress information
         eval_logger.info(f"Loading base model from {self.base_model_hf}...")
@@ -209,11 +192,8 @@ class HealthGPT_L14(lmms):
         self._model = load_weights(self._model, self.hlora_weights_local)
         self._model.eval()
 
-        # Set up model
-        if self.device_map == "auto":
-            self._model.to(model_dtype).to("cuda")
-        else:
-            self._model.to(model_dtype).to(self.device)
+        # Set up model on the target device
+        self._model.to(model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -281,7 +261,7 @@ class HealthGPT_L14(lmms):
         conv.append_message(conv.roles[0], qs)
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
-        input_ids = tokenizer_image_token(prompt, self._tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").cuda().unsqueeze_(0)
+        input_ids = tokenizer_image_token(prompt, self._tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").to(self.device).unsqueeze_(0)
         if pil_img:
             image = pil_img.convert("RGB")
             image = expand2square(image, tuple(int(x * 255) for x in self._model.get_vision_tower().image_processor.image_mean))
@@ -289,7 +269,7 @@ class HealthGPT_L14(lmms):
         with torch.inference_mode():
             output_ids = self._model.base_model.model.generate(
                 input_ids,
-                images=image_tensor.to(dtype=model_dtype, device="cuda", non_blocking=True) if pil_img else None,
+                images=image_tensor.to(dtype=model_dtype, device=self.device, non_blocking=True) if pil_img else None,
                 image_sizes=image.size if pil_img else None,
                 do_sample=self.do_sample,
                 temperature=self.temperature,

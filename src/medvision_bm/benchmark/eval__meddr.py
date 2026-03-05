@@ -150,12 +150,6 @@ def parse_args():
     )
     # resource-specific arguments
     parser.add_argument(
-        "--minimum_gpu",
-        default=1,
-        type=int,
-        help="Minimum number of GPUs to use.",
-    )
-    parser.add_argument(
         "--batch_size_per_gpu",
         default=1,
         type=int,
@@ -227,7 +221,7 @@ def main():
     data_dir = args.data_dir
     sample_limit = args.sample_limit
 
-    num_processes = set_cuda_num_processes(minimum_gpu=args.minimum_gpu)
+    num_processes = set_cuda_num_processes()
 
     # NOTE: DO NOT change the order of these calls
     # ------
@@ -259,7 +253,7 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
-        model_args = f"model_path={model_hf}," "device_map=auto"
+        model_args = f"model_path={model_hf},"
 
         rc = run_evaluation_for_task(
             num_processes=num_processes,

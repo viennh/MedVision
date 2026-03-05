@@ -11,6 +11,7 @@ from accelerate import Accelerator, DistributedType
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from loguru import logger as eval_logger
 from torchvision.transforms.functional import to_pil_image
 from tqdm import tqdm
@@ -29,10 +30,8 @@ class Llama4(lmms):
     def __init__(
         self,
         pretrained: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-        device: str = "cuda",
         dtype: Union[str, torch.dtype] = "bf16",
         attn_implementation: Optional[str] = "flex_attention",
-        device_map: Optional[Union[str, dict]] = "auto",
         batch_size: int = 1,
         quant_int4: bool = True,
         **kwargs,
@@ -42,17 +41,9 @@ class Llama4(lmms):
         """
         super().__init__()
 
-        # Device setup
+        # Set up accelerator and device assignment using standard practice
         accelerator = Accelerator()
-        if accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
-        elif accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(accelerator)
 
         # Load processor
         self.processor = AutoProcessor.from_pretrained(pretrained)
@@ -65,7 +56,7 @@ class Llama4(lmms):
             self._model = Llama4ForConditionalGeneration.from_pretrained(
                 pretrained,
                 attn_implementation=attn_implementation,
-                device_map=device_map,
+                device_map=self.device_map,
                 quantization_config=bnb_config,
             )
         else:
@@ -82,13 +73,11 @@ class Llama4(lmms):
             self._model = Llama4ForConditionalGeneration.from_pretrained(
                 pretrained,
                 attn_implementation=attn_implementation,
-                device_map=device_map,
+                device_map=self.device_map,
                 torch_dtype=__dtype,
             )
 
-        # Only move model to device if not using a device_map
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
+        # Set up distributed training if using multiple processes
         assert accelerator.distributed_type in [
             DistributedType.FSDP,
             DistributedType.MULTI_GPU,

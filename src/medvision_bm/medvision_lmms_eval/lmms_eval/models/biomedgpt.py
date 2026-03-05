@@ -5,6 +5,7 @@ from accelerate import Accelerator, DistributedType
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from loguru import logger as eval_logger
 from PIL import Image
 from torchvision import transforms
@@ -28,23 +29,13 @@ class BiomedGPT(lmms):
     def __init__(
         self,
         pretrained: str = "PanaceaAI/BiomedGPT-Base-Pretrained",
-        device: Optional[str] = "cuda",
-        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
 
-        # Set up accelerator
+        # Set up accelerator and device assignment using standard practice
         accelerator = Accelerator()
-        if accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
-        elif accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
-            self.device_map = f"cuda:{accelerator.local_process_index}"
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(accelerator)
 
         # Set up model and tokenizer
         self._tokenizer = OFATokenizer.from_pretrained(pretrained)
@@ -52,8 +43,6 @@ class BiomedGPT(lmms):
         # NOTE: USE this model with caution, as discussed here: https://github.com/taokz/BiomedGPT/issues/39#issuecomment-2374711794
         self._model = OFAModel.from_pretrained(pretrained, ignore_mismatched_sizes=True)
 
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -128,8 +117,8 @@ class BiomedGPT(lmms):
             text_tokens = self._tokenizer([contexts], return_tensors="pt").input_ids
 
             if self.device_map == "auto":
-                text_tokens = text_tokens.to("cuda")
-                patch_img = patch_img.to("cuda")
+                text_tokens = text_tokens.to(self.device)
+                patch_img = patch_img.to(self.device)
             else:
                 text_tokens = text_tokens.to(self.device)
                 patch_img = patch_img.to(self.device)

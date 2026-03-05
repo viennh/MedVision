@@ -12,6 +12,7 @@ logging.set_verbosity_error()
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
+from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 
 # NOTE: This is a workaround for the issue with the import of HuatuoGPT-Vision modules
 dir_huatuogpt_vision = os.environ.get("HuatuoGPTVision_DIR")
@@ -29,14 +30,12 @@ class HuatuoGPT_Vision(lmms):
         self,
         model_path: str = "FreedomIntelligence/HuatuoGPT-Vision-34B",
         dtype: str = "FP16",
-        device: Optional[str] = "cuda",
-        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
         self.model_path = model_path
         self.dtype = dtype
-        self.prepare_model(device, device_map)
+        self.prepare_model()
 
     @property
     def tokenizer(self):
@@ -66,21 +65,10 @@ class HuatuoGPT_Vision(lmms):
     def world_size(self):
         return self._world_size
 
-    def prepare_model(self, device, device_map):
-        # Set up accelerator
+    def prepare_model(self):
+        # Set up accelerator and device assignment using standard practice
         self.accelerator = Accelerator()
-        if self.accelerator.num_processes > 1:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-        elif self.accelerator.num_processes == 1 and device_map == "auto":
-            self._device = torch.device(device)
-            self.device_map = device_map
-        else:
-            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
-            self.device_map = f"cuda:{self.accelerator.local_process_index}"
-
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
+        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
 
         self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 

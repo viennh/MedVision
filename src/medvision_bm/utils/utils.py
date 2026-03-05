@@ -1,5 +1,6 @@
 import json
 import os
+import torch
 
 
 def str2bool(v):
@@ -15,11 +16,13 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
-def set_cuda_num_processes(minimum_gpu=1):
+def set_cuda_num_processes():
     cuda_visible = os.getenv("CUDA_VISIBLE_DEVICES", None)
     if cuda_visible is None:
-        print(f"No CUDA_VISIBLE_DEVICES found. Using minimum GPU: {minimum_gpu}")
-        num_processes = minimum_gpu
+        num_processes = torch.cuda.device_count()
+        print(
+            f"No CUDA_VISIBLE_DEVICES found. Using all available GPUs: {num_processes}"
+        )
         return num_processes
     else:
         num_processes = max(1, len([d for d in cuda_visible.split(",") if d.strip()]))
