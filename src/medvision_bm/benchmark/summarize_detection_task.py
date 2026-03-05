@@ -236,7 +236,7 @@ def calculate_summary_metrics_per_anatomy_detection_task(grouped_data):
     return summary_metrics
 
 
-def group_anatomy_vs_tumor_lesion(model_path):
+def group_anatomy_vs_tumor_lesion(model_path, limit=None):
     """
     Group anatomical regions into 'anatomy' vs 'tumor/lesion' (T/L) categories
     and calculate weighted mean metrics for each group.
@@ -250,15 +250,18 @@ def group_anatomy_vs_tumor_lesion(model_path):
 
     Args:
         model_path: Path to the model folder containing summary metrics file
-    """
-    input_file = os.path.join(model_path, SUMMARY_FILENAME_DETECT_METRICS)
+        limit: Maximum samples to process per file (None = all)
 
-    if not os.path.exists(input_file):
-        print(f"Summary metrics file not found: {input_file}")
+    """
+    metrics_filename = SUMMARY_FILENAME_DETECT_METRICS if limit is None else f"{SUMMARY_FILENAME_DETECT_METRICS.removesuffix('.json')}_limit{limit}.json"
+    metrics_path = os.path.join(model_path, metrics_filename)
+
+    if not os.path.exists(metrics_path):
+        print(f"Summary metrics file not found: {metrics_path}")
         return
 
     # Read the summary metrics
-    with open(input_file, "r") as f:
+    with open(metrics_path, "r") as f:
         data = json.load(f)
 
     # Initialize groups
@@ -355,13 +358,12 @@ def group_anatomy_vs_tumor_lesion(model_path):
     }
 
     # Save grouped results
-    output_path = os.path.join(
-        model_path, SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS
-    )
-    with open(output_path, "w") as f:
+    grouped_metrics_filename = SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS if limit is None else f"{SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS.removesuffix('.json')}_limit{limit}.json"
+    grouped_metrics_path = os.path.join(model_path, grouped_metrics_filename)
+    with open(grouped_metrics_path, "w") as f:
         json.dump(convert_numpy_to_python(grouped_results), f, indent=2)
 
-    print(f"Saved grouped anatomy vs tumor/lesion metrics to {output_path}")
+    print(f"Saved grouped anatomy vs tumor/lesion metrics to {grouped_metrics_path}")
     print(
         f"Anatomy group: {len(anatomy_group)} regions, {anatomy_mean.get('total_samples', 0)} total samples"
     )
@@ -519,22 +521,24 @@ def process_parsed_file_in_model_folder(
     summary_metrics = calculate_summary_metrics_per_anatomy_detection_task(grouped_data)
 
     # Save values JSON file
-    output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_DETECT_VALUES)
-    with open(output_path, "w") as f:
+    values_filename = SUMMARY_FILENAME_DETECT_VALUES if limit is None else f"{SUMMARY_FILENAME_DETECT_VALUES.removesuffix('.json')}_limit{limit}.json"
+    values_path = os.path.join(parsed_files_dir, values_filename)
+    with open(values_path, "w") as f:
         json.dump(convert_numpy_to_python(grouped_data), f, indent=2)
-    print(f"Saved target and model-predicted values to {output_path}")
+    print(f"Saved target and model-predicted values to {values_path}")
 
     # Save summary metrics JSON file
-    output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_DETECT_METRICS)
-    with open(output_path, "w") as f:
+    metrics_filename = SUMMARY_FILENAME_DETECT_METRICS if limit is None else f"{SUMMARY_FILENAME_DETECT_METRICS.removesuffix('.json')}_limit{limit}.json"
+    metrics_path = os.path.join(parsed_files_dir, metrics_filename)
+    with open(metrics_path, "w") as f:
         json.dump(convert_numpy_to_python(summary_metrics), f, indent=2)
-    print(f"Saved summary metrics to {output_path}")
+    print(f"Saved summary metrics to {metrics_path}")
 
     # Group anatomy vs tumor/lesion and calculate mean metrics
-    group_anatomy_vs_tumor_lesion(parsed_files_dir)
+    group_anatomy_vs_tumor_lesion(parsed_files_dir, limit)
 
 
-def print_summary_metrics(task_dir, skip_model_wo_parsed_files=False):
+def print_summary_metrics(task_dir, limit=None, skip_model_wo_parsed_files=False):
     """
     Print and save summary metrics for all models in a task directory.
 
@@ -546,13 +550,15 @@ def print_summary_metrics(task_dir, skip_model_wo_parsed_files=False):
 
     Args:
         task_dir: Path to task directory containing model folders
+        limit: Maximum samples to process per file (None = all)
         skip_model_wo_parsed_files: If True, skip models without parsed folders
     """
     # Get list of model folders within task_dir
     model_dirs = get_subfolders(task_dir)
 
     # Prepare output file path
-    output_file_path = os.path.join(task_dir, "summary_detection_task.txt")
+    output_filename = f"summary_detection_task{'_limit' + str(limit) if limit is not None else ''}.txt"
+    output_file_path = os.path.join(task_dir, output_filename)
 
     # Collect all output lines
     output_lines = []
@@ -577,10 +583,11 @@ def print_summary_metrics(task_dir, skip_model_wo_parsed_files=False):
             print(f"\nSkipping model directory (no parsed folder): {model_dir}")
             continue
 
-        metrics_file = os.path.join(parsed_dir, SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS)
+        grouped_metrics_filename = SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS if limit is None else f"{SUMMARY_FILENAME_GROUPED_ANATOMY_VS_TUMOR_LESION_DETECT_METRICS.removesuffix('.json')}_limit{limit}.json"
+        grouped_metrics_path = os.path.join(parsed_dir, grouped_metrics_filename)
 
-        if os.path.exists(metrics_file):
-            with open(metrics_file, "r") as f:
+        if os.path.exists(grouped_metrics_path):
+            with open(grouped_metrics_path, "r") as f:
                 data = json.load(f)
 
             model_metrics = {}
@@ -626,14 +633,15 @@ def print_summary_metrics(task_dir, skip_model_wo_parsed_files=False):
                 )
 
     # Save summary metrics to JSON
-    summary_output_path = os.path.join(
-        task_dir, SUMMARY_FILENAME_ALL_MODELS_DETECT_METRICS
+    summary_filename = SUMMARY_FILENAME_ALL_MODELS_DETECT_METRICS if limit is None else f"{SUMMARY_FILENAME_ALL_MODELS_DETECT_METRICS.removesuffix('.json')}_limit{limit}.json"
+    summary_path = os.path.join(
+        task_dir, summary_filename
     )
-    with open(summary_output_path, "w") as f:
+    with open(summary_path, "w") as f:
         json.dump(convert_numpy_to_python(all_model_metrics), f, indent=2)
 
     print_and_capture("\n" + "=" * 80)
-    print_and_capture(f"Summary metrics saved to: {summary_output_path}")
+    print_and_capture(f"Summary metrics saved to: {summary_path}")
     print_and_capture("=" * 80)
 
     # Save printed output to text file
@@ -683,7 +691,7 @@ def _process_task_directory(
         process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
     # Print summary metrics at the end
-    print_summary_metrics(task_dir, skip_model_wo_parsed_files)
+    print_summary_metrics(task_dir, limit, skip_model_wo_parsed_files)
 
 
 def _process_single_model_directory(model_dir, limit, processes=None):
