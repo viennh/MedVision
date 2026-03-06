@@ -8,8 +8,8 @@ test_split: test
 fewshot_split: test
 num_fewshot: 0
 output_type: generate_until
-doc_to_visual: !function utils.doc_to_visual_wMask-woMedImg
-doc_to_text: !function utils.doc_to_text_MaskSize_wMask-woMedImg
+doc_to_visual: !function utils.doc_to_visual_wMask_woMedImg
+doc_to_text: !function utils.doc_to_text_MaskSize_wMask_woMedImg
 doc_to_target: !function utils.doc_to_target_MaskSize
 process_results: !function utils.process_results_MaskSize
 metric_list:

@@ -11,7 +11,7 @@ from lmms_eval.tasks.medvision.medvision_utils import (
     doc_to_text_BiometricsFromLandmarks_wVisualPrompt_woMedImg, 
     create_doc_to_text_BoxCoordinate,
     create_doc_to_text_BoxCoordinate_wBox,
-    doc_to_text_BiometricsFromLandmarks_wVisualPrompt_woMedImg,
+    doc_to_text_BoxCoordinate_wBox_woMedImg,
     create_doc_to_text_MaskSize,
     create_doc_to_text_MaskSize_wMask,
     doc_to_text_MaskSize_wMask_woMedImg,

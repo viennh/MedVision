@@ -8,8 +8,8 @@ test_split: test
 fewshot_split: test
 num_fewshot: 0
 output_type: generate_until
-doc_to_visual: !function utils.doc_to_visual_wBox-woMedImg
-doc_to_text: !function utils.doc_to_text_BoxCoordinate_wBox-woMedImg
+doc_to_visual: !function utils.doc_to_visual_wBox_woMedImg
+doc_to_text: !function utils.doc_to_text_BoxCoordinate_wBox_woMedImg
 doc_to_target: !function utils.doc_to_target_BoxCoordinate
 process_results: !function utils.process_results_BoxCoordinate
 metric_list:
