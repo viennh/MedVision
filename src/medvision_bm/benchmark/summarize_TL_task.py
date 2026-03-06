@@ -84,7 +84,9 @@ def _update_mae_counters(value, counters):
         value: MAE value to add
         counters: Dictionary of counters to update
     """
-    if not np.isnan(value):
+    # Guard against non-finite values (inf, -inf, nan) that cannot be
+    # converted to int or meaningfully summed.
+    if np.isfinite(value):
         counters["sum_MAE"] += value
         counters["count_valid_AE"] += 1
 
@@ -101,7 +103,9 @@ def _update_mre_counters(value, counters):
         value: MRE value to add
         counters: Dictionary of counters to update
     """
-    if not np.isnan(value):
+    # Guard against non-finite values (inf, -inf, nan) that cannot be
+    # converted to int or meaningfully summed.
+    if np.isfinite(value):
         counters["sum_MRE"] += value
         counters["count_valid_RE"] += 1
 
@@ -112,12 +116,13 @@ def _update_mre_counters(value, counters):
 
 def _update_metric_counters_TL_task(metrics_dict, counters):
     """Update all metric counters based on calculated metrics."""
-    # Update MAE
-    if not np.isnan(metrics_dict["avgMAE"]["MAE"]):
+    # Update MAE counters (skip nan and inf — non-finite values are unparseable
+    # responses and should not contribute to the running average)
+    if np.isfinite(metrics_dict["avgMAE"]["MAE"]):
         _update_mae_counters(metrics_dict["avgMAE"]["MAE"], counters)
 
-    # Update MRE
-    if not np.isnan(metrics_dict["avgMRE"]["MRE"]):
+    # Update MRE counters
+    if np.isfinite(metrics_dict["avgMRE"]["MRE"]):
         _update_mre_counters(metrics_dict["avgMRE"]["MRE"], counters)
 
     # Update success count

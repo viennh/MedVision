@@ -62,7 +62,9 @@ def _update_mae_counters(mae_value, counters):
         mae_value: Mean Absolute Error value
         counters: Dictionary of metric counters to update
     """
-    if not np.isnan(mae_value):
+    # Guard against non-finite values (inf, -inf, nan) that cannot be
+    # converted to int or meaningfully summed.
+    if np.isfinite(mae_value):
         counters["sum_MAE"] += mae_value
         counters["count_valid_AE"] += 1
 
@@ -97,28 +99,28 @@ def _update_metric_counters_detection_task(metrics_dict, counters):
     _update_mae_counters(metrics_dict["avgMAE"]["MAE"], counters)
 
     # Update IoU
-    if not np.isnan(metrics_dict["avgIoU"]["IoU"]):
+    if np.isfinite(metrics_dict["avgIoU"]["IoU"]):
         iou = metrics_dict["avgIoU"]["IoU"]
         counters["sum_IoU"] += iou
         counters["count_valid_IoU"] += 1
         _update_threshold_counters(iou, counters["count_IoU_thresholds"])
 
     # Update F1
-    if not np.isnan(metrics_dict["F1"]["F1"]):
+    if np.isfinite(metrics_dict["F1"]["F1"]):
         f1 = metrics_dict["F1"]["F1"]
         counters["sum_F1"] += f1
         counters["count_valid_F1"] += 1
         _update_threshold_counters(f1, counters["count_F1_thresholds"])
 
     # Update Precision
-    if not np.isnan(metrics_dict["Precision"]["Precision"]):
+    if np.isfinite(metrics_dict["Precision"]["Precision"]):
         precision = metrics_dict["Precision"]["Precision"]
         counters["sum_Precision"] += precision
         counters["count_valid_Precision"] += 1
         _update_threshold_counters(precision, counters["count_Precision_thresholds"])
 
     # Update Recall
-    if not np.isnan(metrics_dict["Recall"]["Recall"]):
+    if np.isfinite(metrics_dict["Recall"]["Recall"]):
         recall = metrics_dict["Recall"]["Recall"]
         counters["sum_Recall"] += recall
         counters["count_valid_Recall"] += 1

@@ -112,7 +112,9 @@ def _update_mae_counters(value, counters):
         - Only processes non-NaN values
         - Threshold buckets: i covers [i*0.1, (i+1)*0.1), bucket 9 covers [0.9, ∞)
     """
-    if not np.isnan(value):
+    # Guard against non-finite values (inf, -inf, nan) that cannot be
+    # converted to int or meaningfully summed.
+    if np.isfinite(value):
         counters["sum_MAE"] += value
         counters["count_valid_AE"] += 1
 
@@ -135,7 +137,9 @@ def _update_mre_counters(value, counters):
         - Only processes non-NaN values
         - Threshold buckets: i covers [i*0.1, (i+1)*0.1), bucket 9 covers [0.9, ∞)
     """
-    if not np.isnan(value):
+    # Guard against non-finite values (inf, -inf, nan) that cannot be
+    # converted to int or meaningfully summed.
+    if np.isfinite(value):
         counters["sum_MRE"] += value
         counters["count_valid_RE"] += 1
 
@@ -155,12 +159,13 @@ def _update_metric_counters_AD_task(metrics_dict, counters):
         metrics_dict (dict): Dictionary containing avgMAE, avgMRE, and SuccessRate metrics
         counters (dict): Counter dictionary to update in-place
     """
-    # Update MAE counters
-    if not np.isnan(metrics_dict["avgMAE"]["MAE"]):
+    # Update MAE counters (skip nan and inf — non-finite values are unparseable
+    # responses and should not contribute to the running average)
+    if np.isfinite(metrics_dict["avgMAE"]["MAE"]):
         _update_mae_counters(metrics_dict["avgMAE"]["MAE"], counters)
 
     # Update MRE counters
-    if not np.isnan(metrics_dict["avgMRE"]["MRE"]):
+    if np.isfinite(metrics_dict["avgMRE"]["MRE"]):
         _update_mre_counters(metrics_dict["avgMRE"]["MRE"], counters)
 
     # Update success count
