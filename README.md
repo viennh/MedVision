@@ -155,12 +155,12 @@ Next (in the container):
      # --limit: limit sample size in the parsed files
      # --skip_existing: (store_true arg) skip parsed files
      # --processes, -p: number of processes
-     # --rm_old: remove existing "parsed" folder for each model
+     # --rm_old: remove existing "parsed" folder for each model 🔥
      
      # example 1: parse all models for the T/L task 
      python -m medvision_bm.benchmark.parse_outputs --task_type TL --task_dir Results/MedVision-TL -p 32
 
-     # example 2: parse all models for the A/D task (remove existing `parsed` folder) 
+     # example 2: parse all models for the A/D task (remove existing `parsed` folder) 🔥
      python -m medvision_bm.benchmark.parse_outputs --task_type AD --task_dir Results/MedVision-AD -p 32 --rm_old
      
      # example 3: parse one model for the detection task and skip existing parsed files
@@ -185,19 +185,24 @@ Next (in the container):
       # args:
       # --task_dir: task folder
       # --model_dir: model folder
+      # --limit: limit sample size in the parsed files 🔥
       # --skip_model_wo_parsed_files: skip model directories that don't have a 'parsed' folder
       # --processes, -p: number of processes 
       
       # example 1: summarize all models for the A/D task
       python -m medvision_bm.benchmark.summarize_AD_task --task_dir Results/MedVision-AD -p 32
+
+      # example 2: summarize all models for the T/L task (limit sample size in the parsed files) 🔥
+      # e.g. Your testing set limit is 1000, and you want to analyze the first 100 samples in each subtask because you want to compare with another ablation study where the testing set limit is 100. 
+      python -m medvision_bm.benchmark.summarize_TL_task --task_dir Results/MedVision-TL -p 32 --limit 100
       
-      # example 2: summarize one model for the detection task
+      # example 3: summarize one model for the detection task
       python -m medvision_bm.benchmark.summarize_detection_task --model_dir Results/MedVision-detect/Qwen2.5-VL-32B-Instruct -p 32
       
-      # example 3: analyze how target size affect detection performance
+      # example 4: analyze how target size affect detection performance
       python -m medvision_bm.benchmark.analyze_detection_task_boxsize --task_dir Results/MedVision-detect -p 32
       
-      # example 4: compare detection performance with random guessing
+      # example 5: compare detection performance with random guessing
       python -m medvision_bm.benchmark.analyze_detection_task_boxsize_vs_random --task_dir Results/MedVision-detect -p 32
       ```
 

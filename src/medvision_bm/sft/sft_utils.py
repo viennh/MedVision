@@ -1602,7 +1602,7 @@ def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None,
     """
     try:
         print(
-            f"\n[Info] Loading dataset:\nHF Dataset ID: {dataset_hf_id}\nConfiguration:{config}"
+            f"\n[Info] Loading dataset:\nHF Dataset ID: {dataset_hf_id}\nConfiguration: {config}"
         )
 
         # Add timeout and retry logic for dataset loading
