@@ -24,9 +24,20 @@ tasks_list_json_path="${benchmark_dir}/tasks_list/tasks_MedVision-TL.json"
 task_status_json_path="${benchmark_dir}/completed_tasks/completed_tasks_${task_tag}.json"
 sample_limit=1000
 
-# Install medvision_bm
-rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
-pip install "${benchmark_dir}"
+# Install medvision_bm (locked shared build)
+set -euo pipefail
+lockfile="${benchmark_dir}/.medvision_build.lock"
+wheelhouse="${benchmark_dir}/.wheelhouse"
+mkdir -p "${wheelhouse}"
+flock "${lockfile}" bash -c '
+    set -euo pipefail
+    benchmark_dir="'"${benchmark_dir}"'"
+    wheelhouse="'"${wheelhouse}"'"
+    rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
+    python -m pip wheel "${benchmark_dir}" -w "${wheelhouse}" --no-deps
+    latest_wheel="$(ls -t "${wheelhouse}"/medvision_bm-*.whl | head -n1)"
+    python -m pip install --force-reinstall "${latest_wheel}"
+'
 
 # Temp fix: "cannot import name 'is_offline_mode' from 'huggingface_hub'" 
 # ---
@@ -38,7 +49,6 @@ python -m medvision_bm.benchmark.install_medvision_ds --data_dir "${data_dir}"
 python -m medvision_bm.benchmark.install_vendored_lmms_eval
 pip install -r "${benchmark_dir}/requirements/requirements_eval_medgemma.txt" --no-deps
 
-CUDA_VISIBLE_DEVICES=0 \
 python -m  medvision_bm.benchmark.eval__medgemma \
 --skip_env_setup \
 --model_hf_id $model_hf_id \
@@ -56,7 +66,6 @@ python -m  medvision_bm.benchmark.eval__medgemma \
 # # --env_setup_only \
 # # --skip_env_setup \
 # # --skip_update_status \
-# CUDA_VISIBLE_DEVICES=0 \
 # python -m  medvision_bm.benchmark.eval__medgemma \
 # --model_hf_id $model_hf_id \
 # --model_name $model_name \

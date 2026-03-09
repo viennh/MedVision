@@ -25,9 +25,20 @@ tasks_list_json_path="${benchmark_dir}/tasks_list/tasks_MedVision-AD.json"
 task_status_json_path="${benchmark_dir}/completed_tasks/completed_tasks_${task_tag}.json"
 sample_limit=1000
 
-# Install medvision_bm
-rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
-pip install "${benchmark_dir}"
+# Install medvision_bm (locked shared build)
+set -euo pipefail
+lockfile="${benchmark_dir}/.medvision_build.lock"
+wheelhouse="${benchmark_dir}/.wheelhouse"
+mkdir -p "${wheelhouse}"
+flock "${lockfile}" bash -c '
+    set -euo pipefail
+    benchmark_dir="'"${benchmark_dir}"'"
+    wheelhouse="'"${wheelhouse}"'"
+    rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
+    python -m pip wheel "${benchmark_dir}" -w "${wheelhouse}" --no-deps
+    latest_wheel="$(ls -t "${wheelhouse}"/medvision_bm-*.whl | head -n1)"
+    python -m pip install --force-reinstall "${latest_wheel}"
+'
 
 # (Method 1) Manually install requirements before running the eval script (more robust)
 # ---
@@ -38,7 +49,6 @@ pip install -r "${benchmark_dir}/requirements/requirements_eval_meddr.txt" --no-
 # Important: Fix module import failure in distributed subprocess
 export PYTHONPATH="${dir_third_party}/MedDr:$PYTHONPATH"
 
-CUDA_VISIBLE_DEVICES=0 \
 python -m medvision_bm.benchmark.eval__meddr \
 --skip_env_setup \
 --model_hf_id $model_hf_id \
@@ -57,7 +67,6 @@ python -m medvision_bm.benchmark.eval__meddr \
 # # --env_setup_only \
 # # --skip_env_setup \
 # # --skip_update_status \
-# CUDA_VISIBLE_DEVICES=0 \
 # python -m  medvision_bm.benchmark.eval__meddr \
 # --model_hf_id $model_hf_id \
 # --model_name $model_name \
