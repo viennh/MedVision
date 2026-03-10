@@ -15,8 +15,8 @@ benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
 model_hf_id="Qwen/Qwen2.5-VL-7B-Instruct"
 model_name="Qwen2.5-VL-7B-Instruct"
-batch_size_per_gpu=20
-gpu_memory_utilization=0.99
+batch_size_per_gpu=10
+gpu_memory_utilization=0.9
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-AD"

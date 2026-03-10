@@ -16,7 +16,7 @@ data_dir="${benchmark_dir}/Data"
 dir_third_party="${benchmark_dir}/third_party"
 model_hf_id="FreedomIntelligence/HuatuoGPT-Vision-34B"
 model_name="HuatuoGPT-Vision-34B"
-batch_size_per_gpu=4
+batch_size_per_gpu=2
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-TL"

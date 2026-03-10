@@ -16,7 +16,7 @@ data_dir="${benchmark_dir}/Data"
 dir_third_party="${benchmark_dir}/third_party"
 model_hf_id="Sunanhe/MedDr_0401"
 model_name="MedDr"
-batch_size_per_gpu=1
+batch_size_per_gpu=2
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-AD"

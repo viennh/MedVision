@@ -15,7 +15,7 @@ benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
 model_hf_id="OpenGVLab/InternVL3-38B"
 model_name="InternVL3-38B"
-batch_size_per_gpu=1
+batch_size_per_gpu=2
 gpu_memory_utilization=0.9
 
 # Other configs (safe to leave as is)

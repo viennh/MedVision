@@ -15,8 +15,8 @@ benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
 model_hf_id="google/gemma-3-27b-it"
 model_name="gemma-3-27b-it"
-batch_size_per_gpu=10
-gpu_memory_utilization=0.99
+batch_size_per_gpu=4
+gpu_memory_utilization=0.9
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-detect"

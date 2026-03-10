@@ -16,7 +16,7 @@ data_dir="${benchmark_dir}/Data"
 dir_third_party="${benchmark_dir}/third_party"
 model_hf_id="microsoft/llava-med-v1.5-mistral-7b"
 model_name="llava-med-v1.5-mistral-7b"
-batch_size_per_gpu=50
+batch_size_per_gpu=20
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-detect"

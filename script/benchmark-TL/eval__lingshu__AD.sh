@@ -15,7 +15,7 @@ benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
 model_hf_id="lingshu-medical-mllm/Lingshu-32B"
 model_name="lingshu-32b"
-batch_size_per_gpu=10
+batch_size_per_gpu=2
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-TL"

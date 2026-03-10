@@ -15,7 +15,7 @@ benchmark_dir="/root/Documents/MedVision"
 data_dir="${benchmark_dir}/Data"
 dir_third_party="${benchmark_dir}/third_party"
 model_name="HealthGPT-L14"
-batch_size_per_gpu=20
+batch_size_per_gpu=10
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-TL"

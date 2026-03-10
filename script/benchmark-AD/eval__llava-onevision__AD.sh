@@ -16,7 +16,7 @@ data_dir="${benchmark_dir}/Data"
 model_hf_id="llava-hf/llava-onevision-qwen2-72b-ov-hf"
 model_name="llava-onevision-qwen2-72b-ov-hf"
 batch_size_per_gpu=1
-gpu_memory_utilization=0.99
+gpu_memory_utilization=0.9
 
 # Other configs (safe to leave as is)
 task_tag="MedVision-AD"
