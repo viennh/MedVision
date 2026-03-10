@@ -78,18 +78,25 @@ class Llama4(lmms):
             )
 
         # Set up distributed training if using multiple processes
-        assert accelerator.distributed_type in [
-            DistributedType.FSDP,
-            DistributedType.MULTI_GPU,
-        ], "Unsupported distributed type provided. Only DDP and FSDP are supported."
-        if accelerator.distributed_type == DistributedType.FSDP:
-            self._model = accelerator.prepare(self.model)
+        if accelerator.num_processes > 1:
+            assert accelerator.distributed_type in [
+                DistributedType.FSDP,
+                DistributedType.MULTI_GPU,
+            ], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+            if accelerator.distributed_type == DistributedType.FSDP:
+                self._model = accelerator.prepare(self.model)
+            else:
+                self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
+            if accelerator.is_local_main_process:
+                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
         else:
-            self._model = accelerator.prepare_model(self.model, evaluation_mode=True)
+            eval_logger.info(f"Using single device: {self._device}")
         self.accelerator = accelerator
-        if self.accelerator.is_local_main_process:
-            eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
 
+        # Initialize properties expected by the lmms base class
+        self._config = self._model.config
+        self._max_length = 2048
+        self._tokenizer = self.processor.tokenizer
         self._batch_size = batch_size
 
     @property
@@ -148,7 +155,7 @@ class Llama4(lmms):
 
         for contexts, gen_kwargs, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:
 
-            # Prepare messages
+            # Load and normalise visuals (Tensors/ndarrays are converted to PIL)
             visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
             visuals = self.flatten(visuals)
             messages = [{"role": "user", "content": []}]
@@ -174,15 +181,19 @@ class Llama4(lmms):
             ).to(self.model.device)
 
             # Get the model's response
+            if "max_new_tokens" not in gen_kwargs:
+                gen_kwargs["max_new_tokens"] = 4096
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=256,
+                    max_new_tokens=gen_kwargs["max_new_tokens"],
                 )
+                # Slice off input tokens so only newly generated tokens remain
                 response = self.processor.batch_decode(outputs[:, inputs["input_ids"].shape[-1] :])[0]
-                pbar.update(1)
+            res.append(response)
+            pbar.update(1)
         pbar.close()
-        return response
+        return res
 
     def generate_until_multi_round(self, requests: List[Instance]) -> List[str]:
         raise NotImplementedError("Error: generate_until_multi_round not implemented for Llama4")

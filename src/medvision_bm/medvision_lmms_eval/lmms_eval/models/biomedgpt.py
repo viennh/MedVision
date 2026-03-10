@@ -116,16 +116,15 @@ class BiomedGPT(lmms):
             # Text inputs
             text_tokens = self._tokenizer([contexts], return_tensors="pt").input_ids
 
-            if self.device_map == "auto":
-                text_tokens = text_tokens.to(self.device)
-                patch_img = patch_img.to(self.device)
-            else:
-                text_tokens = text_tokens.to(self.device)
-                patch_img = patch_img.to(self.device)
+            # Prepare text and image tensors, move to device
+            text_tokens = text_tokens.to(self.device)
+            patch_img = patch_img.to(self.device)
 
             # Get model outputs
             # https://colab.research.google.com/drive/1AMG-OwmDpnu24a9ZvCNvZi3BZwb3nSfS?usp=sharing#scrollTo=WgLUTdMIuUb_
-            gen = self._model.generate(text_tokens, patch_images=patch_img, num_beams=5, no_repeat_ngram_size=3, max_length=16)
+            if "max_new_tokens" not in gen_kwargs:
+                gen_kwargs["max_new_tokens"] = 4096
+            gen = self._model.generate(text_tokens, patch_images=patch_img, num_beams=5, no_repeat_ngram_size=3, max_length=gen_kwargs["max_new_tokens"])
             response = self._tokenizer.batch_decode(gen, skip_special_tokens=True)[0]
             res.append(response)
             pbar.update(1)

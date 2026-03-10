@@ -25,7 +25,7 @@ IMAGENET_STD = (0.229, 0.224, 0.225)
 
 DEFAULT_GEN_KWARGS = dict(
     num_beams=1,
-    max_new_tokens=1024,
+    max_new_tokens=4096,
     do_sample=False,
 )
 
@@ -196,6 +196,8 @@ class InternVL3(lmms):
 
         self._rank = self.accelerator.process_index
         self._world_size = self.accelerator.num_processes
+        # Initialize _config for base class compatibility
+        self._config = self._model.config
         if accelerator.num_processes > 1:
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
             # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
@@ -269,6 +271,7 @@ class InternVL3(lmms):
         pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
 
         for contexts, gen_kwargs, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:
+            # Sanitise gen_kwargs: start from defaults, keep only keys InternVL3 understands
             if "until" in gen_kwargs:
                 gen_kwargs.pop("until")
             for k, v in DEFAULT_GEN_KWARGS.items():
@@ -283,25 +286,32 @@ class InternVL3(lmms):
             for k in pop_keys:
                 gen_kwargs.pop(k)
 
+            # Load visuals for this request
             visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
             visuals = self.flatten(visuals)
             if self.modality == "image":
                 if visuals:
+                    # Preprocess each image with InternVL's dynamic-resolution loader,
+                    # then concatenate all patch tensors into a single pixel_values batch.
                     visuals = [load_image(visual).to(torch.bfloat16).to(self.device) for visual in visuals]
                     pixel_values = torch.cat(visuals, dim=0)
                     num_patches_list = [visual.size(0) for visual in visuals]
+                    # Prepend one <image> token per input image so the model knows where to attend
                     image_tokens = ["<image>"] * len(visuals)
                     image_tokens = " ".join(image_tokens)
                     contexts = image_tokens + "\n" + contexts
                 else:
                     pixel_values = None
                     num_patches_list = None
+                # Delegate to the model's own chat() which handles the prompt template internally
                 response, history = self.model.chat(self.tokenizer, pixel_values, contexts, gen_kwargs, num_patches_list=num_patches_list, history=None, return_history=True)
             elif self.modality == "video":
                 assert len(visuals) == 1, f"Only one video is supported, but got {len(visuals)} videos."
                 video_path = visuals[0]
+                # Sample num_frame frames uniformly; returns (pixel_values, patches-per-frame list)
                 pixel_values, num_patches_list = load_video(video_path, num_segments=self.num_frame)
                 pixel_values = pixel_values.to(torch.bfloat16).to(self.device)
+                # Build a numbered frame prefix so the model can refer to individual frames
                 video_prefix = "".join([f"Frame{i+1}: <image>\n" for i in range(len(num_patches_list))])
                 question = video_prefix + contexts
                 response, history = self.model.chat(self.tokenizer, pixel_values, question, gen_kwargs, num_patches_list=num_patches_list, history=None, return_history=True)

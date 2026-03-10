@@ -55,8 +55,9 @@ class LlamaVision(lmms):
         self.model.eval()
         self.processor = AutoProcessor.from_pretrained(pretrained)
 
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
+        # Use local accelerator variable here — self.accelerator is set later in the constructor
+        self._rank = accelerator.process_index
+        self._world_size = accelerator.num_processes
         if accelerator.num_processes > 1 and device_map == "":
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
             # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
@@ -82,6 +83,12 @@ class LlamaVision(lmms):
             eval_logger.info(f"Using single device: {self._device}")
             self.model.to(self._device)
         self.accelerator = accelerator
+
+        # Initialize properties expected by the lmms base class
+        self.batch_size_per_gpu = int(batch_size)
+        self._config = self._model.config
+        self._max_length = 2048
+        self._tokenizer = self.processor.tokenizer
 
     @property
     def config(self):
@@ -164,9 +171,12 @@ class LlamaVision(lmms):
         pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
 
         for contexts, gen_kwargs, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:
+            # Load visuals: video paths are decoded into individual PIL frames;
+            # PIL images are added directly
             visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
             visuals = self.flatten(visuals)
 
+            # Build message with one <image> slot per image frame, then the text
             messages = [{"role": "user", "content": []}]
             images = []
 
@@ -181,11 +191,14 @@ class LlamaVision(lmms):
             for _ in range(len(images)):
                 messages[-1]["content"].append({"type": "image"})
             messages[-1]["content"].append({"type": "text", "text": contexts})
+
+            # Apply Llama 3.2 Vision chat template and tokenize
             prompt = self.processor.apply_chat_template(messages, add_generation_prompt=True)
             inputs = self.processor(images, prompt, add_special_tokens=False, return_tensors="pt").to(self.model.device)
 
+            # Apply generation defaults; gen_kwargs values take precedence
             if "max_new_tokens" not in gen_kwargs:
-                gen_kwargs["max_new_tokens"] = 1024
+                gen_kwargs["max_new_tokens"] = 4096
             if "temperature" not in gen_kwargs:
                 gen_kwargs["temperature"] = 0
             if "top_p" not in gen_kwargs:
@@ -202,6 +215,7 @@ class LlamaVision(lmms):
                     temperature=gen_kwargs["temperature"],
                     do_sample=gen_kwargs["do_sample"],
                 )
+                # Slice off input tokens to get only newly generated tokens
                 output = output[:, inputs["input_ids"].shape[-1] :]
                 res.append(self.processor.decode(output[0], skip_special_tokens=True))
 

@@ -33,7 +33,7 @@ class MedGemma(lmms):
         batch_size: Optional[Union[int, str]] = 1,
         use_flash_attention_2: Optional[bool] = False,
         use_pipeline: bool = True,
-        max_new_tokens: int = 300,
+        max_new_tokens: int = 4096,
         num_workers: int = 8,
         device: Optional[str] = "cuda",
         device_map: Optional[str] = "auto",
@@ -170,7 +170,8 @@ class MedGemma(lmms):
         self.pipe.model.generation_config.do_sample = False
 
     # Code adapted from https://huggingface.co/google/medgemma-4b-it
-    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]]) -> Union[str, List[str]]:
+    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]], max_new_tokens: int = None) -> Union[str, List[str]]:
+        _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
         # Handle single input case
         if isinstance(questions, str):
             questions = [questions]
@@ -183,7 +184,7 @@ class MedGemma(lmms):
             batch_messages.append(messages)
 
         if self.use_pipeline:
-            outputs = self.pipe(text=batch_messages, max_new_tokens=self.max_new_tokens, batch_size=self.batch_size)
+            outputs = self.pipe(text=batch_messages, max_new_tokens=_max_new_tokens, batch_size=self.batch_size)
             responses = [output[0]["generated_text"][-1]["content"] for output in outputs]
         else:
             responses = []
@@ -191,7 +192,7 @@ class MedGemma(lmms):
                 inputs = self._processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt").to(self._model.device, dtype=self.model_dtype)
                 input_len = inputs["input_ids"].shape[-1]
                 with torch.inference_mode():
-                    generation = self._model.generate(**inputs, max_new_tokens=300, do_sample=False)
+                    generation = self._model.generate(**inputs, max_new_tokens=_max_new_tokens, do_sample=False)
                     generation = generation[0][input_len:]
                 resp = self._processor.decode(generation, skip_special_tokens=True)
                 responses.append(resp)
@@ -251,7 +252,8 @@ class MedGemma(lmms):
             batch_contexts, batch_visuals = self.process_batch_parallel(batch_requests)
 
             # Get batch model outputs
-            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals)
+            _gen_kwargs = batch_requests[0].args[1]
+            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals, max_new_tokens=_gen_kwargs.get("max_new_tokens", self.max_new_tokens))
 
             # Ensure batch_responses is a list
             if isinstance(batch_responses, str):

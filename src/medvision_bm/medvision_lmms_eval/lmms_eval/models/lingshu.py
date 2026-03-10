@@ -30,7 +30,7 @@ class Lingshu(lmms):
         model_hf: str = "lingshu-medical-mllm/Lingshu-32B",
         batch_size: Optional[Union[int, str]] = 1,
         use_flash_attention_2: Optional[bool] = False,
-        max_new_tokens: int = 300,
+        max_new_tokens: int = 4096,
         num_workers: int = 8,
         **kwargs,
     ) -> None:
@@ -101,7 +101,8 @@ class Lingshu(lmms):
         return base64_string
 
     # Code adapted from https://huggingface.co/lingshu-medical-mllm/Lingshu-32B
-    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]]) -> Union[str, List[str]]:
+    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]], max_new_tokens: int = None) -> Union[str, List[str]]:
+        _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
         # Normalize inputs to lists
         if isinstance(questions, str):
             questions = [questions]
@@ -175,7 +176,7 @@ class Lingshu(lmms):
             with torch.inference_mode():
                 generated_ids = self._model.generate(
                     **inputs,
-                    max_new_tokens=self.max_new_tokens,
+                    max_new_tokens=_max_new_tokens,
                 )
         except torch.cuda.OutOfMemoryError:
             raise RuntimeError("Out of memory during generation. Try reducing batch size.")
@@ -245,7 +246,8 @@ class Lingshu(lmms):
             batch_contexts, batch_visuals = self.process_batch_parallel(batch_requests)
 
             # Get batch model outputs
-            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals)
+            _gen_kwargs = batch_requests[0].args[1]
+            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals, max_new_tokens=_gen_kwargs.get("max_new_tokens", self.max_new_tokens))
 
             # Ensure batch_responses is a list
             if isinstance(batch_responses, str):

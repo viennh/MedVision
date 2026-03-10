@@ -232,8 +232,6 @@ class VLLM_Qwen25VL(lmms):
             for idx in range(len(batch_requests)):
                 contexts, gen_kwargs, doc_to_visual, doc_id, task, split = batch_requests[idx].arguments
                 if "max_new_tokens" not in gen_kwargs:
-                    gen_kwargs["max_new_tokens"] = 1024
-                if gen_kwargs["max_new_tokens"] > 4096:
                     gen_kwargs["max_new_tokens"] = 4096
                 if "temperature" not in gen_kwargs:
                     gen_kwargs["temperature"] = 0
@@ -245,7 +243,8 @@ class VLLM_Qwen25VL(lmms):
                     "max_tokens": gen_kwargs["max_new_tokens"],
                     "top_p": gen_kwargs["top_p"],
                 }
-                sampling_params = SamplingParams(**params)
+                # params is collected per-request; after the loop, SamplingParams
+                # is built once from the last request's params for the batch call.
 
                 visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
                 if None in visuals:
@@ -264,8 +263,8 @@ class VLLM_Qwen25VL(lmms):
                             elif isinstance(visual, Image.Image):
                                 all_tasks.append(executor.submit(self.encode_image, visual))
 
-                        for task in all_tasks:
-                            imgs.append(task.result())
+                        for future in all_tasks:
+                            imgs.append(future.result())
 
                 messages = [{"role": "user", "content": []}]
                 # When there is no image token in the context, append the image to the text

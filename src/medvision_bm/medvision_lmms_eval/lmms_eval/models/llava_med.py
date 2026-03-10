@@ -45,6 +45,7 @@ class LLaVA_Med(lmms):
         temperature: float = 0.2,
         top_p: float = None,
         num_beams: int = 1,
+        max_new_tokens: int = 4096,
         dtype: str = "FP16",
         **kwargs,
     ) -> None:
@@ -55,6 +56,7 @@ class LLaVA_Med(lmms):
         self.temperature = temperature
         self.top_p = top_p
         self.num_beams = num_beams
+        self.max_new_tokens = max_new_tokens
         self.dtype = dtype
         self.prepare_model()
 
@@ -103,11 +105,9 @@ class LLaVA_Med(lmms):
         model_name = get_model_name_from_path(model_path)
         self._tokenizer, self._model, self._image_processor, self.context_len = load_pretrained_model(model_path, self.model_base, model_name)
 
-        # Set up model
-        if self.device_map == "auto":
-            self._model.to(model_dtype).to(self.device)
-        else:
-            self._model.to(model_dtype).to(self.device)
+        # Set up model — device placement is handled by load_pretrained_model;
+        # move to the correct dtype and device explicitly
+        self._model.to(model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -117,7 +117,6 @@ class LLaVA_Med(lmms):
                 self._model = self.accelerator.prepare(self._model)
             else:
                 self._model = self.accelerator.prepare_model(self._model, evaluation_mode=True)
-            self.accelerator = self.accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {self.accelerator.num_processes} devices with data parallelism")
         else:
@@ -142,7 +141,7 @@ class LLaVA_Med(lmms):
             if len(visuals) == 1 and isinstance(visuals[0], Image.Image):
                 visual = visuals[0]
             else:
-                raise ValueError("i 1 image input and it should be of Image.Image type.")
+                raise ValueError("The model only supports 1 image input and it should be of Image.Image type.")
 
             # Get model outputs
             response = self.eval_model(question=contexts, pil_img=visual)
@@ -192,7 +191,7 @@ class LLaVA_Med(lmms):
                 temperature=self.temperature,
                 top_p=self.top_p,
                 num_beams=self.num_beams,
-                max_new_tokens=1024,
+                max_new_tokens=self.max_new_tokens,
                 use_cache=True,
             )
 

@@ -139,7 +139,7 @@ class MedDr(lmms):
                 raise ValueError("The model only supports 1 image input and it should be of Image.Image type.")
 
             # Get model outputs
-            response = self.eval_model(question=contexts, pil_img=visual)
+            response = self.eval_model(question=contexts, pil_img=visual, max_new_tokens=gen_kwargs.get("max_new_tokens", 4096))
             res.append(response)
             pbar.update(1)
 
@@ -154,10 +154,10 @@ class MedDr(lmms):
 
     # Modified from the source:
     # https://github.com/sunanhe/MedDr/blob/main/demo.py
-    def eval_model(self, question: str, pil_img: Image.Image) -> str:
+    def eval_model(self, question: str, pil_img: Image.Image, max_new_tokens: int = 4096) -> str:
         generation_config = dict(
             num_beams=1,
-            max_new_tokens=512,
+            max_new_tokens=max_new_tokens,
             do_sample=False,
         )
         image = self._image_processor(pil_img).unsqueeze(0).to(self._device).to(self.model_dtype)

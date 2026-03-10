@@ -84,7 +84,7 @@ class HealthGPT(lmms):
         temperature: float = 0.0,
         top_p: float = None,
         num_beams: int = 1,
-        max_new_tokens: int = 1024,
+        max_new_tokens: int = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -197,11 +197,8 @@ class HealthGPT(lmms):
         self._model = load_weights(self._model, self.hlora_weights_local)
         self._model.eval()
 
-        # Set up model
-        if self.device_map == "auto":
-            self._model.to(model_dtype).to(self.device)
-        else:
-            self._model.to(model_dtype).to(self.device)
+        # Move model to device with target dtype
+        self._model.to(model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -238,7 +235,7 @@ class HealthGPT(lmms):
                 raise ValueError("The model only supports 1 image input and it should be of Image.Image type.")
 
             # Get model outputs
-            response = self.infer(question=contexts, pil_img=visual)
+            response = self.infer(question=contexts, pil_img=visual, max_new_tokens=gen_kwargs.get("max_new_tokens", self.max_new_tokens))
             res.append(response)
             pbar.update(1)
 
@@ -258,7 +255,9 @@ class HealthGPT(lmms):
         self,
         question: str = None,
         pil_img: str = None,
+        max_new_tokens: int = None,
     ):
+        _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
         model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         if pil_img:
@@ -283,7 +282,7 @@ class HealthGPT(lmms):
                 temperature=self.temperature,
                 top_p=self.top_p,
                 num_beams=self.num_beams,
-                max_new_tokens=self.max_new_tokens,
+                max_new_tokens=_max_new_tokens,
                 use_cache=True,
             )
         response = self._tokenizer.decode(output_ids[0], skip_special_tokens=True)

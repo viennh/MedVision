@@ -406,6 +406,7 @@ class Llava_OneVision(lmms):
                     self._config.image_aspect_ratio = origin_image_aspect_ratio
                     eval_logger.info(f"Resetting image aspect ratio to {origin_image_aspect_ratio}")
 
+                # Determine task type and preprocess visuals into image_tensor
                 if visual is None or visual == []:  # for text-only tasks.
                     visual = None
                     task_type = "text"
@@ -417,6 +418,7 @@ class Llava_OneVision(lmms):
                         eval_logger.info(f"In Multi-Image setting, image aspect ratio: {self._config.image_aspect_ratio}")
 
                     if "task_type" in metadata and metadata["task_type"] == "video" and "sample_frames" in metadata:  # overwrite logic for video task with multiple static image frames
+                        # Video delivered as a list of PIL frames — sample a fixed number uniformly
                         assert type(visual) == list, "sample_frames must be specified for video task"
                         sample_indices = np.linspace(0, len(visual) - 1, metadata["sample_frames"], dtype=int)
                         visual = [visual[i] for i in sample_indices]
@@ -442,6 +444,7 @@ class Llava_OneVision(lmms):
                         placeholder_count = len(visual) if isinstance(visual, list) else 1
 
                     elif type(visual[0]) == str:  # For video task
+                        # Video delivered as a file path — decode into frames on the fly
                         image_tensor = []
                         try:
                             if self.video_decode_backend == "decord":
@@ -457,6 +460,9 @@ class Llava_OneVision(lmms):
                         task_type = "video"
                         placeholder_count = len(frames) if self.token_strategy == "multiple" else 1
 
+                # Prepend image placeholder tokens if the prompt doesn't already contain them.
+                # Rules: text-only → no tokens; image → one <image> per image;
+                # video → one token (single-token strategy) or one per decoded frame (multiple-token strategy).
                 if image_tensor is not None and len(image_tensor) != 0 and DEFAULT_IMAGE_TOKEN not in context:
                     """
                     Three senarios:
@@ -475,7 +481,7 @@ class Llava_OneVision(lmms):
                 else:
                     question = context
 
-                # This is much safer for llama3, as we now have some object type in it
+                # Build conversation using the appropriate template; deepcopy for llama_3 to avoid state leak
                 if "llama_3" in self.conv_template:
                     conv = copy.deepcopy(conv_templates[self.conv_template])
                 else:
@@ -498,9 +504,9 @@ class Llava_OneVision(lmms):
                     prompt_question = conv.get_prompt()
                     question_input.append(prompt_question)
 
-            # preconfigure gen_kwargs with defaults
+            # Apply generation defaults; caller-supplied gen_kwargs take precedence
             if "max_new_tokens" not in gen_kwargs:
-                gen_kwargs["max_new_tokens"] = 1024
+                gen_kwargs["max_new_tokens"] = 4096
             if "temperature" not in gen_kwargs:
                 gen_kwargs["temperature"] = 0
             if "do_sample" not in gen_kwargs:
@@ -510,11 +516,14 @@ class Llava_OneVision(lmms):
             if "num_beams" not in gen_kwargs:
                 gen_kwargs["num_beams"] = 1
 
+            # Tokenize the formatted prompt(s) and pad to a common length for batched generation
             input_ids_list = [tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt") for prompt in question_input]
             pad_token_ids = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
             input_ids = self.pad_sequence(input_ids_list, batch_first=True, padding_value=pad_token_ids).to(self.device)
             attention_masks = input_ids.ne(pad_token_ids).to(self.device)
 
+            # Add task-specific kwargs: image sizes for LLaVA's dynamic resolution pipeline,
+            # or video modality flag + stopping criteria for video tasks.
             if task_type == "image":
                 gen_kwargs["image_sizes"] = [batched_visuals[0][idx].size for idx in range(len(batched_visuals[0]))]
             elif task_type == "video":
@@ -535,6 +544,7 @@ class Llava_OneVision(lmms):
                     cont = self.model.generate(input_ids, attention_mask=attention_masks, pad_token_id=pad_token_ids, images=image_tensor, use_cache=self.use_cache, **gen_kwargs)
                     # cont = self.model.generate(qwen_input_ids, pad_token_id=pad_token_ids, images=image_tensor, use_cache=self.use_cache, **gen_kwargs)
 
+                # Decode the full output sequences; input tokens are already excluded by LLaVA's generate()
                 text_outputs = self.tokenizer.batch_decode(cont, skip_special_tokens=True)
             except Exception as e:
                 raise e
@@ -711,7 +721,7 @@ class Llava_OneVision(lmms):
 
                 # preconfigure gen_kwargs with defaults
                 if "max_new_tokens" not in gen_kwargs:
-                    gen_kwargs["max_new_tokens"] = 1024
+                    gen_kwargs["max_new_tokens"] = 4096
                 if "temperature" not in gen_kwargs:
                     gen_kwargs["temperature"] = 0
                 if "do_sample" not in gen_kwargs:

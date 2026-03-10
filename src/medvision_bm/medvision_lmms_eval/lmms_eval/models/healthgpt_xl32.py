@@ -84,7 +84,7 @@ class HealthGPT_XL32(lmms):
         temperature: float = 0.0,
         top_p: float = None,
         num_beams: int = 1,
-        max_new_tokens: int = 1024,
+        max_new_tokens: int = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -230,7 +230,7 @@ class HealthGPT_XL32(lmms):
                 raise ValueError("The model only supports 1 image input and it should be of Image.Image type.")
 
             # Get model outputs
-            response = self.infer(question=contexts, pil_img=visual)
+            response = self.infer(question=contexts, pil_img=visual, max_new_tokens=gen_kwargs.get("max_new_tokens", self.max_new_tokens))
             res.append(response)
             pbar.update(1)
 
@@ -250,7 +250,9 @@ class HealthGPT_XL32(lmms):
         self,
         question: str = None,
         pil_img: str = None,
+        max_new_tokens: int = None,
     ):
+        _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
         model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         if pil_img:
@@ -275,7 +277,7 @@ class HealthGPT_XL32(lmms):
                 temperature=self.temperature,
                 top_p=self.top_p,
                 num_beams=self.num_beams,
-                max_new_tokens=self.max_new_tokens,
+                max_new_tokens=_max_new_tokens,
                 use_cache=True,
             )
         response = self._tokenizer.decode(output_ids[0], skip_special_tokens=True)

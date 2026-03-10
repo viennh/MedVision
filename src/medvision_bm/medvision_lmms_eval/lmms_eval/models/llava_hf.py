@@ -105,8 +105,8 @@ class LlavaHf(lmms):
         self.chat_template = chat_template
         self.use_cache = use_cache
 
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes        
+        self._rank = accelerator.process_index
+        self._world_size = accelerator.num_processes
         if accelerator.num_processes > 1 and device_map == "":
             assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
             # If you want to use DistributedType.DEEPSPEED, you have to run accelerate config before using the model
@@ -309,7 +309,7 @@ class LlavaHf(lmms):
             assert self.batch_size_per_gpu == 1, "Do not support batch_size_per_gpu > 1 for now"
             context = contexts[0]
 
-            # Some benchmarks like MME do not contain image tokens, so we prepend them to the prompt.
+            # Inject image/video placeholder tokens if the benchmark prompt omits them
             if DEFAULT_IMAGE_TOKEN not in context:
                 if task_type == "image":
                     image_tokens = [DEFAULT_IMAGE_TOKEN] * len(visuals)
@@ -317,7 +317,8 @@ class LlavaHf(lmms):
                     image_tokens = [DEFAULT_VIDEO_TOKEN] * len(visuals)
                 image_tokens = " ".join(image_tokens)
                 context = f"{image_tokens}\n{context}"
-            # Apply chat template
+
+            # Apply chat template (prefer explicit override → model default → Vicuna fallback)
             messages = [{"role": "user", "content": context}]
             if self.chat_template is not None:
                 self.tokenizer.chat_template = self.chat_template
@@ -331,6 +332,7 @@ class LlavaHf(lmms):
             if self.accelerator.is_main_process and doc_id[0] % 100 == 0:
                 eval_logger.debug(f"Prompt for doc ID {doc_id[0]}:\n\n{text}\n")
 
+            # Load video frames (done after templating to avoid loading if template fails)
             if task_type == "video":
                 try:
                     visuals = [self.load_video(visuals, self.max_frames_num)]
@@ -338,15 +340,18 @@ class LlavaHf(lmms):
                     res.append("")
                     eval_logger.info(f"Error {e} when loading video : {visuals}")
                     pbar.update(1)
+                    continue
 
+            # Tokenize and move to device; branch on modality so the processor receives the right keyword
             if task_type == "image":
                 inputs = self._image_processor(images=visuals, text=text, return_tensors="pt").to(self._device, self.model.dtype)
             elif task_type == "video":
                 inputs = self._image_processor(videos=visuals, text=text, return_tensors="pt").to(self._device, self.model.dtype)
 
+            # Apply generation defaults; caller-supplied gen_kwargs take precedence
             gen_kwargs["image_sizes"] = [visuals[idx].size for idx in range(len(visuals))]
             if "max_new_tokens" not in gen_kwargs:
-                gen_kwargs["max_new_tokens"] = 1024
+                gen_kwargs["max_new_tokens"] = 4096
             if "temperature" not in gen_kwargs:
                 gen_kwargs["temperature"] = 0
             if "top_p" not in gen_kwargs:
@@ -365,6 +370,7 @@ class LlavaHf(lmms):
                     pad_token_id=self.eot_token_id,
                     eos_token_id=self.eot_token_id,
                 )
+                # Slice off input tokens so only newly generated tokens are decoded
                 cont = cont[:, inputs["input_ids"].shape[-1] :]
             except Exception as e:
                 eval_logger.error(f"Error {e} in generating")
