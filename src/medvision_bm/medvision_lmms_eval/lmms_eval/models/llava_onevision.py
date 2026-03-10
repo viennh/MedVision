@@ -81,9 +81,13 @@ class Llava_OneVision(lmms):
         mm_spatial_pool_mode: Optional[str] = "bilinear",
         token_strategy: Optional[str] = "single",  # could be "single" or "multiple", "multiple" denotes adding multiple <image> tokens for each frame
         video_decode_backend: str = "decord",
+        max_new_tokens: Optional[int] = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
+
+        self.max_new_tokens = max_new_tokens
+
         # Do not use kwargs for now
         assert kwargs == {}, f"Unexpected kwargs: {kwargs}"
 
@@ -506,7 +510,7 @@ class Llava_OneVision(lmms):
 
             # Apply generation defaults; caller-supplied gen_kwargs take precedence
             if "max_new_tokens" not in gen_kwargs:
-                gen_kwargs["max_new_tokens"] = 4096
+                gen_kwargs["max_new_tokens"] = self.max_new_tokens
             if "temperature" not in gen_kwargs:
                 gen_kwargs["temperature"] = 0
             if "do_sample" not in gen_kwargs:
@@ -721,7 +725,7 @@ class Llava_OneVision(lmms):
 
                 # preconfigure gen_kwargs with defaults
                 if "max_new_tokens" not in gen_kwargs:
-                    gen_kwargs["max_new_tokens"] = 4096
+                    gen_kwargs["max_new_tokens"] = self.max_new_tokens
                 if "temperature" not in gen_kwargs:
                     gen_kwargs["temperature"] = 0
                 if "do_sample" not in gen_kwargs:

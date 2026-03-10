@@ -168,6 +168,13 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
+    # output length arguments
+    parser.add_argument(
+        "--max_new_tokens",
+        default=4096,
+        type=int,
+        help="Maximum number of new tokens to generate.",
+    )
     # resource-specific arguments
     parser.add_argument(
         "--batch_size_per_gpu",
@@ -239,6 +246,7 @@ def main():
     task_status_json_path = args.task_status_json_path
     data_dir = args.data_dir
     sample_limit = args.sample_limit
+    max_new_tokens = args.max_new_tokens
 
     num_processes = set_cuda_num_processes()
 
@@ -288,6 +296,7 @@ def main():
             f"hlora_alpha={hlora_alpha},"
             f"hlora_nums={hlora_nums},"
             f"vq_idx_nums={vq_idx_nums},"
+            f"max_new_tokens={max_new_tokens},"
             "dtype=FP16"  # ["FP16", "FP32", "BF16"]
         )
 

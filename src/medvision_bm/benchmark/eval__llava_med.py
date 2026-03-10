@@ -114,6 +114,13 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
+    # set max_new_tokens
+    parser.add_argument(
+        "--max_new_tokens",
+        default=4096,
+        type=int,
+        help="Maximum number of new tokens to generate per sample.",
+    )
     # resource-specific arguments
     parser.add_argument(
         "--batch_size_per_gpu",
@@ -186,6 +193,7 @@ def main():
     task_status_json_path = args.task_status_json_path
     data_dir = args.data_dir
     sample_limit = args.sample_limit
+    max_new_tokens = args.max_new_tokens
 
     num_processes = set_cuda_num_processes()
 
@@ -221,7 +229,10 @@ def main():
 
         batch_size = args.batch_size_per_gpu * num_processes
         model_args = (
-            f"model_path={model_hf}," "conv_mode=mistral_instruct," "temperature=0"
+            f"model_path={model_hf},"
+            "conv_mode=mistral_instruct,"
+            "temperature=0,"
+            f"max_new_tokens={max_new_tokens},"
         )
 
         rc = run_evaluation_for_task(

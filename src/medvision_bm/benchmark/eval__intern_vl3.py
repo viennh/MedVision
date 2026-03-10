@@ -65,6 +65,13 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
+    # set max_new_tokens
+    parser.add_argument(
+        "--max_new_tokens",
+        default=4096,
+        type=int,
+        help="Maximum number of new tokens to generate per sample.",
+    )
     # resource-specific arguments
     parser.add_argument(
         "--batch_size_per_gpu",
@@ -138,6 +145,7 @@ def main():
     data_dir = args.data_dir
     gpu_memory_utilization = args.gpu_memory_utilization
     sample_limit = args.sample_limit
+    max_new_tokens = args.max_new_tokens
 
     num_processes = set_cuda_num_processes()
 
@@ -181,7 +189,8 @@ def main():
             # "max_model_len=1024," # (optional) maximum input length
             # for InternVL3, https://github.com/vllm-project/vllm/blob/f3137cdd81cae3a48282c22130fbcadcfc64ea95/examples/offline_inference/vision_language.py#L393
             'limit_mm_per_prompt={"image": 1},'
-            "dtype=bfloat16"  # https://huggingface.co/OpenGVLab/InternVL3-38B
+            "dtype=bfloat16,"  # https://huggingface.co/OpenGVLab/InternVL3-38B
+            f"max_new_tokens={max_new_tokens}"
         )
 
         rc = run_evaluation_for_task_vllm_proxy(

@@ -141,6 +141,7 @@ class VLLM_Gemma3(lmms):
         gpu_memory_utilization: float = 0.8,
         batch_size: int = 1,
         max_frame_num: int = 32,
+        max_new_tokens: int = 4096,
         threads: int = 16,  # Threads to use for decoding visuals
         trust_remote_code: Optional[bool] = True,
         chat_template: Optional[str] = None,
@@ -152,6 +153,7 @@ class VLLM_Gemma3(lmms):
         # Here we just use the same token as llava for convenient
         self.model_version = model_version
         self.max_frame_num = max_frame_num
+        self.max_new_tokens = max_new_tokens
         self.threads = threads
         self.chat_template = chat_template
 
@@ -231,10 +233,13 @@ class VLLM_Gemma3(lmms):
             batched_messages = []
             for idx in range(len(batch_requests)):
                 contexts, gen_kwargs, doc_to_visual, doc_id, task, split = batch_requests[idx].arguments
+
                 if "max_new_tokens" not in gen_kwargs:
-                    gen_kwargs["max_new_tokens"] = 4096
+                    gen_kwargs["max_new_tokens"] = self.max_new_tokens
+
                 if "temperature" not in gen_kwargs:
                     gen_kwargs["temperature"] = 0
+
                 if "top_p" not in gen_kwargs:
                     gen_kwargs["top_p"] = 0.95
 

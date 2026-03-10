@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -70,6 +71,39 @@ def run_evaluation_for_task_vllm_proxy(
     return cmd_result.returncode
 
 
+def resolve_qwen25vl_hf_overrides(model_hf_id: str) -> dict:
+    """Build minimal HF config overrides required by vLLM for Qwen2.5-VL."""
+    vision_start_token_id = None
+
+    try:
+        from transformers import AutoConfig, AutoTokenizer
+
+        config = AutoConfig.from_pretrained(model_hf_id, trust_remote_code=True)
+        if hasattr(config, "vision_start_token_id"):
+            vision_start_token_id = getattr(config, "vision_start_token_id")
+
+        if vision_start_token_id is None:
+            tokenizer = AutoTokenizer.from_pretrained(model_hf_id, trust_remote_code=True)
+            # Common vision start tokens used by Qwen VL-style tokenizers.
+            for token in ("<|vision_start|>", "<|vision_start_token|>"):
+                token_id = tokenizer.convert_tokens_to_ids(token)
+                if isinstance(token_id, int) and token_id >= 0 and token_id != tokenizer.unk_token_id:
+                    vision_start_token_id = token_id
+                    break
+    except Exception as e:
+        print(f"[Warning] Failed to auto-resolve vision_start_token_id for {model_hf_id}: {e}")
+
+    if vision_start_token_id is None:
+        # Qwen2.5-VL default; used only as a fallback if config/tokenizer probing fails.
+        vision_start_token_id = 151652
+        print(
+            "[Warning] Falling back to vision_start_token_id=151652. "
+            "If your tokenizer differs, pass a model-specific override in code."
+        )
+
+    return {"vision_start_token_id": int(vision_start_token_id)}
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Run MedVision benchmarking.")
     # model-specific arguments
@@ -84,6 +118,13 @@ def parse_args():
         default="Qwen2.5-VL-7B-Instruct",
         type=str,
         help="Name of the model to evaluate.",
+    )
+    # set max_new_tokens
+    parser.add_argument(
+        "--max_new_tokens",
+        default=4096,
+        type=int,
+        help="Maximum number of new tokens to generate per sample.",
     )
     # resource-specific arguments
     parser.add_argument(
@@ -158,6 +199,7 @@ def main():
     data_dir = args.data_dir
     gpu_memory_utilization = args.gpu_memory_utilization
     sample_limit = args.sample_limit
+    max_new_tokens = args.max_new_tokens
 
     num_processes = set_cuda_num_processes()
 
@@ -194,6 +236,8 @@ def main():
     # ------
 
     tasks = load_tasks(tasks_list_json_path)
+    hf_overrides = resolve_qwen25vl_hf_overrides(model_hf)
+    hf_overrides_json = json.dumps(hf_overrides, separators=(",", ":"))
 
     for task in tasks:
         completed_tasks = load_tasks_status(task_status_json_path, model_name)
@@ -207,7 +251,9 @@ def main():
             f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
-            "dtype=bfloat16"
+            f"hf_overrides={hf_overrides_json},"
+            "dtype=bfloat16,"
+            f"max_new_tokens={max_new_tokens}"
         )
 
         rc = run_evaluation_for_task_vllm_proxy(

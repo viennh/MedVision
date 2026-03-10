@@ -141,7 +141,7 @@ class VLLM_Qwen3VL(lmms):
         gpu_memory_utilization: float = 0.9,
         batch_size: int = 1,
         max_frame_num: int = 32,
-        max_new_tokens: int = 1024,
+        max_new_tokens: int = 4096,
         threads: int = 16,  # Threads to use for decoding visuals
         trust_remote_code: Optional[bool] = True,
         chat_template: Optional[str] = None,
@@ -235,7 +235,7 @@ class VLLM_Qwen3VL(lmms):
                 contexts, gen_kwargs, doc_to_visual, doc_id, task, split = batch_requests[idx].arguments
 
                 if "max_new_tokens" not in gen_kwargs:
-                    gen_kwargs["max_new_tokens"] = 4096
+                    gen_kwargs["max_new_tokens"] = self.max_new_tokens
                 if "temperature" not in gen_kwargs:
                     gen_kwargs["temperature"] = 0
                 if "top_p" not in gen_kwargs:

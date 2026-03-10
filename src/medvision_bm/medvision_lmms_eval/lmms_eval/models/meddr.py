@@ -36,12 +36,14 @@ class MedDr(lmms):
         model_path: str = "Sunanhe/MedDr_0401",
         dtype: str = "FP16",
         attn_implementation: str = "flash_attention_2",
+        max_new_tokens: Optional[int] = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
         self.model_path = model_path
         self.dtype = dtype
         self.attn_implementation = attn_implementation
+        self.max_new_tokens = max_new_tokens
         self.prepare_model()
 
     @property
@@ -139,7 +141,10 @@ class MedDr(lmms):
                 raise ValueError("The model only supports 1 image input and it should be of Image.Image type.")
 
             # Get model outputs
-            response = self.eval_model(question=contexts, pil_img=visual, max_new_tokens=gen_kwargs.get("max_new_tokens", 4096))
+            if "max_new_tokens" not in gen_kwargs:
+                gen_kwargs["max_new_tokens"] = self.max_new_tokens
+
+            response = self.eval_model(question=contexts, pil_img=visual, max_new_tokens=gen_kwargs.get("max_new_tokens"))
             res.append(response)
             pbar.update(1)
 

@@ -166,10 +166,12 @@ class InternVL3(lmms):
         batch_size: str = "1",
         num_frame: int = 32,
         num_layers=None,
+        max_new_tokens=4096,
         **kwargs,
     ):
         super().__init__()
 
+        self.max_new_tokens = max_new_tokens
         self.path = pretrained
         self.num_frame = num_frame
 
@@ -274,6 +276,10 @@ class InternVL3(lmms):
             # Sanitise gen_kwargs: start from defaults, keep only keys InternVL3 understands
             if "until" in gen_kwargs:
                 gen_kwargs.pop("until")
+
+            if "max_new_tokens" not in gen_kwargs:
+                gen_kwargs["max_new_tokens"] = self.max_new_tokens
+
             for k, v in DEFAULT_GEN_KWARGS.items():
                 if k not in gen_kwargs:
                     gen_kwargs[k] = v
