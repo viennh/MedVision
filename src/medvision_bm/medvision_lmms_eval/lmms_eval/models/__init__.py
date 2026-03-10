@@ -16,6 +16,7 @@ AVAILABLE_MODELS = {
     "vllm_llama_3_2_vision": "VLLM_Llama_3_2_Vision",
     "vllm_llava_onevision": "VLLM_Llava_OneVision",
     "vllm_qwen25vl": "VLLM_Qwen25VL",
+    "vllm_qwen3vl": "VLLM_Qwen3VL",
     "lingshu": "Lingshu",
     "medgemma": "MedGemma",
     "biomedgpt": "BiomedGPT",

@@ -774,6 +774,21 @@ def _process_img_qwen25vl(img_2d_raw, extra_kwargs):
     return img_shape_resized_hw
 
 
+# NOTE: 
+# TODO:
+# to be confirmed
+def _process_img_qwen3vl(img_2d_raw, extra_kwargs):
+    img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "Qwen/Qwen3-VL-30B-A3B-Thinking")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
+    processed_visual = img_processor([img_PIL])
+    image_grid_thw = processed_visual["image_grid_thw"][0]
+    patch_size = img_processor.patch_size
+    img_shape_resized_hw = (image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
+    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
+    return img_shape_resized_hw
+
+
 def _process_img_lingshu(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
     sample_model_hf = extra_kwargs.get("sample_model_hf", "lingshu-medical-mllm/Lingshu-32B")
@@ -1100,12 +1115,14 @@ def _process_img_gemma3(img_2d_raw, extra_kwargs):
 
 def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
     # Supported models
-    supported_models = ["qwen2_5_vl", "medgemma", "meddr", "llava_onevision", "llava_med", "llama_3_2_vision", "internvl3", "huatuogpt_vision", "healthgpt_l14", "gemma3", "lingshu"]
+    supported_models = ["qwen3_vl", "qwen2_5_vl", "medgemma", "meddr", "llava_onevision", "llava_med", "llama_3_2_vision", "internvl3", "huatuogpt_vision", "healthgpt_l14", "gemma3", "lingshu"]
     if model_name not in supported_models:
         raise ValueError(f"Model {model_name} is not supported for tumor/lesion size estimation task.\n You need to add model-specific implementation in this function: doc_to_text_TumorLesionSize().")
 
     # Get reshaped image size so that we can adjust the pixel size dynamically
-    if model_name == "qwen2_5_vl":
+    if model_name == "qwen3_vl":
+        img_shape_resized_hw = _process_img_qwen3vl(img_2d_raw, extra_kwargs) 
+    elif model_name == "qwen2_5_vl":
         # NOTE: Qwen2.5-VL resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84

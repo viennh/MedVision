@@ -116,6 +116,10 @@ qwen2_5_vl = [
     "qwen_vl_utils",
     "qwen-vl-utils[decord]>=0.0.8",
 ]
+qwen3_vl = [
+    "transformers==4.57.0",
+    "qwen-vl-utils==0.0.14",
+]
 gemini = [
     "google-genai",
 ]
