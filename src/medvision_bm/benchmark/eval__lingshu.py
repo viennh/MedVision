@@ -174,7 +174,7 @@ def main():
 
         batch_size = args.batch_size_per_gpu * num_processes
         model_args = (
-            f"model_path={model_hf},"
+            f"model_hf={model_hf},"
             "use_flash_attention_2=True,"
             f"max_new_tokens={max_new_tokens},"
         )
