@@ -172,7 +172,7 @@ def main():
 
         batch_size = args.batch_size_per_gpu * num_processes
         model_args = (
-            f"model_path={model_hf}," 
+            f"model_hf={model_hf}," 
             f"max_new_tokens={max_new_tokens}," 
             "use_pipeline=True"
         )
@@ -184,7 +184,7 @@ def main():
             task=task,
             batch_size=batch_size,
             sample_limit=sample_limit,
-            output_path=result_dir,
+            output_path=os.path.join(result_dir, model_name),
         )
 
         if rc == 0 and not args.skip_update_status:
