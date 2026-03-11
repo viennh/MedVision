@@ -28,12 +28,12 @@ class HuatuoGPT_Vision(lmms):
 
     def __init__(
         self,
-        model_path: str = "FreedomIntelligence/HuatuoGPT-Vision-34B",
+        model_hf: str = "FreedomIntelligence/HuatuoGPT-Vision-34B",
         dtype: str = "FP16",
         **kwargs,
     ) -> None:
         super().__init__()
-        self.model_path = model_path
+        self.model_hf = model_hf
         self.dtype = dtype
         self.prepare_model()
 
@@ -73,7 +73,7 @@ class HuatuoGPT_Vision(lmms):
         self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Load model
-        self.huatuo_chatbot = HuatuoChatbot(self.model_path, device=self._device)
+        self.huatuo_chatbot = HuatuoChatbot(self.model_hf, device=self._device)
 
     def flatten(self, input):
         new_list = []

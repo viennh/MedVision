@@ -33,14 +33,14 @@ class MedDr(lmms):
 
     def __init__(
         self,
-        model_path: str = "Sunanhe/MedDr_0401",
+        model_hf: str = "Sunanhe/MedDr_0401",
         dtype: str = "FP16",
         attn_implementation: str = "flash_attention_2",
         max_new_tokens: Optional[int] = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
-        self.model_path = model_path
+        self.model_hf = model_hf
         self.dtype = dtype
         self.attn_implementation = attn_implementation
         self.max_new_tokens = max_new_tokens
@@ -82,7 +82,7 @@ class MedDr(lmms):
         self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Add loading progress information
-        eval_logger.info(f"Loading base model from {self.model_path}...")
+        eval_logger.info(f"Loading base model from {self.model_hf}...")
 
         # Optimize model loading with better device_map and config
         load_config = {
@@ -95,8 +95,8 @@ class MedDr(lmms):
         load_config["device_map"] = {"":  self.device}
 
         # Load model
-        self._tokenizer = LlamaTokenizer.from_pretrained(self.model_path, **load_config)
-        self._model = InternVLChatModel.from_pretrained(self.model_path, low_cpu_mem_usage=True, torch_dtype=self.model_dtype).eval()
+        self._tokenizer = LlamaTokenizer.from_pretrained(self.model_hf, **load_config)
+        self._model = InternVLChatModel.from_pretrained(self.model_hf, low_cpu_mem_usage=True, torch_dtype=self.model_dtype).eval()
         image_size = self._model.config.force_image_size or self._model.config.vision_config.image_size
         pad2square = self._model.config.pad2square
         img_context_token_id = self._tokenizer.convert_tokens_to_ids(IMG_CONTEXT_TOKEN)

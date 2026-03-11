@@ -1,4 +1,5 @@
 import argparse
+import os
 import subprocess
 
 from medvision_bm.utils import (
@@ -186,7 +187,7 @@ def main():
             task=task,
             batch_size=batch_size,
             sample_limit=sample_limit,
-            output_path=result_dir,
+            output_path=os.path.join(result_dir, model_name),
         )
 
         if rc == 0 and not args.skip_update_status:

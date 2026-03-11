@@ -39,7 +39,7 @@ class LLaVA_Med(lmms):
 
     def __init__(
         self,
-        model_path: str = "microsoft/llava-med-v1.5-mistral-7b",
+        model_hf: str = "microsoft/llava-med-v1.5-mistral-7b",
         model_base: str = None,
         conv_mode: str = "mistral_instruct",
         temperature: float = 0.2,
@@ -50,7 +50,7 @@ class LLaVA_Med(lmms):
         **kwargs,
     ) -> None:
         super().__init__()
-        self.model_path = model_path
+        self.model_hf = model_hf
         self.model_base = model_base
         self.conv_mode = conv_mode
         self.temperature = temperature
@@ -96,12 +96,12 @@ class LLaVA_Med(lmms):
         model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Add loading progress information
-        eval_logger.info(f"Loading base model from {self.model_path}...")
+        eval_logger.info(f"Loading base model from {self.model_hf}...")
 
         # Load model
         set_seed(0)
         disable_torch_init()
-        model_path = os.path.expanduser(self.model_path)
+        model_path = os.path.expanduser(self.model_hf)
         model_name = get_model_name_from_path(model_path)
         self._tokenizer, self._model, self._image_processor, self.context_len = load_pretrained_model(model_path, self.model_base, model_name)
 

@@ -41,7 +41,7 @@ class VLLM_Qwen25VL(lmms):
         - VLLM chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
 
     Args:
-        model_version (str): HuggingFace model identifier or path to the model.
+        model_hf (str): HuggingFace model identifier or path to the model.
             Default: "Qwen/Qwen2.5-VL-3B-Instruct"
         tensor_parallel_size (int): Number of GPUs to use for tensor parallelism.
             Default: 1
@@ -72,7 +72,7 @@ class VLLM_Qwen25VL(lmms):
             "--model",
             "vllm",
             "--model_args",
-            "model_version=meta-llama/Llama-4-Scout-17B-16E-Instruct,"
+            "model_hf=meta-llama/Llama-4-Scout-17B-16E-Instruct,"
             "tensor_parallel_size=4,"
             "dtype=bfloat16,"
             "max_model_len=10240,"
@@ -109,7 +109,7 @@ class VLLM_Qwen25VL(lmms):
         "--model",
         "vllm",
         "--model_args",
-        "model_version=deepseek-ai/deepseek-vl2,"
+        "model_hf=deepseek-ai/deepseek-vl2,"
         'hf_overrides={"architectures": ["DeepseekVLV2ForCausalLM"]},' # example of passing model specific arguments, JSON string will be parsed automatically
         f"chat_template={chat_template_file}," # chat template file path
         "tensor_parallel_size=2,"
@@ -136,7 +136,7 @@ class VLLM_Qwen25VL(lmms):
 
     def __init__(
         self,
-        model_version: str = "Qwen/Qwen2.5-VL-3B-Instruct",
+        model_hf: str = "Qwen/Qwen2.5-VL-3B-Instruct",
         tensor_parallel_size: int = 1,
         gpu_memory_utilization: float = 0.8,
         batch_size: int = 1,
@@ -151,7 +151,7 @@ class VLLM_Qwen25VL(lmms):
         # Manually set a image token for GPT4V so that we can search for it
         # and split the text and image
         # Here we just use the same token as llava for convenient
-        self.model_version = model_version
+        self.model_hf = model_hf
         self.max_frame_num = max_frame_num
         self.max_new_tokens = max_new_tokens
         self.threads = threads
@@ -167,7 +167,7 @@ class VLLM_Qwen25VL(lmms):
 
         # Set up vllm client
         self.client = LLM(
-            model=self.model_version,
+            model=self.model_hf,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             trust_remote_code=trust_remote_code,

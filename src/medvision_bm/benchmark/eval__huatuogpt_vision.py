@@ -206,7 +206,7 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
-        model_args = f"model_path={model_hf}"
+        model_args = f"model_hf={model_hf}"
 
         rc = run_evaluation_for_task(
             num_processes=num_processes,
@@ -215,7 +215,7 @@ def main():
             task=task,
             batch_size=batch_size,
             sample_limit=sample_limit,
-            output_path=result_dir,
+            output_path=os.path.join(result_dir, model_name),
         )
 
         if rc == 0 and not args.skip_update_status:

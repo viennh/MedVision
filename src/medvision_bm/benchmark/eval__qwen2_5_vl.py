@@ -247,7 +247,7 @@ def main():
 
         batch_size = args.batch_size_per_gpu * num_processes
         vllm_model_args = (
-            f"model_version={model_hf},"
+            f"model_hf={model_hf},"
             f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
