@@ -10,16 +10,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
+import lmms_eval.api
+import lmms_eval.api.metrics
+import lmms_eval.api.registry
 import numpy as np
 import torch
 import torch.distributed as dist
 from datasets import Image, Sequence
-from loguru import logger as eval_logger
-from tqdm import tqdm
-
-import lmms_eval.api
-import lmms_eval.api.metrics
-import lmms_eval.api.registry
 from lmms_eval.evaluator_utils import (
     consolidate_group_results,
     consolidate_results,
@@ -44,6 +41,8 @@ from lmms_eval.utils import (
     run_task_tests,
     simple_parse_args_string,
 )
+from loguru import logger as eval_logger
+from tqdm import tqdm
 
 
 @positional_deprecated
@@ -377,10 +376,24 @@ def evaluate(
         if not all("bypass" not in getattr(task_output.task, "_metric_fn_list", {}).keys() for task_output in eval_tasks):
             raise ValueError("log_samples must be True for 'bypass' metric-only tasks")
 
+    # Extract model info from cli_args
+    _parsed_model_args = utils.simple_parse_args_string(cli_args.model_args) if cli_args is not None and hasattr(cli_args, "model_args") and cli_args.model_args else {}
+    _model_arg_model_hf = _parsed_model_args.get("model_hf", None)
+    # The registered model name from --model CLI arg (e.g. "meddr", "qwen2_5_vl", "vllm_qwen25vl")
+    _model_name = cli_args.model if cli_args is not None and hasattr(cli_args, "model") else None
+
     for task_output in eval_tasks:
         task: Task = task_output.task
         task_name = task_output.task_name
         task.args = cli_args
+
+        # Inject model info into lmms_eval_specific_kwargs
+        if task.lmms_eval_specific_kwargs is None:
+            task.lmms_eval_specific_kwargs = {}
+        if _model_arg_model_hf is not None:
+            task.lmms_eval_specific_kwargs["model_hf"] = _model_arg_model_hf
+        if _model_name is not None:
+            task.lmms_eval_specific_kwargs["model_name"] = _model_name
 
         name_to_task[task_name] = task
 

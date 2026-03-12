@@ -19,7 +19,9 @@ from medvision_bm.utils import (
 )
 
 
-def install_transformers_accelerate_for_qwen3vl(transformers_version="4.57.0", accelerate_version="1.9.0"):
+def install_transformers_accelerate_for_qwen3vl(
+    transformers_version="4.57.0", accelerate_version="1.9.0"
+):
     # NOTE: Reinstall dev version of transformers and accelerate
     # NOTE: This is specific for the Qwen3-VL model
     # Install the required packages
@@ -34,7 +36,8 @@ def install_transformers_accelerate_for_qwen3vl(transformers_version="4.57.0", a
         check=True,
     )
     subprocess.run(
-        [sys.executable, "-m", "pip", "install", f"accelerate=={accelerate_version}"], check=True
+        [sys.executable, "-m", "pip", "install", f"accelerate=={accelerate_version}"],
+        check=True,
     )
 
 
@@ -135,6 +138,13 @@ def parse_args():
         type=int,
         help="Maximum number of samples to evaluate per task.",
     )
+    # model behavior arguments
+    parser.add_argument(
+        "--enable_thinking",
+        action="store_true",
+        default=False,
+        help="Enable thinking/reasoning mode for the model (e.g. for Qwen3-VL thinking models). Defaults to False for non-thinking instruct models.",
+    )
     # debugging and control arguments
     parser.add_argument(
         "--skip_env_setup",
@@ -167,6 +177,7 @@ def main():
     gpu_memory_utilization = args.gpu_memory_utilization
     sample_limit = args.sample_limit
     max_new_tokens = args.max_new_tokens
+    enable_thinking = args.enable_thinking
 
     num_processes = set_cuda_num_processes()
 
@@ -174,7 +185,7 @@ def main():
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements
         ensure_hf_hub_installed(hf_hub_version="0.35.3")
         install_vendored_lmms_eval(proj_dependency="qwen3_vl")
         install_medvision_ds(data_dir)
@@ -184,8 +195,9 @@ def main():
         install_vllm(data_dir, version="0.14.0")
 
         # NOTE: Reinstall packages to overwrite potentially incompatible versions
-        install_transformers_accelerate_for_qwen3vl(transformers_version="4.57.0", accelerate_version="1.9.0")
-
+        install_transformers_accelerate_for_qwen3vl(
+            transformers_version="4.57.0", accelerate_version="1.9.0"
+        )
 
         if args.env_setup_only:
             print(
@@ -209,11 +221,12 @@ def main():
 
         batch_size = args.batch_size_per_gpu * num_processes
         vllm_model_args = (
-            f"model_version={model_hf},"
+            f"model_hf={model_hf},"
             f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
             f"max_new_tokens={max_new_tokens},"
+            f"enable_thinking={enable_thinking},"
             "dtype=bfloat16"
         )
 
