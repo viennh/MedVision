@@ -1,3 +1,5 @@
+include:
+  - ../medvision/metadata.yaml
 tag: MedVision-TumorLesionSize,KiPA22
 dataset_path: YongchengYAO/MedVision
 dataset_kwargs:
@@ -81,7 +83,3 @@ lmms_eval_specific_kwargs:
     pre_prompt: ""
     post_prompt: ""
   dataset:
-
-
-metadata:
-- version: 1.0.0
