@@ -41,7 +41,7 @@ class VLLM_Qwen3VL(lmms):
         - VLLM chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
 
     Args:
-        model_version (str): HuggingFace model identifier or path to the model.
+        model_hf (str): HuggingFace model identifier or path to the model.
             Default: "Qwen/Qwen3-VL-30B-A3B-Thinking"
         tensor_parallel_size (int): Number of GPUs to use for tensor parallelism.
             Default: 1
@@ -72,7 +72,7 @@ class VLLM_Qwen3VL(lmms):
             "--model",
             "vllm",
             "--model_args",
-            "model_version=meta-llama/Llama-4-Scout-17B-16E-Instruct,"
+            "model_hf=meta-llama/Llama-4-Scout-17B-16E-Instruct,"
             "tensor_parallel_size=4,"
             "dtype=bfloat16,"
             "max_model_len=10240,"
@@ -109,7 +109,7 @@ class VLLM_Qwen3VL(lmms):
         "--model",
         "vllm",
         "--model_args",
-        "model_version=deepseek-ai/deepseek-vl2,"
+        "model_hf=deepseek-ai/deepseek-vl2,"
         'hf_overrides={"architectures": ["DeepseekVLV2ForCausalLM"]},' # example of passing model specific arguments, JSON string will be parsed automatically
         f"chat_template={chat_template_file}," # chat template file path
         "tensor_parallel_size=2,"
@@ -136,7 +136,7 @@ class VLLM_Qwen3VL(lmms):
 
     def __init__(
         self,
-        model_version: str = "Qwen/Qwen3-VL-30B-A3B-Thinking",
+        model_hf: str = "Qwen/Qwen3-VL-30B-A3B-Thinking",
         tensor_parallel_size: int = 1,
         gpu_memory_utilization: float = 0.9,
         batch_size: int = 1,
@@ -145,17 +145,19 @@ class VLLM_Qwen3VL(lmms):
         threads: int = 16,  # Threads to use for decoding visuals
         trust_remote_code: Optional[bool] = True,
         chat_template: Optional[str] = None,
+        enable_thinking: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
         # Manually set a image token for GPT4V so that we can search for it
         # and split the text and image
         # Here we just use the same token as llava for convenient
-        self.model_version = model_version
+        self.model_hf = model_hf
         self.max_frame_num = max_frame_num
         self.max_new_tokens = max_new_tokens
         self.threads = threads
         self.chat_template = chat_template
+        self.enable_thinking = enable_thinking
 
         # Convert any string arguments that start with { and end with } to dictionaries
         for key, value in kwargs.items():
@@ -167,12 +169,17 @@ class VLLM_Qwen3VL(lmms):
 
         # Set up vllm client
         self.client = LLM(
-            model=self.model_version,
+            model=self.model_hf,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             trust_remote_code=trust_remote_code,
             **kwargs,
         )
+
+        # Set padding side
+        tokenizer = self.client.get_tokenizer()
+        tokenizer.padding_side = "left" 
+        self.client.set_tokenizer(tokenizer)
 
         self.batch_size_per_gpu = int(batch_size)
 
@@ -284,16 +291,29 @@ class VLLM_Qwen3VL(lmms):
             # - vllm chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
             # The logic here is similar to the vllm implementation as shown here (https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat)
             # - vllm implementation: https://github.com/vllm-project/vllm/blob/d97841078b6e0dde8da36d5a2b8e8857a2c37944/vllm/entrypoints/chat_utils.py#L829
+            chat_template_kwargs = {"enable_thinking": self.enable_thinking}
             if self.chat_template is not None:
                 if os.path.isfile(self.chat_template):
                     with open(self.chat_template, "r") as f:
                         chat_template = f.read()
                 else:
                     chat_template = self.chat_template
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template, chat_template_kwargs=chat_template_kwargs)
             else:
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages)
-            response_text = [o.outputs[0].text for o in response]
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template_kwargs=chat_template_kwargs)
+                
+            # NOTE: In vLLM 0.8.5+, for Qwen3 thinking models, CompletionOutput splits output into:
+            #   - reasoning_content: content inside <think>...</think> (may be empty if thinking disabled)
+            #   - text: content AFTER </think> (may be empty if all content is in reasoning_content)
+            # We combine both to get the full response for robust downstream parsing.
+            def _get_full_text(output) -> str:
+                text = output.text
+                reasoning = getattr(output, "reasoning_content", None) or ""
+                if reasoning:
+                    return reasoning + ("\n" + text if text else "")
+                return text
+
+            response_text = [_get_full_text(o.outputs[0]) for o in response]
 
             assert len(response_text) == len(batch_requests)
             res.extend(response_text)
