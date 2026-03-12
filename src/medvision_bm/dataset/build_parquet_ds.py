@@ -18,7 +18,7 @@ def parse_arguments():
     parser.add_argument(
         "--parquet_ds_dir",
         type=str,
-        help="Path to the prepared dataset directory to load from disk",
+        help="Directory of the final parquet dataset.",
     )
     # -- Dataset download mode
     parser.add_argument(
@@ -50,14 +50,7 @@ def parse_arguments():
         default=4,
         help="Number of workers for concatenating datasets, should be <= number of tasks",
     )
-    parser.add_argument(
-        "--dataloader_num_workers",
-        type=int,
-        default=8,
-        help="Number of workers for data loading",
-    )
     # -- Sample limits
-    # NOTE: Hierarchy of grouping: subset < task (one of AD/Detection/TL) < total
     # Limit the number of samples per subset (e.g., per dataset) for training
     parser.add_argument(
         "--train_sample_limit_per_subset",
@@ -71,7 +64,7 @@ def parse_arguments():
         default=-1,
         help="Limit the number of test samples per subset, -1 (default) means no limit",
     )
-    # Limit the number of samples per task
+    # Limit the number of samples per task (e.g., A/D, T/L, and detection tasks, each of which contains multiple datasets)
     parser.add_argument(
         "--train_sample_limit_per_task",
         type=int,
@@ -81,7 +74,7 @@ def parse_arguments():
     parser.add_argument(
         "--val_sample_limit_per_task",
         type=int,
-        default=100,
+        default=100, 
         help="Limit the number of validation samples per task",
     )
     parser.add_argument(
@@ -174,7 +167,31 @@ def main(**kwargs):
     # Output parquet dataset directory
     parquet_ds_dir = kwargs.get("parquet_ds_dir")
 
-    # Parse sample limits
+    # =========================================================================
+    # Sample limit hierarchy (applied in order, from fine-grained to coarse):
+    #
+    # [Level 1] Per-subset limit  (--train/test_sample_limit_per_subset)
+    #   └─ Caps samples loaded from each individual dataset/config (e.g., one
+    #      CT study series) before any merging.  Use -1 for no limit.
+    #
+    # [Level 2] Per-task limit    (--train/val/test_sample_limit_per_task)
+    #   └─ Caps the merged pool for each task group (AD / TL / Detection)
+    #      after all subsets are concatenated.  Use -1 for no limit.
+    #
+    # [Level 3] Task-specific override
+    #           (--train/val/test_sample_limit_task_{AD|Detection|TL})
+    #   └─ Overrides the per-task limit for one particular task group when > 0.
+    #      Takes priority over Level 2 if set to a positive value.
+    #
+    # [Level 4] Total limit       (--train/val/test_sample_limit)
+    #   └─ Caps the grand total after all task groups are concatenated.
+    #      Use -1 for no limit.
+    #
+    # Validation split is always carved out of the training pool (after
+    # Level-1/2/3 limits are applied) before the Level-4 total cap.
+    # =========================================================================
+
+    # Resolve per-task limits (Level 2/3) for each task group
     (
         train_limit_AD,
         val_limit_AD,
@@ -186,6 +203,8 @@ def main(**kwargs):
         val_limit_TL,
         test_limit_TL,
     ) = parse_sample_limits_tr_val_ts(**kwargs)
+
+    # Per-subset limits (Level 1) — shared across all task groups
     train_limit_per_subset = kwargs.get("train_sample_limit_per_subset")
     test_limit_per_subset = kwargs.get("test_sample_limit_per_subset")
 
@@ -286,7 +305,7 @@ def main(**kwargs):
     os.makedirs(parquet_ds_dir, exist_ok=True)
     print(f"\nSaving the prepared Verl parquet dataset to {parquet_ds_dir} ...")
     for split in dataset.keys():
-        output_path = os.path.join(parquet_ds_dir, f"{split}_verl.parquet")
+        output_path = os.path.join(parquet_ds_dir, f"{split}.parquet")
         print(f"  - Saving {split} split to {output_path} ...")
         dataset[split].to_parquet(output_path)
 
