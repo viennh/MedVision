@@ -55,11 +55,11 @@ python -m medvision_bm.dataset.build_parquet_ds --parquet_ds_dir ${dir_parquet}/
 
 # Visualization
 # Detection
-python -m medvision_bm.dataset.visualize_samples.py --parquet_ds_path ${dir_parquet}/medvision_Detection/test.parquet --fig_dir ${dir_figure}/Fig-Detection --num_samples 100 --task_type Detection
+python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_Detection/test.parquet --fig_dir ${dir_figure}/Fig-Detection --num_samples 100 --task_type Detection
 
 # Angle & Distance
-python -m medvision_bm.dataset.visualize_samples.py --parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet --fig_dir ${dir_figure}/Fig-AD-Angle --num_samples 100 --task_type Angle
-python -m medvision_bm.dataset.visualize_samples.py --parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet --fig_dir ${dir_figure}/Fig-AD-Distance --num_samples 100 --task_type Distance
+python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet --fig_dir ${dir_figure}/Fig-AD-Angle --num_samples 100 --task_type Angle
+python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet --fig_dir ${dir_figure}/Fig-AD-Distance --num_samples 100 --task_type Distance
 
 # Tumor/Lesion size
-python -m medvision_bm.dataset.visualize_samples.py --parquet_ds_path ${dir_parquet}/medvision_TL/test.parquet --fig_dir ${dir_figure}/Fig-TL --num_samples 100 --task_type TL
+python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_TL/test.parquet --fig_dir ${dir_figure}/Fig-TL --num_samples 100 --task_type TL
