@@ -377,7 +377,7 @@ def evaluate(
             raise ValueError("log_samples must be True for 'bypass' metric-only tasks")
 
     # Extract model info from cli_args
-    _parsed_model_args = utils.simple_parse_args_string(cli_args.model_args) if cli_args is not None and hasattr(cli_args, "model_args") and cli_args.model_args else {}
+    _parsed_model_args = simple_parse_args_string(cli_args.model_args) if cli_args is not None and hasattr(cli_args, "model_args") and cli_args.model_args else {}
     _model_arg_model_hf = _parsed_model_args.get("model_hf", None)
     # The registered model name from --model CLI arg (e.g. "meddr", "qwen2_5_vl", "vllm_qwen25vl")
     _model_name = cli_args.model if cli_args is not None and hasattr(cli_args, "model") else None
