@@ -193,7 +193,7 @@ class Llava_OneVision(lmms):
             input_ids = [torch.flip(_input_ids, [0]) for _input_ids in input_ids]
         input_ids = torch.nn.utils.rnn.pad_sequence(input_ids, batch_first=batch_first, padding_value=padding_value)
         if self.tokenizer.padding_side == "left":
-            input_ids = torch.flip(input_ids, [1])
+            input_ids = torch.flip(input_ids, [1 if batch_first else 0])
         return input_ids
 
     @property
