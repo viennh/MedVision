@@ -136,6 +136,7 @@ def main(
                         limit_val_sample=val_limit_AD,
                         mapping_func=_format_data_AngleDistanceTask,
                         model_family_name=model_family_name,
+                        base_model_hf=base_model_hf,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -151,6 +152,13 @@ def main(
                         new_shape_hw=kwargs.get("new_shape_hw"),
                         download_mode=kwargs.get("ds_download_mode"),
                     )
+                    # Keep task label for optional temperature-based sampling.
+                    dataset_AD["train"] = dataset_AD["train"].add_column(
+                        kwargs.get("temperature_sampler_task_column"), ["AD"] * len(dataset_AD["train"])
+                    )
+                    dataset_AD["validation"] = dataset_AD["validation"].add_column(
+                        kwargs.get("temperature_sampler_task_column"), ["AD"] * len(dataset_AD["validation"])
+                    )
                     train_ds_list.append(dataset_AD["train"])
                     val_ds_list.append(dataset_AD["validation"])
 
@@ -162,6 +170,7 @@ def main(
                         limit_val_sample=val_limit_detect,
                         mapping_func=_format_data_DetectionTask,
                         model_family_name=model_family_name,
+                        base_model_hf=base_model_hf,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -177,6 +186,17 @@ def main(
                         new_shape_hw=kwargs.get("new_shape_hw"),
                         download_mode=kwargs.get("ds_download_mode"),
                     )
+                    # Keep task label for optional temperature-based sampling.
+                    dataset_detect["train"] = dataset_detect["train"].add_column(
+                        kwargs.get("temperature_sampler_task_column"),
+                        ["Detection"] * len(dataset_detect["train"]),
+                    )
+                    dataset_detect["validation"] = dataset_detect[
+                        "validation"
+                    ].add_column(
+                        kwargs.get("temperature_sampler_task_column"),
+                        ["Detection"] * len(dataset_detect["validation"]),
+                    )
                     train_ds_list.append(dataset_detect["train"])
                     val_ds_list.append(dataset_detect["validation"])
 
@@ -188,6 +208,7 @@ def main(
                         limit_val_sample=val_limit_TL,
                         mapping_func=_format_data_TumorLesionTask,
                         model_family_name=model_family_name,
+                        base_model_hf=base_model_hf,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -202,6 +223,13 @@ def main(
                         ),
                         new_shape_hw=kwargs.get("new_shape_hw"),
                         download_mode=kwargs.get("ds_download_mode"),
+                    )
+                    # Keep task label for optional temperature-based sampling.
+                    dataset_TL["train"] = dataset_TL["train"].add_column(
+                        kwargs.get("temperature_sampler_task_column"), ["TL"] * len(dataset_TL["train"])
+                    )
+                    dataset_TL["validation"] = dataset_TL["validation"].add_column(
+                        kwargs.get("temperature_sampler_task_column"), ["TL"] * len(dataset_TL["validation"])
                     )
                     train_ds_list.append(dataset_TL["train"])
                     val_ds_list.append(dataset_TL["validation"])
@@ -271,6 +299,14 @@ def main(
             gradient_checkpointing=kwargs.get("gradient_checkpointing"),
             dataloader_pin_memory=kwargs.get("dataloader_pin_memory"),
             push_LoRA=kwargs.get("push_LoRA"),
+            enable_temperature_sampler=kwargs.get("enable_temperature_sampler"),
+            temperature_sampler_T=kwargs.get("temperature_sampler_T"),
+            temperature_sampler_task_column=kwargs.get(
+                "temperature_sampler_task_column"
+            ),
+            temperature_sampler_num_samples=kwargs.get(
+                "temperature_sampler_num_samples"
+            ),
         )
 
         # Train the model (DO NOT guard this with is_main_process())

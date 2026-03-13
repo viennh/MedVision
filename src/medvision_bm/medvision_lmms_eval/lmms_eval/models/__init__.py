@@ -2,7 +2,6 @@ import importlib
 import os
 import sys
 
-import hf_transfer
 from loguru import logger
 
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
@@ -13,7 +12,7 @@ logger.add(sys.stdout, level="WARNING")
 # Commented out models are not fully tested
 # ---
 # NOTE:
-# In the MedVision benchmark (https://medvision-vlm.github.io), 
+# In the MedVision benchmark (https://medvision-vlm.github.io),
 # we use the vllm inference engine for some models (e.g., Gemma3, InternVL3, Llama-3.2-Vision, Llava-OneVision, Qwen2.5-VL).
 # Commented out models are those not included in MedVision Benchmark.
 # ---
@@ -56,6 +55,11 @@ AVAILABLE_MODELS = {
     # BiomedGPT
     # "biomedgpt": "BiomedGPT",
 }
+
+
+def get_available_model_names():
+    """Return available model identifiers as a plain list."""
+    return list(AVAILABLE_MODELS.keys())
 
 
 def get_model(model_name):

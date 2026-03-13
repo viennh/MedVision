@@ -203,6 +203,22 @@ COT_TEMPLATE_ANGLE = (
     "</answer>"
 )
 
+COT_TEMPLATE_DETECTION = (
+    "<think> "
+    "<step-1-reasoning> "
+    "I need to identify the relative coordinates of the bounding box of <label_name>. "
+    "The relative coordinates must be written as (x, y), where x is the relative position in width and y is the relative position in height. "
+    "I understand that the origin of the image space coordinate system is at the lower-left corner of the image. "
+    "</step-1-reasoning> "
+    "<step-1-answer> "
+    "The relative coordinates of the bounding box: (<coor0_w>, <coor0_h>), (<coor1_w>, <coor1_h>). "
+    "</step-1-answer> "
+    "</think> "
+    "<answer> "
+    "<coor0_w>,<coor0_h>,<coor1_w>,<coor1_h>"
+    "</answer>"
+)
+
 # ======================================================================================================
 
 

@@ -20,8 +20,8 @@ from accelerate import PartialState
 from datasets import DatasetDict, concatenate_datasets, load_dataset
 from PIL import Image
 from scipy.ndimage import zoom
+from torch.utils.data import WeightedRandomSampler
 
-from medvision_bm.sft.config import check_model_supported, load_model_info
 from medvision_bm.sft.sft_prompts import (
     _get_prompt_angle,
     _get_prompt_distance,
@@ -176,7 +176,9 @@ def get_image_info_for_medvision_dataset(doc):
     ]
     task_type = doc["taskType"]
     if task_type not in valid_task_types:
-        raise ValueError(f"Invalid taskType: {task_type}. Must be one of {valid_task_types}.")
+        raise ValueError(
+            f"Invalid taskType: {task_type}. Must be one of {valid_task_types}."
+        )
 
     # Get data info
     dataset_name = doc["dataset_name"]
@@ -196,7 +198,9 @@ def get_image_info_for_medvision_dataset(doc):
     dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
     if dataset_module is None:
         raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
-    processor_module = importlib.import_module(f"medvision_ds.datasets.{dataset_module}.{processor_module_name}")
+    processor_module = importlib.import_module(
+        f"medvision_ds.datasets.{dataset_module}.{processor_module_name}"
+    )
 
     # Get task info
     taskID = doc["taskID"]
@@ -253,7 +257,11 @@ def normalize_general_img(img):
 
 def normalize_img(doc, img_2d):
     """Convert document to image with scale bar added."""
-    from medvision_bm.utils.configs import CT_HU_windows_WL, label_map_regroup, TASK_LIST_FORCE_STANDARD_IMAGE_NORMALIZATION
+    from medvision_bm.utils.configs import (
+        TASK_LIST_FORCE_STANDARD_IMAGE_NORMALIZATION,
+        CT_HU_windows_WL,
+        label_map_regroup,
+    )
 
     # Get image info
     # NOTE: For Biometrics-From-Landmarks* (A/D) tasks, label_name would be None
@@ -263,9 +271,9 @@ def normalize_img(doc, img_2d):
     is_standard_normalization_required = False
     for task in TASK_LIST_FORCE_STANDARD_IMAGE_NORMALIZATION:
         if (
-            task["dataset_name"] == doc["dataset_name"] and
-            task["taskID"] == doc["taskID"] and
-            task["taskType"] == doc["taskType"]
+            task["dataset_name"] == doc["dataset_name"]
+            and task["taskID"] == doc["taskID"]
+            and task["taskType"] == doc["taskType"]
         ):
             is_standard_normalization_required = True
             break
@@ -275,17 +283,31 @@ def normalize_img(doc, img_2d):
     # TODO: Could be improved by adding label_name or HU window info for A/D tasks in MedVision
     if image_modality.lower() in ["ct"]:
         # Use HU window-based normalization if: 1) label_name is not None, 2) label is not regrouped to "others", and 3) standard image normalization is not forced in this task
-        if label_name is not None and not is_standard_normalization_required and label_map_regroup[label_name].lower() != "others":
+        if (
+            label_name is not None
+            and not is_standard_normalization_required
+            and label_map_regroup[label_name].lower() != "others"
+        ):
             hu_window_WL = CT_HU_windows_WL.get(label_map_regroup[label_name], None)
-            assert hu_window_WL is not None, f"Fail to set HU window for label_name {label_name}. Check CT_HU_windows_WL in medvision_bm/utils/configs.py"
-            img_2d_normalized = normalize_ct_img(img_2d, hu_window_WL[0], hu_window_WL[1])
+            assert (
+                hu_window_WL is not None
+            ), f"Fail to set HU window for label_name {label_name}. Check CT_HU_windows_WL in medvision_bm/utils/configs.py"
+            img_2d_normalized = normalize_ct_img(
+                img_2d, hu_window_WL[0], hu_window_WL[1]
+            )
         else:
             if label_name is None:
-                print("[Info] label_name is None, using general normalization (which does not use HU windows) for CT image.")
+                print(
+                    "[Info] label_name is None, using general normalization (which does not use HU windows) for CT image."
+                )
             if is_standard_normalization_required:
-                print("[Info] standard image normalization is forced for this task, using general normalization (which does not use HU windows)")
+                print(
+                    "[Info] standard image normalization is forced for this task, using general normalization (which does not use HU windows)"
+                )
             if label_map_regroup[label_name].lower() == "others":
-                print(f"[Info] label_name {label_name} is regrouped to 'others', using general normalization (which does not use HU windows)") 
+                print(
+                    f"[Info] label_name {label_name} is regrouped to 'others', using general normalization (which does not use HU windows)"
+                )
             img_2d_normalized = normalize_general_img(img_2d)
     else:
         img_2d_normalized = normalize_general_img(img_2d)
@@ -310,12 +332,12 @@ def _doc_to_visual(doc, new_shape_hw=None):
     return [pil_img]
 
 
-def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
+def _doc_to_text_AngleDistanceTask(doc, model_name, model_hf, new_shape_hw=None):
     """Convert document to text."""
-    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
     from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
         get_resized_img_shape,
     )
+    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_1_DECIMAL_NUMBER
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -351,18 +373,22 @@ def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
     img_shape = img_2d_raw.shape
 
     # Get resized image shape
-    model_info = load_model_info()
     img_shape_resized = get_resized_img_shape(
-        model_name, img_2d_raw, model_info
+        model_name, img_2d_raw, {"model_hf":model_hf}
     )  # implicit/dynamic resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
-    resize_ratio_h = img_shape_resized[0] / original_height
-    resize_ratio_w = img_shape_resized[1] / original_width
+    resized_img_h, resized_img_w = img_shape_resized
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
     adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
 
@@ -424,6 +450,7 @@ def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
         f"Given the input medical image{image_prompt}, "
         f"{task_prompt}"
         f"Additional information:\n"
+        f"{image_size_text}\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
         f"{FORMAT_PROMPT_1_DECIMAL_NUMBER}"
@@ -431,15 +458,15 @@ def _doc_to_text_AngleDistanceTask(doc, model_name, new_shape_hw=None):
     return question
 
 
-def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, new_shape_hw=None):
+def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, model_hf, new_shape_hw=None):
     """Convert document to text."""
+    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+        get_resized_img_shape,
+    )
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_ANGLE,
         COT_INSTRUCT_DISTANCE,
         FORMAT_PROMPT_AD_REASONING,
-    )
-    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
-        get_resized_img_shape,
     )
 
     # Import the dataset-specific module from medvision_ds.datasets
@@ -476,10 +503,10 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, new_shape_hw=None):
     img_shape = img_2d_raw.shape
 
     # Get resized image shape
-    model_info = load_model_info()
     img_shape_resized = get_resized_img_shape(
-        model_name, img_2d_raw, model_info
+        model_name, img_2d_raw, {"model_hf":model_hf}
     )  # implicit/dynamic resizing from VLM
+
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
@@ -792,12 +819,13 @@ def img_proccessor_nii2png_save2dataset(example, new_shape_hw=None):
 def _format_data_AngleDistanceTask(
     example,
     model_name,
+    model_hf, 
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
 ):
     target_str = str(_doc_to_target_AngleDistanceTask(example))
-    prompt = _doc_to_text_AngleDistanceTask(example, model_name, new_shape_hw)
+    prompt = _doc_to_text_AngleDistanceTask(example, model_name, model_hf, new_shape_hw)
 
     example["messages"] = [
         {
@@ -841,12 +869,13 @@ def _format_data_AngleDistanceTask(
 def _format_data_AngleDistanceTask_CoT(
     example,
     model_name,
+    model_hf,
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
 ):
     prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(
-        example, model_name, new_shape_hw
+        example, model_name, model_hf, new_shape_hw
     )
     target_str = _doc_to_target_AngleDistanceTask_CoT(example, values_dict)
 
@@ -888,12 +917,12 @@ def _format_data_AngleDistanceTask_CoT(
     return example
 
 
-def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
+def _doc_to_text_TumorLesionTask(doc, model_name, model_hf, new_shape_hw=None):
     """Convert document to text."""
-    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
     from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
         get_resized_img_shape,
     )
+    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_TUMOR_LESION_SIZE
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -944,18 +973,22 @@ def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
     # Get resized image shape
-    model_info = load_model_info()
     img_shape_resized = get_resized_img_shape(
-        model_name, img_2d_raw, model_info
+        model_name, img_2d_raw, {"model_hf":model_hf}
     )  # implicit/dynamic resizing from VLM
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
-    resize_ratio_h = img_shape_resized[0] / original_height
-    resize_ratio_w = img_shape_resized[1] / original_width
+    resized_img_h, resized_img_w = img_shape_resized
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
     adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} {metric_unit} (width) x {adjusted_pixel_height:.3f} {metric_unit} (height)."
 
@@ -970,6 +1003,7 @@ def _doc_to_text_TumorLesionTask(doc, model_name, new_shape_hw=None):
         f"Given the input medical image{image_prompt}, "
         f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
         f"Additional information:\n"
+        f"{image_size_text}\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
         f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1093,14 +1127,14 @@ def _get_landmarks_coords(example, landmark_keys):
     return landmark_coords
 
 
-def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
+def _doc_to_text_TumorLesionTask_CoT(doc, model_name, model_hf, new_shape_hw=None):
     """Convert document to text."""
+    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
+        get_resized_img_shape,
+    )
     from medvision_bm.sft.sft_prompts import (
         COT_INSTRUCT_TL_NORM,
         FORMAT_PROMPT_TL_REASONING,
-    )
-    from medvision_bm.medvision_lmms_eval.lmms_eval.tasks.medvision.medvision_utils import (
-        get_resized_img_shape,
     )
 
     # Import the dataset-specific module from medvision_ds.datasets
@@ -1152,9 +1186,8 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, new_shape_hw=None):
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
     # Get resized image shape
-    model_info = load_model_info()
     img_shape_resized = get_resized_img_shape(
-        model_name, img_2d_raw, model_info
+        model_name, img_2d_raw, {"model_hf":model_hf}
     )  # implicit resizing from VLM
 
     # Adjust pixel size based on the resize ratio
@@ -1282,13 +1315,14 @@ def _doc_to_target_TumorLesionTask_CoT(values_dict):
 def _format_data_TumorLesionTask(
     example,
     model_name,
+    model_hf,
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
 ):
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
-    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name, new_shape_hw)
+    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name, model_hf, new_shape_hw)
 
     example["messages"] = [
         {
@@ -1332,6 +1366,7 @@ def _format_data_TumorLesionTask(
 def _format_data_TumorLesionTask_CoT(
     example,
     model_name,
+    model_hf,
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
@@ -1343,7 +1378,7 @@ def _format_data_TumorLesionTask_CoT(
     2. Returns a target string that includes reasoning steps.
     """
     prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(
-        example, model_name, new_shape_hw
+        example, model_name, model_hf, new_shape_hw
     )
     target_str = _doc_to_target_TumorLesionTask_CoT(values_dict)
 
@@ -1427,6 +1462,60 @@ def _doc_to_text_DetectionTask(doc):
         f"{FORMAT_PROMPT_BOX_COORDINATES}"
     )
     return question
+
+
+def _doc_to_text_DetectionTask_CoT(doc):
+    """Convert document to text."""
+    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_BOX_COORDINATES
+
+    # Import the dataset-specific module from medvision_ds.datasets
+    dataset_name = doc["dataset_name"]
+    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
+    if dataset_module is None:
+        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
+    preprocess_detection = importlib.import_module(
+        f"medvision_ds.datasets.{dataset_module}.preprocess_detection"
+    )
+
+    # Get task infoG
+    taskID = doc["taskID"]
+    bm_plan = preprocess_detection.benchmark_plan
+    task_info = bm_plan["tasks"][int(taskID) - 1]
+    # Get label info
+    label = str(doc["label"])
+    labels_map = task_info["labels_map"]
+    if label not in labels_map:
+        raise ValueError(f"Label {label} not found in labels_map.")
+    else:
+        label_name = labels_map.get(label)
+    # Get image info
+    image_description = task_info["image_description"]
+
+    if image_description != "" and image_description is not None:
+        image_prompt = ": " + image_description
+    else:
+        image_prompt = ""
+
+    # Question
+    question = (
+        f"Task:\n"
+        f"Given the input medical image{image_prompt}, "
+        f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
+        f"Format requirement:\n"
+        f"{FORMAT_PROMPT_BOX_COORDINATES}"
+    )
+
+    # Prepare values_dict
+    # NOTE: the keys must be in the COT_TEMPLATE_DETECTION from medvision_bm.sft.sft_prompts
+    coor0_w, coor0_h, coor1_w, coor1_h = _doc_to_target_DetectionTask(doc)
+    values_dict = {
+        "<label_name>": label_name,
+        "<coor0_w>": f"{coor0_w:.3f}",
+        "<coor0_h>": f"{coor0_h:.3f}",
+        "<coor1_w>": f"{coor1_w:.3f}",
+        "<coor1_h>": f"{coor1_h:.3f}",
+    }
+    return question, values_dict
 
 
 def _doc_to_target_DetectionTask(doc):
@@ -1524,12 +1613,19 @@ def _doc_to_target_DetectionTask(doc):
     return [coor0_w, coor0_h, coor1_w, coor1_h]
 
 
-# NOTE: img_processor and reshape_size are not used for detection task, but kept for API consistency
-# TODO: testing removing img_processor and reshape_size
+def _doc_to_target_DetectionTask_CoT(values_dict):
+    from medvision_bm.sft.sft_prompts import COT_TEMPLATE_DETECTION
+
+    # Prepare values to fill in the CoT template
+    target_outputs_cot = fill_in_template(COT_TEMPLATE_DETECTION, values_dict)
+
+    return target_outputs_cot
+
+
+# NOTE: model_name is not used, but must be kept for consistent function signature -- check usage in prepare_dataset()
 def _format_data_DetectionTask(
     example,
-    img_processor=None,
-    reshape_size=None,
+    model_name=None,
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
@@ -1578,14 +1674,65 @@ def _format_data_DetectionTask(
     return example
 
 
-def _format_data_DetectionTask_CoT():
-    raise NotImplementedError(
-        "CoT formatting for DetectionTask is not implemented yet. "
-        "Please use the non-CoT version for now."
-    )
+# NOTE: model_name is not used, but must be kept for consistent function signature -- check usage in prepare_dataset()
+def _format_data_DetectionTask_CoT(
+    example,
+    model_name=None,
+    process_img=False,
+    save_processed_img_to_disk=False,
+    new_shape_hw=None,
+):
+    # Since reshaping does not affect relative coordinates, we do not pass new_shape_hw to _doc_to_text_DetectionTask()
+    prompt, values_dict = _doc_to_text_DetectionTask_CoT(example)
+    target_str = _doc_to_target_DetectionTask_CoT(values_dict)
+
+    example["messages"] = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                },
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+            ],
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": target_str,
+                },
+            ],
+        },
+    ]
+
+    # [Not recommended] Save processed images to dataset, making the cached dataset very large
+    if process_img:
+        example["processed_images"] = img_proccessor_nii2png_save2dataset(
+            example, new_shape_hw
+        )
+
+    # [Recommended] Save processed images to PNG files on disk
+    if save_processed_img_to_disk:
+        example["image_file_png"] = img_proccessor_nii2png_save2disk(
+            example, new_shape_hw
+        )
+
+    return example
 
 
-def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None, download_mode="reuse_dataset_if_exists"):
+def _load_single_dataset(
+    dataset_hf_id,
+    dataset_name,
+    config,
+    split,
+    limit=None,
+    download_mode="reuse_dataset_if_exists",
+):
     """
     Load a single dataset configuration with improved error handling.
 
@@ -1615,7 +1762,7 @@ def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None,
                     trust_remote_code=True,
                     split=split,
                     streaming=False,
-                    download_mode=download_mode, 
+                    download_mode=download_mode,
                 )
                 if limit is not None and limit > 0 and len(ds) > limit:
                     ds = ds.select(range(limit))
@@ -1629,11 +1776,6 @@ def _load_single_dataset(dataset_hf_id, dataset_name, config, split, limit=None,
                     time.sleep(wait_time)
                 else:
                     raise
-        
-        # TODO: This part can be removed since we have dataset_name in each example doc
-        # # Add dataset_name column for tracking
-        # if dataset_name is not None:
-        #     ds = ds.add_column("dataset_name", [dataset_name] * len(ds))
 
         print(
             f"\n[Info] Successfully loaded {len(ds)} samples from config {config} (dataset: {dataset_name})"
@@ -1988,6 +2130,7 @@ def prepare_dataset(
     limit_val_sample,
     mapping_func,
     model_family_name,
+    base_model_hf,
     num_workers_concat_datasets=4,
     num_workers_format_dataset=32,
     tag_ds=None,
@@ -2009,6 +2152,7 @@ def prepare_dataset(
     # Format dataset
     mapping_func_args = {
         "model_name": model_family_name,
+        "model_hf": base_model_hf,
         "process_img": process_img,
         "save_processed_img_to_disk": save_processed_img_to_disk,
         "new_shape_hw": new_shape_hw,
@@ -2104,14 +2248,43 @@ def prepare_trainer(
     gradient_checkpointing=False,
     dataloader_pin_memory=True,
     push_LoRA=False,
+    enable_temperature_sampler=False,
+    temperature_sampler_T=3.0,
+    temperature_sampler_task_column="__task_name",
+    temperature_sampler_num_samples=-1,
 ):
-    from peft import LoraConfig 
+    from peft import LoraConfig
     from transformers import (
         AutoModelForImageTextToText,
         AutoProcessor,
         BitsAndBytesConfig,
     )
     from trl import SFTConfig, SFTTrainer
+
+    # NOTE: We override only the train sampler behavior while keeping SFTTrainer unchanged.
+    # This keeps compatibility with existing trainer setup/checkpoint logic.
+    class TemperatureSamplerSFTTrainer(SFTTrainer):
+        """SFTTrainer variant that uses temperature-based weighted sampling."""
+
+        def __init__(
+            self,
+            *args,
+            sample_weights,
+            num_samples,
+            **kwargs,
+        ):
+            super().__init__(*args, **kwargs)
+            self._temperature_sample_weights = sample_weights
+            self._temperature_num_samples = num_samples
+
+        def _get_train_sampler(self):
+            # replacement=True is required so minority-task samples can be drawn more often
+            # than their raw cardinality in one epoch.
+            return WeightedRandomSampler(
+                weights=self._temperature_sample_weights,
+                num_samples=self._temperature_num_samples,
+                replacement=True,
+            )
 
     # Check if GPU supports bfloat16
     if torch.cuda.get_device_capability()[0] < 8:
@@ -2210,7 +2383,7 @@ def prepare_trainer(
         dataloader_persistent_workers=False,
     )
 
-    trainer = SFTTrainer(
+    trainer_kwargs = dict(
         model=model,
         args=args,
         train_dataset=data["train"],
@@ -2219,6 +2392,79 @@ def prepare_trainer(
         processing_class=processor,
         data_collator=make_collate_fn(processor),
     )
+
+    # Temperature sampler path (optional): rebalance multi-task sampling by sampling tasks
+    # according to p(task) ~ count(task)^(1/T) instead of raw dataset proportion.
+    if enable_temperature_sampler:
+        if temperature_sampler_T <= 0:
+            raise ValueError("temperature_sampler_T must be > 0.")
+
+        train_dataset = data["train"]
+        # The train scripts add this column when preparing datasets.
+        # It is required to group examples by task and compute per-task counts.
+        if temperature_sampler_task_column not in train_dataset.column_names:
+            raise ValueError(
+                f"Temperature sampler requires column '{temperature_sampler_task_column}' in train dataset. "
+                "Regenerate prepared dataset with task labels or disable temperature sampler."
+            )
+
+        task_labels = train_dataset[temperature_sampler_task_column]
+        task_counts = defaultdict(int)
+        for task_label in task_labels:
+            task_counts[str(task_label)] += 1
+
+        if len(task_counts) <= 1:
+            # With a single task there is nothing to rebalance; use default trainer path.
+            safe_print(
+                "[Info] Temperature sampler enabled but only one task found; falling back to standard sampling."
+            )
+            trainer = SFTTrainer(**trainer_kwargs)
+            return trainer
+
+        count_tensor = torch.tensor(
+            [float(c) for c in task_counts.values()],
+            dtype=torch.float,
+        )
+        task_probs = count_tensor.pow(1.0 / float(temperature_sampler_T))
+        task_probs = task_probs / task_probs.sum()
+
+        # Per-sample weight for examples in task i:
+        #   weight_i = p(task_i) / count(task_i)
+        # This guarantees task-level sampling probability follows task_probs.
+        weight_per_task = {
+            task_name: float(task_probs[idx] / count_tensor[idx])
+            for idx, task_name in enumerate(task_counts.keys())
+        }
+        sample_weights = torch.DoubleTensor(
+            [weight_per_task[str(task_label)] for task_label in task_labels]
+        )
+
+        # Number of draws per epoch. Default (<=0) keeps the previous epoch length,
+        # while still changing the task composition within each epoch.
+        num_samples = (
+            len(train_dataset)
+            if temperature_sampler_num_samples is None
+            or int(temperature_sampler_num_samples) <= 0
+            else int(temperature_sampler_num_samples)
+        )
+
+        safe_print(
+            f"[Info] Using temperature sampler (T={temperature_sampler_T}) with task counts: {dict(task_counts)}"
+        )
+        safe_print(
+            f"[Info] Temperature-sampled per-task probabilities: "
+            f"{ {k: round(float(task_probs[i]), 6) for i, k in enumerate(task_counts.keys())} }"
+        )
+        safe_print(f"[Info] Temperature sampler num_samples per epoch: {num_samples}")
+
+        trainer = TemperatureSamplerSFTTrainer(
+            sample_weights=sample_weights,
+            num_samples=num_samples,
+            **trainer_kwargs,
+        )
+    else:
+        trainer = SFTTrainer(**trainer_kwargs)
+
     return trainer
 
 
@@ -2676,15 +2922,64 @@ def parse_args_multiTask():
         default=True,
         help="Pin memory for faster GPU transfer",
     )
+    parser.add_argument(
+        "--enable_temperature_sampler",
+        type=str2bool,
+        default=False,
+        # When enabled, prepare_trainer() switches to TemperatureSamplerSFTTrainer.
+        help="Enable temperature-based weighted random sampling across tasks.",
+    )
+    parser.add_argument(
+        "--temperature_sampler_T",
+        type=float,
+        default=3.0,
+        # T=1 means proportional to counts; larger T flattens task probabilities.
+        help="Temperature T for task sampling probabilities: p(task) ~ count^(1/T).",
+    )
+    parser.add_argument(
+        "--temperature_sampler_task_column",
+        type=str,
+        default="__task_name",
+        # This column is injected in train__SFT*.py when concatenating per-task datasets.
+        help="Column name in prepared train dataset that stores task labels for weighted sampling.",
+    )
+    parser.add_argument(
+        "--temperature_sampler_num_samples",
+        type=int,
+        default=-1,
+        # <=0 uses len(train_dataset), matching default epoch length semantics.
+        help="Number of drawn samples per epoch when temperature sampler is enabled. <=0 means len(train_dataset).",
+    )
     args = parser.parse_args()
     return args
+
+
+def check_model_supported(model_name):
+    from lmms_eval.models import get_available_model_names
+
+    supported_models = get_available_model_names()
+
+    # Accept both "vllm_<name>" and "<name>" inputs.
+    clean_models = []
+    for supported_model in supported_models:
+        if supported_model.startswith("vllm_"):
+            # Use removeprefix if on Python 3.9+
+            clean_model_name = supported_model.removeprefix("vllm_")
+            clean_models.append(clean_model_name)
+    supported_models.extend(clean_models)
+
+    if model_name not in supported_models:
+        raise ValueError(
+            f"\n [Error] Model '{model_name}' is not supported. "
+            f"Supported models are: {supported_models}"
+        )
 
 
 def parse_validate_args_multiTask():
     args = parse_args_multiTask()
 
     # Validate model family name
-    check_model_supported(args.model_family_name)
+    check_model_supported(args.model_family_name) 
 
     # Arguments
     # ------------------------------------------------------------
