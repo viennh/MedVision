@@ -1115,10 +1115,15 @@ def _process_img_gemma3(img_2d_raw, extra_kwargs):
 
 def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
     # NOTE: The model_name is the same as the key in AVAILABLE_MODELS. If you add new models, the strings in the if conditions below should be consistent with the keys in AVAILABLE_MODELS.
+    # NOTE: When this function get_resized_img_shape() is not used in the MedVision benchmark, for example, if it is used for SFT model training,
+    # the model_name could be different from AVAILABLE_MODELS. For example, we use the model name "vllm_qwen25vl" to refer to the 
+    # vllm inference backend of Qwen2.5VL in the MedVision benchmark. While in SFT code, maybe sometimes we use "qwen25vl" as "model_family_name" 
+    # -- check the usage of model_family_name in medvision_bm.sft.sft_utils for more details
+
     # Get reshaped image size so that we can adjust the pixel size dynamically
-    if model_name == "qwen3vl":
+    if model_name == "qwen3vl" or "vllm_qwen3vl":
         img_shape_resized_hw = _process_img_qwen3vl(img_2d_raw, extra_kwargs) 
-    elif model_name == "vllm_qwen25vl":
+    elif model_name == "vllm_qwen25vl" or "qwen25vl":
         # NOTE: Qwen2.5-VL resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
@@ -1128,18 +1133,18 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # Preprocessor config: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
         img_shape_resized_hw = _process_img_lingshu(img_2d_raw, extra_kwargs)
-    elif model_name == "vllm_llama_3_2_vision":
+    elif model_name == "vllm_llama_3_2_vision" or "llama_3_2_vision":
         # NOTE: Llama-3.2-Vision dynamically resize the image to a shape that can fit in patches of size [560, 560].
         # Preprocessor config: https://huggingface.co/meta-llama/Llama-3.2-11B-Vision-Instruct/blob/main/preprocessor_config.json
         # Image processor - MllamaImageProcessor: https://github.com/huggingface/transformers/blob/main/src/transformers/models/mllama/image_processing_mllama.py#L536
         img_shape_resized_hw = _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs)
-    elif model_name == "vllm_llava_onevision":
+    elif model_name == "vllm_llava_onevision" or "llava_onevision":
         # NOTE: Llava-OneVision dynamically resize the image to a shape that can fit in patches of size [384,384]
         # NOTE: The current probing method only work for single image input, as padding is enabled for multiple image inputs
         # Preprocessor config: https://huggingface.co/llava-hf/llava-onevision-qwen2-72b-ov-hf/blob/main/preprocessor_config.json
         # Image processor - LlavaOnevisionImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/llava_onevision/image_processing_llava_onevision.py#L108
         img_shape_resized_hw = _process_img_llavaonevision(img_2d_raw, extra_kwargs)
-    elif model_name == "vllm_gemma3":
+    elif model_name == "vllm_gemma3" or "gemma3":
         # NOTE: HealthGPT resize images to a fixed size [896, 896]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/google/gemma-3-27b-it/blob/main/preprocessor_config.json
         # Image processor - Gemma3ImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/gemma3/image_processing_gemma3.py#L53
@@ -1161,7 +1166,7 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # Check the fixed size in the model config: https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json
         img_shape_resized_hw = [336, 336]
         # img_shape_resized_hw = _process_img_llavamed(img_2d_raw, extra_kwargs) # for debugging only
-    elif model_name == "vllm_internvl3":
+    elif model_name == "vllm_internvl3" or "internvl3":
         # NOTE: InternVL3 resizes images to a fixed size [448, 448]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/OpenGVLab/InternVL3-38B/blob/main/preprocessor_config.json
         # Image processor - CLIPImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/clip/image_processing_clip.py#L54
@@ -1177,6 +1182,8 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # NOTE: HealthGPT resize images to a fixed size [336, 336]. We used this size for pixel size adjustment.
         img_shape_resized_hw = [336, 336]
         # img_shape_resized_hw = _process_img_healthgpt_L14(img_2d_raw, extra_kwargs)  # for debugging only
+    else:
+        raise ValueError("[Error] {model_name} is not recognised/supported.")
     return img_shape_resized_hw
 
 
@@ -1205,6 +1212,7 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         slice_idx = doc["slice_idx"]
 
         # Load 2D slice from NIfTI file, with optional resizing
+        # NOTE: reshape_image_hw is the shape of input image
         reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
         if reshape_image_hw is not None:
             pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
@@ -1230,16 +1238,23 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1254,6 +1269,7 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
             f"Given the input medical image{image_prompt}, "
             f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
             f"Additional information:\n"
+            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1305,16 +1321,23 @@ def doc_to_text_TumorLesionSize_woMedImg(doc, lmms_eval_specific_kwargs=None):
     # -------------
     # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
     # -------------
+    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
     model_name = lmms_eval_specific_kwargs.get("model_name")
     img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape_hw
     pixel_height, pixel_width = pixel_size_hw
-    resize_ratio_h = img_shape_resized_hw[0] / original_height
-    resize_ratio_w = img_shape_resized_hw[1] / original_width
+    resized_img_h, resized_img_w = img_shape_resized_hw
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
     adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
     # -------------
@@ -1324,6 +1347,7 @@ def doc_to_text_TumorLesionSize_woMedImg(doc, lmms_eval_specific_kwargs=None):
         f"Task:\n"
         f"Estimate the major and minor axis lengths of the ellipse enclosing the highlighted region, in {metric_unit}.\n"
         f"Additional information:\n"
+        f"{image_size_text}\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
         f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1381,16 +1405,23 @@ def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module)
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1405,6 +1436,7 @@ def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module)
             f"Given the input medical image{image_prompt}, and the two lines indicating the major and minor axes of the ellipse enclosing the {label_name}, "
             f"estimate the major and minor axis lengths in {metric_unit}.\n"
             f"Additional information:\n"
+            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1456,16 +1488,23 @@ def doc_to_text_TumorLesionSize_wVisualPrompt_woMedImg(doc, lmms_eval_specific_k
     # -------------
     # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
     # -------------
+    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
     model_name = lmms_eval_specific_kwargs.get("model_name")
     img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape_hw
     pixel_height, pixel_width = pixel_size_hw
-    resize_ratio_h = img_shape_resized_hw[0] / original_height
-    resize_ratio_w = img_shape_resized_hw[1] / original_width
+    resized_img_h, resized_img_w = img_shape_resized_hw
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
     adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
     # -------------
@@ -1476,6 +1515,7 @@ def doc_to_text_TumorLesionSize_wVisualPrompt_woMedImg(doc, lmms_eval_specific_k
         f"Given the two lines indicating the major and minor axes of the ellipse enclosing the highlighted region, "
         f"estimate the major and minor axis lengths in {metric_unit}.\n"
         f"Additional information:\n"
+        f"{image_size_text}\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
         f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1535,19 +1575,22 @@ def create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry_module
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
@@ -1629,19 +1672,22 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
@@ -1706,16 +1752,23 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1730,6 +1783,7 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
             f"Given the input medical image{image_prompt}, "
             f"estimate the physical size of the {label_name} in square millimeters.\n"
             f"Additional information:\n"
+            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_MASK_SIZE}"
@@ -1775,19 +1829,26 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-        # -------------
+        # ------------- 
 
         # Question
         if image_description != "" and image_description is not None:
@@ -1799,6 +1860,7 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
             f"Given the input medical image{image_prompt}, and the segmentation mask of the {label_name}, "
             f"estimate the physical size of the mask in square millimeters.\n"
             f"Additional information:\n"
+            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_MASK_SIZE}"
@@ -1836,16 +1898,23 @@ def doc_to_text_MaskSize_wMask_woMedImg(doc, lmms_eval_specific_kwargs=None):
     # -------------
     # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
     # -------------
+    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
     model_name = lmms_eval_specific_kwargs.get("model_name")
     img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape_hw
     pixel_height, pixel_width = pixel_size_hw
-    resize_ratio_h = img_shape_resized_hw[0] / original_height
-    resize_ratio_w = img_shape_resized_hw[1] / original_width
+    resized_img_h, resized_img_w = img_shape_resized_hw
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
     adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
     # -------------
@@ -1855,6 +1924,7 @@ def doc_to_text_MaskSize_wMask_woMedImg(doc, lmms_eval_specific_kwargs=None):
         f"Task:\n"
         f"Estimate the physical size of the highlighted region in square millimeters.\n"
         f"Additional information:\n"
+        f"{image_size_text}\n"
         f"{pixel_size_text}\n"
         f"Format requirement:\n"
         f"{FORMAT_PROMPT_MASK_SIZE}"
@@ -1914,16 +1984,23 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1972,6 +2049,7 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             f"Task:\n" 
             f"Given the input medical image{image_prompt}, {task_prompt}" 
             f"Additional information:\n" 
+            f"{image_size_text}\n"
             f"{pixel_size_text}\n" 
             f"Format requirement:\n" 
             f"{FORMAT_PROMPT_BIOMETRICS}")
@@ -2015,16 +2093,23 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
+
+        # Include image size information in the question text
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -2078,7 +2163,14 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
                 f"estimate the angle between the two lines in {metric_unit}.\n"
             )
 
-        question = f"{task_description}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
+        question = (
+            f"{task_description}" 
+            f"Additional information:\n" 
+            f"{image_size_text}\n"
+            f"{pixel_size_text}\n" 
+            f"Format requirement:\n" 
+            f"{FORMAT_PROMPT_BIOMETRICS}"
+            )
         return question
 
     return doc_to_text_BiometricsFromLandmarks_wVisualPrompt
@@ -2117,16 +2209,23 @@ def doc_to_text_BiometricsFromLandmarks_wVisualPrompt_woMedImg(doc, lmms_eval_sp
     # -------------
     # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
     # -------------
+    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
     model_name = lmms_eval_specific_kwargs.get("model_name")
     img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape_hw
     pixel_height, pixel_width = pixel_size_hw
-    resize_ratio_h = img_shape_resized_hw[0] / original_height
-    resize_ratio_w = img_shape_resized_hw[1] / original_width
+    resized_img_h, resized_img_w = img_shape_resized_hw
+    resize_ratio_h = resized_img_h / original_height
+    resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
     adjusted_pixel_width = pixel_width / resize_ratio_w
+
+    # Include image size information in the question text
+    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+
     # Include pixel size information in question text
     pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
     # -------------
@@ -2148,6 +2247,7 @@ def doc_to_text_BiometricsFromLandmarks_wVisualPrompt_woMedImg(doc, lmms_eval_sp
     question = (
         f"{task_description}" 
         f"Additional information:\n" 
+        f"{image_size_text}\n"
         f"{pixel_size_text}\n" 
         f"Format requirement:\n" 
         f"{FORMAT_PROMPT_BIOMETRICS}"
@@ -2192,19 +2292,22 @@ def create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(preprocess_biometr
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
@@ -2317,23 +2420,26 @@ def create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
+        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
+        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
         model_name = lmms_eval_specific_kwargs.get("model_name")
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resize_ratio_h = img_shape_resized_hw[0] / original_height
-        resize_ratio_w = img_shape_resized_hw[1] / original_width
+        resized_img_h, resized_img_w = img_shape_resized_hw
+        resize_ratio_h = resized_img_h / original_height
+        resize_ratio_w = resized_img_w / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
+        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-        # -------------
+        # ------------- 
 
         # Question
         if metric_type == "distance":
