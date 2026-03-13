@@ -774,9 +774,6 @@ def _process_img_qwen25vl(img_2d_raw, extra_kwargs):
     return img_shape_resized_hw
 
 
-# NOTE: 
-# TODO:
-# to be confirmed
 def _process_img_qwen3vl(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
     model_hf = extra_kwargs["model_hf"]
@@ -1121,9 +1118,9 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
     # -- check the usage of model_family_name in medvision_bm.sft.sft_utils for more details
 
     # Get reshaped image size so that we can adjust the pixel size dynamically
-    if model_name == "qwen3vl" or "vllm_qwen3vl":
+    if model_name in ["qwen3vl", "vllm_qwen3vl"]:
         img_shape_resized_hw = _process_img_qwen3vl(img_2d_raw, extra_kwargs) 
-    elif model_name == "vllm_qwen25vl" or "qwen25vl":
+    elif model_name in ["vllm_qwen25vl", "qwen25vl"]:
         # NOTE: Qwen2.5-VL resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
@@ -1133,18 +1130,18 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # Preprocessor config: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
         img_shape_resized_hw = _process_img_lingshu(img_2d_raw, extra_kwargs)
-    elif model_name == "vllm_llama_3_2_vision" or "llama_3_2_vision":
+    elif model_name in ["vllm_llama_3_2_vision", "llama_3_2_vision"]:
         # NOTE: Llama-3.2-Vision dynamically resize the image to a shape that can fit in patches of size [560, 560].
         # Preprocessor config: https://huggingface.co/meta-llama/Llama-3.2-11B-Vision-Instruct/blob/main/preprocessor_config.json
         # Image processor - MllamaImageProcessor: https://github.com/huggingface/transformers/blob/main/src/transformers/models/mllama/image_processing_mllama.py#L536
         img_shape_resized_hw = _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs)
-    elif model_name == "vllm_llava_onevision" or "llava_onevision":
+    elif model_name in ["vllm_llava_onevision", "llava_onevision"]:
         # NOTE: Llava-OneVision dynamically resize the image to a shape that can fit in patches of size [384,384]
         # NOTE: The current probing method only work for single image input, as padding is enabled for multiple image inputs
         # Preprocessor config: https://huggingface.co/llava-hf/llava-onevision-qwen2-72b-ov-hf/blob/main/preprocessor_config.json
         # Image processor - LlavaOnevisionImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/llava_onevision/image_processing_llava_onevision.py#L108
         img_shape_resized_hw = _process_img_llavaonevision(img_2d_raw, extra_kwargs)
-    elif model_name == "vllm_gemma3" or "gemma3":
+    elif model_name in ["vllm_gemma3", "gemma3"]:
         # NOTE: HealthGPT resize images to a fixed size [896, 896]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/google/gemma-3-27b-it/blob/main/preprocessor_config.json
         # Image processor - Gemma3ImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/gemma3/image_processing_gemma3.py#L53
@@ -1166,7 +1163,7 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # Check the fixed size in the model config: https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json
         img_shape_resized_hw = [336, 336]
         # img_shape_resized_hw = _process_img_llavamed(img_2d_raw, extra_kwargs) # for debugging only
-    elif model_name == "vllm_internvl3" or "internvl3":
+    elif model_name in ["vllm_internvl3", "internvl3"]:
         # NOTE: InternVL3 resizes images to a fixed size [448, 448]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/OpenGVLab/InternVL3-38B/blob/main/preprocessor_config.json
         # Image processor - CLIPImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/clip/image_processing_clip.py#L54
@@ -1183,7 +1180,7 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         img_shape_resized_hw = [336, 336]
         # img_shape_resized_hw = _process_img_healthgpt_L14(img_2d_raw, extra_kwargs)  # for debugging only
     else:
-        raise ValueError("[Error] {model_name} is not recognised/supported.")
+        raise ValueError(f"[Error] {model_name} is not recognised/supported.")
     return img_shape_resized_hw
 
 
