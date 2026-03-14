@@ -1117,6 +1117,8 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
     # vllm inference backend of Qwen2.5VL in the MedVision benchmark. While in SFT code, maybe sometimes we use "qwen25vl" as "model_family_name" 
     # -- check the usage of model_family_name in medvision_bm.sft.sft_utils for more details
 
+    assert model_name is not None, "[Error] model_name cannot be None. Please provide a valid model_name to get_resized_img_shape()."
+
     # Get reshaped image size so that we can adjust the pixel size dynamically
     if model_name in ["qwen3vl", "vllm_qwen3vl"]:
         img_shape_resized_hw = _process_img_qwen3vl(img_2d_raw, extra_kwargs) 

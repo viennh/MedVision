@@ -1674,10 +1674,11 @@ def _format_data_DetectionTask(
     return example
 
 
-# NOTE: model_name is not used, but must be kept for consistent function signature -- check usage in prepare_dataset()
+# NOTE: model_name and model_hf is not used, but must be kept for consistent function signature -- check usage in prepare_dataset()
 def _format_data_DetectionTask_CoT(
     example,
     model_name=None,
+    model_hf=None,
     process_img=False,
     save_processed_img_to_disk=False,
     new_shape_hw=None,
