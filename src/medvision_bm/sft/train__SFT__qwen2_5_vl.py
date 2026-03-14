@@ -242,21 +242,37 @@ def main(
                 # Limit the total number of samples if specified
                 train_limit = kwargs.get("train_sample_limit")
                 if train_limit > 0:
-                    dataset["train"] = (
-                        dataset["train"]
-                        .shuffle(seed=SEED)
-                        .select(range(min(len(dataset["train"]), train_limit)))
-                    )
+                    train_size = len(dataset["train"])
+                    if train_limit > train_size:
+                        # Allow sampling with replacement if limit exceeds dataset size
+                        import numpy as np
+                        np.random.seed(SEED)
+                        indices = np.random.choice(train_size, size=train_limit, replace=True)
+                        dataset["train"] = dataset["train"].select(indices)
+                    else:
+                        dataset["train"] = (
+                            dataset["train"]
+                            .shuffle(seed=SEED)
+                            .select(range(train_limit))
+                        )
                 else:
                     dataset["train"] = dataset["train"].shuffle(seed=SEED)
 
                 val_limit = kwargs.get("val_sample_limit")
                 if val_limit > 0:
-                    dataset["validation"] = (
-                        dataset["validation"]
-                        .shuffle(seed=SEED)
-                        .select(range(min(len(dataset["validation"]), val_limit)))
-                    )
+                    val_size = len(dataset["validation"])
+                    if val_limit > val_size:
+                        # Allow sampling with replacement if limit exceeds dataset size
+                        import numpy as np
+                        np.random.seed(SEED)
+                        indices = np.random.choice(val_size, size=val_limit, replace=True)
+                        dataset["validation"] = dataset["validation"].select(indices)
+                    else:
+                        dataset["validation"] = (
+                            dataset["validation"]
+                            .shuffle(seed=SEED)
+                            .select(range(val_limit))
+                        )
                 else:
                     dataset["validation"] = dataset["validation"].shuffle(seed=SEED)
 

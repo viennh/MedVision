@@ -2278,7 +2278,7 @@ def prepare_trainer(
             self._temperature_sample_weights = sample_weights
             self._temperature_num_samples = num_samples
 
-        def _get_train_sampler(self):
+        def _get_train_sampler(self, *args, **kwargs):
             # replacement=True is required so minority-task samples can be drawn more often
             # than their raw cardinality in one epoch.
             return WeightedRandomSampler(

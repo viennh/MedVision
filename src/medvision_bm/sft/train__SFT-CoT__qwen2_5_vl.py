@@ -243,16 +243,41 @@ def main(
                 dataset["validation"] = concatenate_datasets(val_ds_list)
 
                 # Limit the total number of samples if specified
-                dataset["train"] = (
-                    dataset["train"]
-                    .shuffle(seed=SEED)
-                    .select(range(kwargs.get("train_sample_limit")))
-                )
-                dataset["validation"] = (
-                    dataset["validation"]
-                    .shuffle(seed=SEED)
-                    .select(range(kwargs.get("val_sample_limit")))
-                )
+                train_limit = kwargs.get("train_sample_limit")
+                if train_limit > 0:
+                    train_size = len(dataset["train"])
+                    if train_limit > train_size:
+                        # Allow sampling with replacement if limit exceeds dataset size
+                        import numpy as np
+                        np.random.seed(SEED)
+                        indices = np.random.choice(train_size, size=train_limit, replace=True)
+                        dataset["train"] = dataset["train"].select(indices)
+                    else:
+                        dataset["train"] = (
+                            dataset["train"]
+                            .shuffle(seed=SEED)
+                            .select(range(train_limit))
+                        )
+                else:
+                    dataset["train"] = dataset["train"].shuffle(seed=SEED)
+
+                val_limit = kwargs.get("val_sample_limit")
+                if val_limit > 0:
+                    val_size = len(dataset["validation"])
+                    if val_limit > val_size:
+                        # Allow sampling with replacement if limit exceeds dataset size
+                        import numpy as np
+                        np.random.seed(SEED)
+                        indices = np.random.choice(val_size, size=val_limit, replace=True)
+                        dataset["validation"] = dataset["validation"].select(indices)
+                    else:
+                        dataset["validation"] = (
+                            dataset["validation"]
+                            .shuffle(seed=SEED)
+                            .select(range(val_limit))
+                        )
+                else:
+                    dataset["validation"] = dataset["validation"].shuffle(seed=SEED)
 
                 # Save the prepared dataset to disk for other processes to load
                 os.makedirs(prepared_ds_dir, exist_ok=True)
