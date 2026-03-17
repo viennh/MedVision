@@ -1111,11 +1111,14 @@ def _process_img_gemma3(img_2d_raw, extra_kwargs):
 
 
 def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
-    # NOTE: The model_name is the same as the key in AVAILABLE_MODELS. If you add new models, the strings in the if conditions below should be consistent with the keys in AVAILABLE_MODELS.
-    # NOTE: When this function get_resized_img_shape() is not used in the MedVision benchmark, for example, if it is used for SFT model training,
+    # NOTE 1: usage in MedVision benchamrk 
+    # The model_name is the same as the key in AVAILABLE_MODELS. If you add new models, the strings in the if conditions below should be consistent with the keys in AVAILABLE_MODELS.
+    # NOTE 2: usage in SFT training 
+    # When this function get_resized_img_shape() is not used in the MedVision benchmark, for example, if it is used for SFT model training,
     # the model_name could be different from AVAILABLE_MODELS. For example, we use the model name "vllm_qwen25vl" to refer to the 
-    # vllm inference backend of Qwen2.5VL in the MedVision benchmark. While in SFT code, maybe sometimes we use "qwen25vl" as "model_family_name" 
-    # -- check the usage of model_family_name in medvision_bm.sft.sft_utils for more details
+    # vllm inference backend of Qwen2.5VL in the MedVision benchmark. While in SFT code (e.g., check the usage of model_family_name in medvision_bm.sft.sft_utils for more details), we can use "qwen25vl" as "model_family_name" 
+    # NOTE 3: TODO/Maintainance: Supported model_name is hardcoded, could be improved 
+    # For either case, the model_name should be consistent with the string used in the if conditions in this function to ensure the correct image processing method is called to get the resized image shape for pixel size adjustment. 
 
     assert model_name is not None, "[Error] model_name cannot be None. Please provide a valid model_name to get_resized_img_shape()."
 
