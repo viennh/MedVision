@@ -232,6 +232,12 @@ def parse_args():
         action="store_true",
         help="Only perform environment setup and exit.",
     )
+    parser.add_argument(
+        "--reshape_image_hw",
+        default=None,
+        type=str,
+        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
+    )
     return parser.parse_args()
 
 
@@ -300,6 +306,18 @@ def main():
             "dtype=FP16"  # ["FP16", "FP32", "BF16"]
         )
 
+        # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing
+        if args.reshape_image_hw is not None:
+            raw = args.reshape_image_hw
+            if isinstance(raw, str):
+                s = raw.strip()
+                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
+                if not (s.startswith("[") or s.startswith("(")) and "," in s:
+                    s = f"[{s}]"
+            else:
+                s = raw
+            model_args += f",reshape_image_hw={s}"
+
         batch_size = args.batch_size_per_gpu * num_processes
 
         if model_name == "HealthGPT-L14":
@@ -317,8 +335,9 @@ def main():
             output_path=os.path.join(result_dir, model_name),
         )
 
-        if rc == 0 and not args.skip_update_status:
-            update_task_status(task_status_json_path, model_name, task)
+        if rc == 0:
+            if not args.skip_update_status:
+                update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

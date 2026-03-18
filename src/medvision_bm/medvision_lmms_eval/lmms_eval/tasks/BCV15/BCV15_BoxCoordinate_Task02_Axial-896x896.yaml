@@ -1,3 +1,0 @@
-include: BCV15_BoxCoordinate_base-896x896.yaml
-task: BCV15_BoxCoordinate_Task02_Axial-896x896
-dataset_name: BCV15_BoxSize_Task02_Axial_Test

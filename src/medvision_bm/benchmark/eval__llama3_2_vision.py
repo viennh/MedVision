@@ -65,6 +65,12 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
+    parser.add_argument(
+        "--reshape_image_hw",
+        default=None,
+        type=str,
+        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
+    )
     # set max_new_tokens
     parser.add_argument(
         "--max_new_tokens",
@@ -190,6 +196,18 @@ def main():
             f"max_new_tokens={max_new_tokens}"
         )
 
+        # add reshape_image_hw to modle args if specified, with normalization to ensure correct parsing
+        if args.reshape_image_hw is not None:
+            raw = args.reshape_image_hw
+            if isinstance(raw, str):
+                s = raw.strip()
+                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
+                if not (s.startswith("[") or s.startswith("(")) and "," in s:
+                    s = f"[{s}]"
+            else:
+                s = raw
+            vllm_model_args += f",reshape_image_hw={s}"
+
         rc = run_evaluation_for_task_vllm_proxy(
             lmmseval_module="vllm_llama_3_2_vision",
             model_args=vllm_model_args,
@@ -199,8 +217,9 @@ def main():
             output_path=os.path.join(result_dir, model_name),
         )
 
-        if rc == 0 and not args.skip_update_status:
-            update_task_status(task_status_json_path, model_name, task)
+        if rc == 0:
+            if not args.skip_update_status:
+                update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

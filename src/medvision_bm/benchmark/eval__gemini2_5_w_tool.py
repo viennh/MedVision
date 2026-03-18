@@ -62,6 +62,12 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
+    parser.add_argument(
+        "--reshape_image_hw",
+        default=None,
+        type=str,
+        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
+    )
     # resource-specific arguments
     parser.add_argument(
         "--batch_size",
@@ -137,7 +143,7 @@ def main():
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements
         ensure_hf_hub_installed(hf_hub_version="0.36.0")
         install_vendored_lmms_eval(proj_dependency="gemini")
         install_medvision_ds(data_dir)
@@ -170,6 +176,18 @@ def main():
             "ignore_code=True"
         )
 
+        # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing
+        if args.reshape_image_hw is not None:
+            raw = args.reshape_image_hw
+            if isinstance(raw, str):
+                s = raw.strip()
+                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
+                if not (s.startswith("[") or s.startswith("(")) and "," in s:
+                    s = f"[{s}]"
+            else:
+                s = raw
+            model_args += f",reshape_image_hw={s}"
+
         rc = run_evaluation_for_task_API_models(
             lmmseval_module="gemini__2_5",
             model_args=model_args,
@@ -178,8 +196,9 @@ def main():
             sample_limit=sample_limit,
             output_path=os.path.join(result_dir, model_name),
         )
-        if rc == 0 and not args.skip_update_status:
-            update_task_status(task_status_json_path, model_name, task)
+        if rc == 0:
+            if not args.skip_update_status:
+                update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

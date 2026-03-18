@@ -165,6 +165,9 @@ class VLLM_Qwen25VL(lmms):
                 except json.JSONDecodeError:
                     eval_logger.warning(f"Failed to parse JSON-like string for argument '{key}': {value}")
 
+        # Remove MedVision-specific kwargs that should not be forwarded to vLLM
+        kwargs.pop("reshape_image_hw", None)
+
         # Set up vllm client
         self.client = LLM(
             model=self.model_hf,
