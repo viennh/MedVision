@@ -12,7 +12,7 @@ from medvision_bm.utils.configs import SEED
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description="Build parquet dataset for RL finetuning in Verl framework."
+        description="Build parquet dataset for MedVision Dataset."
     )
     # -- Data folder
     parser.add_argument(
@@ -245,7 +245,6 @@ def main(**kwargs):
         val_ds_list.append(dataset_TL["validation"])
         test_ds_list.append(dataset_TL["test"])
     if kwargs.get("tasks_list_json_path_detect") is not None:
-        # TODO: implement _format_data_DetectionTask_CoT_verl()
         dataset_detect = build_parquet_dataset(
             tasks_list_json_path=kwargs.get("tasks_list_json_path_detect"),
             limit_train_sample=train_limit_detect,
@@ -303,7 +302,7 @@ def main(**kwargs):
 
     # Save the dataset to Parquet format
     os.makedirs(parquet_ds_dir, exist_ok=True)
-    print(f"\nSaving the prepared Verl parquet dataset to {parquet_ds_dir} ...")
+    print(f"\nSaving the prepared parquet dataset to {parquet_ds_dir} ...")
     for split in dataset.keys():
         output_path = os.path.join(parquet_ds_dir, f"{split}.parquet")
         print(f"  - Saving {split} split to {output_path} ...")

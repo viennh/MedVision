@@ -38,28 +38,59 @@ flock "${lockfile}" bash -c '
 # NOTE: visualization requires medvision_ds and the vendored lmms_eval
 python -m medvision_bm.benchmark.install_medvision_ds --data_dir ${MedVision_DATA_DIR}
 python -m medvision_bm.benchmark.install_vendored_lmms_eval
-# Force reinstall some packages
+# Force reinstall some packages (temporary solution)
 pip install transformers==4.57.1
 
 
+# NOTE: Check medvision_bm/dataset/build_parquet_ds.py for setting sample size limit for each task
+# ---
 # Building parquet datasets
 # Detecction
-python -m medvision_bm.dataset.build_parquet_ds --parquet_ds_dir ${dir_parquet}/medvision_Detection --tasks_list_json_path_detect ${dir_medvision}/tasks_list/tasks_MedVision-detect__train_SFT.json --num_workers_concat_datasets 1
+python -m medvision_bm.dataset.build_parquet_ds \
+--parquet_ds_dir ${dir_parquet}/medvision_Detection \
+--tasks_list_json_path_detect ${dir_medvision}/tasks_list/tasks_MedVision-detect__train_SFT.json \
+--num_workers_concat_datasets 1
 
 # AD
-python -m medvision_bm.dataset.build_parquet_ds --parquet_ds_dir ${dir_parquet}/medvision_AD --tasks_list_json_path_AD ${dir_medvision}/tasks_list/tasks_MedVision-AD__train_SFT.json --num_workers_concat_datasets 1
+python -m medvision_bm.dataset.build_parquet_ds \
+--parquet_ds_dir ${dir_parquet}/medvision_AD \
+--tasks_list_json_path_AD ${dir_medvision}/tasks_list/tasks_MedVision-AD__train_SFT.json \
+--num_workers_concat_datasets 1
 
 # TL
-python -m medvision_bm.dataset.build_parquet_ds --parquet_ds_dir ${dir_parquet}/medvision_TL --tasks_list_json_path_TL ${dir_medvision}/tasks_list/tasks_MedVision-TL__train_SFT.json --num_workers_concat_datasets 1
+python -m medvision_bm.dataset.build_parquet_ds \
+--parquet_ds_dir ${dir_parquet}/medvision_TL \
+--tasks_list_json_path_TL ${dir_medvision}/tasks_list/tasks_MedVision-TL__train_SFT.json \
+--num_workers_concat_datasets 1
+# ---
 
 
 # Visualization
+# ---
 # Detection
-python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_Detection/test.parquet --fig_dir ${dir_figure}/Fig-Detection --num_samples 100 --task_type Detection
+python -m medvision_bm.dataset.visualize_samples \
+--parquet_ds_path ${dir_parquet}/medvision_Detection/test.parquet \
+--fig_dir ${dir_figure}/Fig-Detection \
+--num_samples 100 \
+--task_type Detection
 
 # Angle & Distance
-python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet --fig_dir ${dir_figure}/Fig-AD-Angle --num_samples 100 --task_type Angle
-python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet --fig_dir ${dir_figure}/Fig-AD-Distance --num_samples 100 --task_type Distance
+python -m medvision_bm.dataset.visualize_samples \
+--parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet \
+--fig_dir ${dir_figure}/Fig-AD-Angle \
+--num_samples 100 \
+--task_type Angle
+
+python -m medvision_bm.dataset.visualize_samples \
+--parquet_ds_path ${dir_parquet}/medvision_AD/test.parquet \
+--fig_dir ${dir_figure}/Fig-AD-Distance \
+--num_samples 100 \
+--task_type Distance
 
 # Tumor/Lesion size
-python -m medvision_bm.dataset.visualize_samples --parquet_ds_path ${dir_parquet}/medvision_TL/test.parquet --fig_dir ${dir_figure}/Fig-TL --num_samples 100 --task_type TL
+python -m medvision_bm.dataset.visualize_samples \
+--parquet_ds_path ${dir_parquet}/medvision_TL/test.parquet \
+--fig_dir ${dir_figure}/Fig-TL \
+--num_samples 100 \
+--task_type TL
+# ---
