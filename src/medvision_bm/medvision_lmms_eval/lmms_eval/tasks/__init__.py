@@ -28,11 +28,13 @@ class TaskManager:
         include_path: Optional[Union[str, List]] = None,
         include_defaults: bool = True,
         model_name: Optional[str] = None,
+        model_hf: Optional[str] = None,
     ) -> None:
         self.verbosity = verbosity
         self.include_path = include_path
         self.logger = eval_logger
         self.model_name = model_name
+        self.model_hf = model_hf
 
         self._task_index = self.initialize_tasks(include_path=include_path, include_defaults=include_defaults)
         self._all_tasks = sorted(list(self._task_index.keys()))
@@ -256,7 +258,7 @@ class TaskManager:
                     # very scuffed: set task name here. TODO: fixme?
                     task_object.config.task = config["task"]
             else:
-                task_object = ConfigurableTask(config=config, model_name=self.model_name)
+                task_object = ConfigurableTask(config=config, model_name=self.model_name, model_hf=self.model_hf)
 
             return {task: task_object}
 

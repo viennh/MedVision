@@ -123,8 +123,38 @@ def simple_parse_args_string(args_string):
     args_string = args_string.strip()
     if not args_string:
         return {}
-    arg_list = [arg for arg in args_string.split(",") if arg]
-    args_dict = {k: handle_arg_string(v) for k, v in [arg.split("=") for arg in arg_list]}
+
+    # Split on commas that are not inside brackets/parentheses/braces
+    def _split_top_level_commas(s: str):
+        parts = []
+        cur = []
+        depth = 0
+        pairs = {"[": "]", "(": ")", "{": "}"}
+        opening = set(pairs.keys())
+        closing = set(pairs.values())
+        for ch in s:
+            if ch in opening:
+                depth += 1
+            elif ch in closing:
+                depth = max(depth - 1, 0)
+
+            if ch == "," and depth == 0:
+                part = "".join(cur).strip()
+                if part:
+                    parts.append(part)
+                cur = []
+            else:
+                cur.append(ch)
+
+        last = "".join(cur).strip()
+        if last:
+            parts.append(last)
+        return parts
+
+    arg_list = [arg for arg in _split_top_level_commas(args_string) if arg]
+    # split only on the first '=' to allow '=' inside values
+    kvs = [arg.split("=", 1) for arg in arg_list]
+    args_dict = {k: handle_arg_string(v) for k, v in kvs}
     return args_dict
 
 

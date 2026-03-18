@@ -682,6 +682,7 @@ class ConfigurableTask(Task):
         download_mode=None,
         config: Optional[dict] = None,
         model_name: Optional[str] = None,
+        model_hf: Optional[str] = None,
     ) -> None:  # TODO no super() call here
         # Get pre-configured attributes
         self._config = self.CONFIG
@@ -702,6 +703,7 @@ class ConfigurableTask(Task):
                 self.VERSION = self.config.metadata["version"]
 
         self.model_name = model_name
+        self.model_hf = model_hf
         self._prepare_model_specific_config()
 
         if self.config.output_type is not None:
@@ -799,8 +801,12 @@ class ConfigurableTask(Task):
                 
             if "model_name" not in self.lmms_eval_specific_kwargs:
                 self.lmms_eval_specific_kwargs["model_name"] = self.model_name
+            if "model_hf" not in self.lmms_eval_specific_kwargs and self.model_hf is not None:
+                self.lmms_eval_specific_kwargs["model_hf"] = self.model_hf
         else:
             self.lmms_eval_specific_kwargs = {"model_name": self.model_name}
+            if self.model_hf is not None:
+                self.lmms_eval_specific_kwargs["model_hf"] = self.model_hf
 
 
         self.model_specific_target_kwargs = self.config.model_specific_target_kwargs

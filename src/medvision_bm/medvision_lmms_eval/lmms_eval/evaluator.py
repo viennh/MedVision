@@ -1,9 +1,11 @@
+import ast
 import collections
 import inspect
 import itertools
 import json
 import os
 import random
+import re
 import sys
 import time
 from collections import defaultdict
@@ -164,8 +166,16 @@ def simple_evaluate(
     if model_args is None:
         model_args = ""
 
+    # Parse model_hf early so it can be injected into lmms_eval_specific_kwargs
+    # during task initialization (ConfigurableTask.__init__ calls doc_to_text which
+    # may need model_hf to compute resized image shapes for prompt generation).
+    _early_parsed = simple_parse_args_string(model_args) if model_args else {}
+    _early_model_hf = _early_parsed.get("model_hf", None)
+
     if task_manager is None:
-        task_manager = TaskManager(verbosity, model_name=model)
+        task_manager = TaskManager(verbosity, model_name=model, model_hf=_early_model_hf)
+    elif _early_model_hf is not None and getattr(task_manager, "model_hf", None) is None:
+        task_manager.model_hf = _early_model_hf
 
     task_dict = get_task_dict(tasks, task_manager)
 
@@ -376,9 +386,39 @@ def evaluate(
         if not all("bypass" not in getattr(task_output.task, "_metric_fn_list", {}).keys() for task_output in eval_tasks):
             raise ValueError("log_samples must be True for 'bypass' metric-only tasks")
 
-    # Extract model info from cli_args
+    # Extract model info from cli_args.model_args
+    # ---
     _parsed_model_args = simple_parse_args_string(cli_args.model_args) if cli_args is not None and hasattr(cli_args, "model_args") and cli_args.model_args else {}
     _model_arg_model_hf = _parsed_model_args.get("model_hf", None)
+
+    # Parse reshape_image_hw from cli_args.model_args if provided. Accept formats like:
+    # - a Python list/tuple string: "[896,896]" or "(896,896)"
+    # - single integer: "896" -> interpreted as [896,896]
+    _model_arg_reshape_image_hw = _parsed_model_args.get("reshape_image_hw", None)
+    if _model_arg_reshape_image_hw is not None:
+        try:
+            raw = _model_arg_reshape_image_hw
+            if isinstance(raw, (list, tuple)):
+                _reshape_image_hw = [int(raw[0]), int(raw[1])] if len(raw) >= 2 else [int(raw[0]), int(raw[0])]
+            elif isinstance(raw, int):
+                _reshape_image_hw = [int(raw), int(raw)]
+            elif isinstance(raw, str):
+                try:
+                    parsed = ast.literal_eval(raw)
+                    if isinstance(parsed, (list, tuple)):
+                        _reshape_image_hw = [int(parsed[0]), int(parsed[1])] if len(parsed) >= 2 else [int(parsed[0]), int(parsed[0])]
+                    elif isinstance(parsed, int):
+                        _reshape_image_hw = [int(parsed), int(parsed)]
+                except Exception:
+                    parts = [p for p in re.split(r"[^0-9]+", raw) if p]
+                    if len(parts) >= 2:
+                        _reshape_image_hw = [int(parts[0]), int(parts[1])]
+                    elif len(parts) == 1:
+                        _reshape_image_hw = [int(parts[0]), int(parts[0])]
+        except Exception:
+            _reshape_image_hw = None
+    # ---
+    
     # The registered model name from --model CLI arg (e.g. "meddr", "qwen2_5_vl", "vllm_qwen25vl")
     _model_name = cli_args.model if cli_args is not None and hasattr(cli_args, "model") else None
 
@@ -394,6 +434,8 @@ def evaluate(
             task.lmms_eval_specific_kwargs["model_hf"] = _model_arg_model_hf
         if _model_name is not None:
             task.lmms_eval_specific_kwargs["model_name"] = _model_name
+        if _reshape_image_hw is not None:
+            task.lmms_eval_specific_kwargs["reshape_image_hw"] = _reshape_image_hw
 
         name_to_task[task_name] = task
 
