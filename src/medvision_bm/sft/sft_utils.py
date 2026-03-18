@@ -1466,7 +1466,7 @@ def _doc_to_text_DetectionTask(doc):
 
 def _doc_to_text_DetectionTask_CoT(doc):
     """Convert document to text."""
-    from medvision_bm.sft.sft_prompts import FORMAT_PROMPT_BOX_COORDINATES
+    from medvision_bm.sft.sft_prompts import COT_INSTRUCT_DETECTION, FORMAT_PROMPT_DETECTION_REASONING
 
     # Import the dataset-specific module from medvision_ds.datasets
     dataset_name = doc["dataset_name"]
@@ -1502,7 +1502,10 @@ def _doc_to_text_DetectionTask_CoT(doc):
         f"Given the input medical image{image_prompt}, "
         f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
         f"Format requirement:\n"
-        f"{FORMAT_PROMPT_BOX_COORDINATES}"
+        f"{FORMAT_PROMPT_DETECTION_REASONING}"
+        f"Reasoning steps:\n"
+        f"{COT_INSTRUCT_DETECTION}\n"
+        f"Follow the reasoning steps to get the final answer in the required format."
     )
 
     # Prepare values_dict

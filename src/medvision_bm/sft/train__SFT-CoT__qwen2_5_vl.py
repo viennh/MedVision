@@ -242,12 +242,11 @@ def main(
                 dataset["train"] = concatenate_datasets(train_ds_list)
                 dataset["validation"] = concatenate_datasets(val_ds_list)
 
-                # Limit the total number of samples if specified
+                # Limit the training samples (allow sampling with replacement if limit exceeds dataset size)
                 train_limit = kwargs.get("train_sample_limit")
                 if train_limit > 0:
                     train_size = len(dataset["train"])
                     if train_limit > train_size:
-                        # Allow sampling with replacement if limit exceeds dataset size
                         import numpy as np
                         np.random.seed(SEED)
                         indices = np.random.choice(train_size, size=train_limit, replace=True)
@@ -261,6 +260,7 @@ def main(
                 else:
                     dataset["train"] = dataset["train"].shuffle(seed=SEED)
 
+                # Limit the validation samples (allow sampling with replacement if limit exceeds dataset size)
                 val_limit = kwargs.get("val_sample_limit")
                 if val_limit > 0:
                     val_size = len(dataset["validation"])
