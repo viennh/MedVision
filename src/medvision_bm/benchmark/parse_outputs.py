@@ -14,6 +14,7 @@ from medvision_bm.utils.parse_utils import (
     cal_metrics,
     convert_numpy_to_python,
     extract_last_k_nums,
+    extract_last_k_nums_within_answer_tag,
     get_subfolders,
     load_nifti_2d,
 )
@@ -206,7 +207,7 @@ def _process_jsonl_file(jsonl_file, temp_file, task_type, limit, verbose=True):
         for data in all_lines:
             doc = data["doc"]
             resps = _extract_response(data)
-            data["filtered_resps"] = [extract_last_k_nums(resps, target_nums)]
+            data["filtered_resps"] = [extract_last_k_nums_within_answer_tag(resps, target_nums)]
 
             # Calculate metrics
             metrics_dict = cal_metrics(data, task_type)
