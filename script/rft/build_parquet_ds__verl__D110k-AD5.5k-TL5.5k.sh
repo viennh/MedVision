@@ -28,7 +28,7 @@ export MedVision_DATA_DIR=${data_dir}
 # !!! The built dataset should be used only with the specified model_family_name or models with the same image processor.
 # ---
 # Supported model_family_name: check get_resized_img_shape() in medvision_bm/medvision_lmms_eval/lmms_eval/tasks/medvision/medvision_utils.py
-model_family_name="qwen2_5_vl"
+model_family_name="qwen25vl"
 model_hf="Qwen/Qwen2.5-VL-7B-Instruct" # Used to load the image processor
 num_workers_concat_datasets=4
 num_workers_format_dataset=16

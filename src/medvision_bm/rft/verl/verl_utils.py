@@ -9,6 +9,7 @@ from medvision_bm.sft.sft_utils import (
     _doc_to_text_DetectionTask_CoT,
     _doc_to_text_DetectionTask,
     format_dataset,
+    clean_dataset,
     img_proccessor_nii2png_save2dataset,
     load_split_limit_dataset,
 )
@@ -600,4 +601,21 @@ def prepare_dataset_for_verl(
         mapping_func_args=mapping_func_args,
         num_workers_format_dataset=num_workers_format_dataset,
     )
+
+    # Clean dataset to keep only necessary keys
+    # ---
+    # Feilds required by Verl:
+    #     - prompt: List of messages with roles and content.
+    #     - ground_truth: Target string.
+    #     - data_source: Data source identifier.
+    #     - ability: Ability identifier.
+    #     - reward_model: Reward model information.
+    #     - extra_info: Additional information. 
+    # Additional fields:
+    #     - image_file: the image (not image path)
+    # ---
+    # "image_file" is the original NIfTI image path
+    keys_to_keep = ["prompt", "ground_truth", "data_source", "ability", "reward_model", "extra_info", "image_file"]
+    dataset = clean_dataset(dataset, keys_to_keep)
+
     return dataset
