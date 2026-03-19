@@ -232,6 +232,7 @@ python -m  medvision_bm.sft.train__SFT-CoT__qwen2_5_vl \
 --resume_from_checkpoint ${resume_from_checkpoint} \
 --gradient_checkpointing ${gradient_checkpointing} \
 --dataloader_pin_memory ${dataloader_pin_memory} \
+--new_shape_hw 512 512 \
 
 # Skip dataset processing and directly load from disk for training
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
@@ -282,7 +283,8 @@ accelerate launch --num_processes=4 --main_process_port=29502 --mixed_precision=
 --gradient_checkpointing ${gradient_checkpointing} \
 --dataloader_pin_memory ${dataloader_pin_memory} \
 --temperature_sampler_T ${temperature_sampler_T} \
---enable_temperature_sampler ${enable_temperature_sampler}
+--enable_temperature_sampler ${enable_temperature_sampler} \
+--new_shape_hw 512 512 \
 
 conda deactivate
 # conda remove -n $ENV_NAME --all -y
