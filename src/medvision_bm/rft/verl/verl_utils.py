@@ -612,10 +612,9 @@ def prepare_dataset_for_verl(
     #     - reward_model: Reward model information.
     #     - extra_info: Additional information. 
     # Additional fields:
-    #     - image_file: the image (not image path)
+    #     - images: the image (not just image path)
     # ---
-    # "image_file" is the original NIfTI image path
-    keys_to_keep = ["prompt", "ground_truth", "data_source", "ability", "reward_model", "extra_info", "image_file"]
+    keys_to_keep = ["prompt", "ground_truth", "data_source", "ability", "reward_model", "extra_info", "images"]
     dataset = clean_dataset(dataset, keys_to_keep)
 
     return dataset
