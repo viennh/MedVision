@@ -209,9 +209,9 @@ def build_parquet_dataset(**kwargs):
     else:
         cot_tag = ""
     if kwargs.get("new_shape_hw") is not None:
-        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}_resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}{cot_tag}__v2"
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}"
     else:
-        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__v2"
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__original"
     parquet_ds_dir = os.path.join(
         data_dir,
         "verl_datasets",
