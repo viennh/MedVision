@@ -78,6 +78,7 @@ def main(
 
     if not kwargs.get("merge_only"):
         # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
+        # ---
         # Parse sample limits
         (
             train_limit_AD,
@@ -88,6 +89,7 @@ def main(
             val_limit_TL,
             train_limit_total,
         ) = parse_sample_limits(**kwargs)
+        # ---
 
         # Print a clear runtime warning on the main process so users notice this requirement
         if is_main_process():
@@ -103,26 +105,37 @@ def main(
                 "Reusing a dataset prepared with different settings or a different model may lead to incorrect results."
             )
 
+        # ---
+        # NOTE: Keep it here (out of the is_main_process() block below) as it is used in all processes for dataset loading later
+        # ---
+        # Prepare the dataset directory path, which will be used to save the prepared dataset for all processes to load later
+        new_shape_hw = kwargs.get("new_shape_hw")
         if kwargs.get("prepared_ds_dir") is not None:
-            # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
+            # User-specified folder
             prepared_ds_dir = kwargs.get("prepared_ds_dir")
             if is_main_process():
                 print(
                     f"[Info] Using user-specified prepared dataset directory: {prepared_ds_dir}\n"
                 )
         else:
-            # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
+            # Default folder with naming convention encoding model identifier and sample limits
             prepared_ds_dir = os.path.join(
                 data_dir,
                 "SFT-CoT_datasets",
                 model_family_name,
                 f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
             )
+            if new_shape_hw is not None:
+                prepared_ds_dir += f"__resized-wh-{new_shape_hw[1]}x{new_shape_hw[0]}" 
+            else:
+                prepared_ds_dir += f"__original"
+
             if is_main_process():
                 os.makedirs(prepared_ds_dir, exist_ok=True)
                 print(
                     f"[Info] Using default prepared dataset directory: {prepared_ds_dir}\n"
                 )
+        # ---
 
         # Prepare the dataset on the main process ONLY
         if is_main_process():

@@ -77,6 +77,8 @@ def main(
         setup_env_hf_medvision_ds(data_dir=data_dir)
 
     if not kwargs.get("merge_only"):
+        # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
+        # ---
         # Parse sample limits
         (
             train_limit_AD,
@@ -87,39 +89,53 @@ def main(
             val_limit_TL,
             train_limit_total,
         ) = parse_sample_limits(**kwargs)
-
-        # Prepare the dataset cache directory
-        # NOTE:
-        # IMPORTANT: The prepared dataset directory must uniquely encode the sample limits and the model identifier.
-        # This is because dataset preparation performs model-specific processing (for example, the model's image_processor
-        # determines image resize ratios and final pixel dimensions). Loading a dataset prepared with different limits
-        # or a different model can produce incorrect preprocessing or mismatched prompts.
+        # --- 
 
         # Print a clear runtime warning on the main process so users notice this requirement
         if is_main_process():
+            # Prepare the dataset cache directory
+            # NOTE:
+            # IMPORTANT: The prepared dataset directory must uniquely encode the sample limits and the model identifier.
+            # This is because dataset preparation performs model-specific processing (for example, the model's image_processor
+            # determines image resize ratios and final pixel dimensions). Loading a dataset prepared with different limits
+            # or a different model can produce incorrect preprocessing or mismatched prompts.
             print(
                 "\n[WARNING] The prepared dataset directory name must uniquely include the model identifier and sample limits.\n"
                 "Dataset preparation depends on model-specific image processing (e.g., resize scale and pixel dimensions).\n"
                 "Reusing a dataset prepared with different settings or a different model may lead to incorrect results."
             )
 
+        # ---
+        # NOTE: Keep it here (out of the is_main_process() block below) as it is used in all processes for dataset loading later
+        # ---
+        # Prepare the dataset directory path, which will be used to save the prepared dataset for all processes to load later
+        new_shape_hw = kwargs.get("new_shape_hw")
         if kwargs.get("prepared_ds_dir") is not None:
+            # User-specified folder
             prepared_ds_dir = kwargs.get("prepared_ds_dir")
             if is_main_process():
                 print(
                     f"[Info] Using user-specified prepared dataset directory: {prepared_ds_dir}\n"
                 )
         else:
+            # Default folder with naming convention encoding model identifier and sample limits
             prepared_ds_dir = os.path.join(
                 data_dir,
                 "SFT_datasets",
                 model_family_name,
                 f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
             )
+            if new_shape_hw is not None:
+                prepared_ds_dir += f"__resized-wh-{new_shape_hw[1]}x{new_shape_hw[0]}" 
+            else:
+                prepared_ds_dir += f"__original"
+
             if is_main_process():
+                os.makedirs(prepared_ds_dir, exist_ok=True)
                 print(
                     f"[Info] Using default prepared dataset directory: {prepared_ds_dir}\n"
                 )
+        # ---
 
         # Prepare the dataset on the main process ONLY
         if is_main_process():
@@ -239,7 +255,7 @@ def main(
                 dataset["train"] = concatenate_datasets(train_ds_list)
                 dataset["validation"] = concatenate_datasets(val_ds_list)
 
-                # Limit the total number of samples if specified
+                # Limit the training samples (allow sampling with replacement if limit exceeds dataset size)
                 train_limit = kwargs.get("train_sample_limit")
                 if train_limit > 0:
                     train_size = len(dataset["train"])
@@ -258,6 +274,7 @@ def main(
                 else:
                     dataset["train"] = dataset["train"].shuffle(seed=SEED)
 
+                # Limit the validation samples (allow sampling with replacement if limit exceeds dataset size)
                 val_limit = kwargs.get("val_sample_limit")
                 if val_limit > 0:
                     val_size = len(dataset["validation"])
