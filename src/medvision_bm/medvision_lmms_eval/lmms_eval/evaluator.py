@@ -394,6 +394,7 @@ def evaluate(
     # Parse reshape_image_hw from cli_args.model_args if provided. Accept formats like:
     # - a Python list/tuple string: "[896,896]" or "(896,896)"
     # - single integer: "896" -> interpreted as [896,896]
+    _reshape_image_hw = None  # Initialize to avoid UnboundLocalError
     _model_arg_reshape_image_hw = _parsed_model_args.get("reshape_image_hw", None)
     if _model_arg_reshape_image_hw is not None:
         try:
@@ -418,7 +419,7 @@ def evaluate(
         except Exception:
             _reshape_image_hw = None
     # ---
-    
+
     # The registered model name from --model CLI arg (e.g. "meddr", "qwen2_5_vl", "vllm_qwen25vl")
     _model_name = cli_args.model if cli_args is not None and hasattr(cli_args, "model") else None
 
