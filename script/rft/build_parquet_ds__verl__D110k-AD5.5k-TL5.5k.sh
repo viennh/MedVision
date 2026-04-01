@@ -66,9 +66,20 @@ val_sample_limit_task_TL=50
 # ----------------------------------------------------------------------------------
 
 
-# Install medvision_bm
-rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
-pip install "${benchmark_dir}"
+# Install medvision_bm (locked shared build)
+set -euo pipefail
+lockfile="${benchmark_dir}/.medvision_build.lock"
+wheelhouse="${benchmark_dir}/.wheelhouse"
+mkdir -p "${wheelhouse}"
+flock "${lockfile}" bash -c '
+    set -euo pipefail
+    benchmark_dir="'"${benchmark_dir}"'"
+    wheelhouse="'"${wheelhouse}"'"
+    rm -rf "${benchmark_dir}/build" "${benchmark_dir}/src/medvision_bm.egg-info"
+    python -m pip wheel "${benchmark_dir}" -w "${wheelhouse}" --no-deps
+    latest_wheel="$(ls -t "${wheelhouse}"/medvision_bm-*.whl | head -n1)"
+    python -m pip install --force-reinstall "${latest_wheel}"
+'
 
 # Setup environment for SFT since we import SFT-related modules
 # NOTE: update "--requirement" and "--lmms_eval_opt_deps" arguments based on the model_family_name

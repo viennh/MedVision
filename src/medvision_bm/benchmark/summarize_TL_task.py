@@ -526,6 +526,10 @@ def print_model_summaries(task_dir, limit=None, skip_model_wo_parsed_files=False
     # Print summary table for each model
     for model, summary in model_summaries.items():
         model_header = f"\nModel: {model}"
+        if summary["weighted_avg_mae"] is None:
+            model_header += " (No valid MAE samples)"
+            print_and_capture(model_header)
+            continue
         weighted_avg = (
             f"Weighted Average MAE: {summary['weighted_avg_mae']:.4f}, "
             f"MRE: {summary['weighted_avg_mre']:.4f}, "

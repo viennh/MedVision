@@ -5,10 +5,16 @@ import subprocess
 from huggingface_hub import snapshot_download
 
 from medvision_bm.utils import (
-    ensure_hf_hub_installed, install_flash_attention_torch_and_deps_py311_v2,
-    install_medvision_ds, install_vendored_lmms_eval, load_tasks,
-    load_tasks_status, set_cuda_num_processes, setup_env_hf_medvision_ds,
-    update_task_status)
+    ensure_hf_hub_installed,
+    install_flash_attention_torch_and_deps_py311_v2,
+    install_medvision_ds,
+    install_vendored_lmms_eval,
+    load_tasks,
+    load_tasks_status,
+    set_cuda_num_processes,
+    setup_env_hf_medvision_ds,
+    update_task_status,
+)
 
 
 def install_healthgpt_dependencies_post(dir_third_party: str, model_name: str):
@@ -51,7 +57,7 @@ def install_healthgpt_dependencies_post(dir_third_party: str, model_name: str):
 
     # Workaround for pydantic and deepspeed conflicts
     subprocess.run("pip install pydantic==1.10.24", check=True, shell=True)
-    
+
     # Install requirements
     subprocess.run(
         "pip install -r requirements.txt", cwd=dir_healthgpt, check=True, shell=True
@@ -260,7 +266,7 @@ def main():
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements
         ensure_hf_hub_installed(hf_hub_version="0.35.3")
         install_vendored_lmms_eval()
         install_medvision_ds(data_dir)

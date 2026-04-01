@@ -2122,6 +2122,7 @@ def clean_dataset(dataset, keys_to_keep):
     dataset = dataset.map(
         _clean_dataset_map,
         fn_kwargs={"keys_to_keep": keys_to_keep},
+        writer_batch_size=100,
         desc="Cleaning dataset",
     )
     return dataset

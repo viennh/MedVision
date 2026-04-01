@@ -2657,7 +2657,7 @@ def process_results_BoxCoordinate(doc, results):
         else:
             absolute_error = np.abs(pred_metrics - target_metric)
             mean_absolute_error = np.mean(absolute_error)
-            mean_relative_error = np.mean(absolute_error / target_metric)
+            mean_relative_error = np.mean(absolute_error / (target_metric + 1e-15))
             success = True
     except Exception as e:
         mean_absolute_error = np.nan
@@ -2687,7 +2687,7 @@ def process_results_TumorLesionSize(doc, results):
         else:
             absolute_error = np.abs(pred_metrics - target_metric)
             mean_absolute_error = np.mean(absolute_error)
-            mean_relative_error = np.mean(absolute_error / target_metric)
+            mean_relative_error = np.mean(absolute_error / (target_metric + 1e-15))
             success = True
     except Exception as e:
         mean_absolute_error = np.nan

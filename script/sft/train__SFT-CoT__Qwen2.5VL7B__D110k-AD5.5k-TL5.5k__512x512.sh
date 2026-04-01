@@ -175,6 +175,7 @@ save_processed_img_to_disk=true
 # prepared_ds_dir="" 
 
 # Config 4
+# NOTE: --enable_temperature_sampler and related CLI args are only effective for training. They do not affect dataset processing when --process_dataset_only is true
 # - Add CLI arg "enable_temperature_sampler=true" to enable temperature-based sampling during multi-task training with imbalanced datasets
 # - If you use it, you can set "temperature_sampler_T" below: default=3, T=1 means proportional to counts; larger T flattens task probabilities.
 enable_temperature_sampler=true
@@ -232,7 +233,7 @@ python -m  medvision_bm.sft.train__SFT-CoT__qwen2_5_vl \
 --resume_from_checkpoint ${resume_from_checkpoint} \
 --gradient_checkpointing ${gradient_checkpointing} \
 --dataloader_pin_memory ${dataloader_pin_memory} \
---new_shape_hw 512 512 \
+--new_shape_hw 512 512
 
 # Skip dataset processing and directly load from disk for training
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
