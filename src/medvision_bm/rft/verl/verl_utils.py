@@ -14,6 +14,8 @@ from medvision_bm.sft.sft_utils import (
     load_split_limit_dataset,
 )
 
+from medvision_bm.dataset.ds_utils import load_split_limit_dataset_tr_val_ts
+
 
 def _format_data_TumorLesionTask_CoT_verl(
     example,
@@ -584,6 +586,64 @@ def prepare_dataset_for_verl(
         tasks_list_json_path=tasks_list_json_path,
         limit_train_sample=limit_train_sample,
         limit_val_sample=limit_val_sample,
+        num_workers_concat_datasets=num_workers_concat_datasets,
+        tag_ds=tag_ds,
+        download_mode=download_mode,
+    )
+
+    # Format dataset
+    mapping_func_args = {
+        "model_name": model_family_name,
+        "model_hf": model_hf,
+        "new_shape_hw": new_shape_hw,
+    }
+    dataset = format_dataset(
+        dataset=dataset,
+        mapping_func=mapping_func,
+        mapping_func_args=mapping_func_args,
+        num_workers_format_dataset=num_workers_format_dataset,
+    )
+
+    # Clean dataset to keep only necessary keys
+    # ---
+    # Feilds required by Verl:
+    #     - prompt: List of messages with roles and content.
+    #     - ground_truth: Target string.
+    #     - data_source: Data source identifier.
+    #     - ability: Ability identifier.
+    #     - reward_model: Reward model information.
+    #     - extra_info: Additional information. 
+    # Additional fields:
+    #     - images: the image (not just image path)
+    # ---
+    keys_to_keep = ["prompt", "ground_truth", "data_source", "ability", "reward_model", "extra_info", "images"]
+    dataset = clean_dataset(dataset, keys_to_keep)
+
+    return dataset
+
+
+# NOTE: Test set is not used in RFT via Verl, but we prepare the dataset with test set for debugging and future flexibility.
+def prepare_dataset_for_verl_with_testset(
+    *,
+    tasks_list_json_path,
+    limit_train_sample,
+    limit_val_sample,
+    mapping_func,
+    model_family_name,
+    model_hf,
+    limit_test_sample=None,
+    num_workers_concat_datasets=4,
+    num_workers_format_dataset=32,
+    tag_ds=None,
+    new_shape_hw=None,
+    download_mode="reuse_dataset_if_exists",
+):
+    # Load and split dataset
+    dataset = load_split_limit_dataset_tr_val_ts(
+        tasks_list_json_path=tasks_list_json_path,
+        limit_train_sample=limit_train_sample,
+        limit_val_sample=limit_val_sample,
+        limit_test_sample=limit_test_sample,
         num_workers_concat_datasets=num_workers_concat_datasets,
         tag_ds=tag_ds,
         download_mode=download_mode,
