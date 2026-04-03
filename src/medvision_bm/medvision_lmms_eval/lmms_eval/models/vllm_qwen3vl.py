@@ -17,6 +17,7 @@ from tqdm import tqdm
 NUM_SECONDS_TO_SLEEP = 5
 
 from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 
 
 @register_model("vllm_qwen3vl")
@@ -137,6 +138,7 @@ class VLLM_Qwen3VL(lmms):
     def __init__(
         self,
         model_hf: str = "Qwen/Qwen3-VL-30B-A3B-Thinking",
+        lora_path: Optional[str] = None,
         tensor_parallel_size: int = 1,
         gpu_memory_utilization: float = 0.9,
         batch_size: int = 1,
@@ -158,6 +160,7 @@ class VLLM_Qwen3VL(lmms):
         self.threads = threads
         self.chat_template = chat_template
         self.enable_thinking = enable_thinking
+        self.lora_path = lora_path
 
         # Convert any string arguments that start with { and end with } to dictionaries
         for key, value in kwargs.items():
@@ -171,11 +174,26 @@ class VLLM_Qwen3VL(lmms):
         kwargs.pop("reshape_image_hw", None)
 
         # Set up vllm client
+        lora_kwargs = {}
+        if self.lora_path is not None:
+            adapter_config_path = os.path.join(self.lora_path, "adapter_config.json")
+            if os.path.isfile(adapter_config_path):
+                with open(adapter_config_path, "r") as f:
+                    adapter_config = json.load(f)
+                lora_rank = adapter_config.get("r", None)
+                if lora_rank is None:
+                    raise ValueError(f"LoRA rank 'r' not found in adapter_config.json at {adapter_config_path}. Please ensure the file contains the necessary configuration for LoRA.")
+            else:
+                raise FileNotFoundError(f"adapter_config.json not found at {self.lora_path}. Please ensure the file exists and contains the necessary configuration for LoRA.")
+            lora_kwargs["enable_lora"] = True
+            lora_kwargs["max_lora_rank"] = lora_rank
+
         self.client = LLM(
             model=self.model_hf,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             trust_remote_code=trust_remote_code,
+            **lora_kwargs,
             **kwargs,
         )
 
@@ -294,6 +312,10 @@ class VLLM_Qwen3VL(lmms):
             # - vllm chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
             # The logic here is similar to the vllm implementation as shown here (https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat)
             # - vllm implementation: https://github.com/vllm-project/vllm/blob/d97841078b6e0dde8da36d5a2b8e8857a2c37944/vllm/entrypoints/chat_utils.py#L829
+            lora_request = None
+            if self.lora_path is not None:
+                lora_request = LoRARequest("adapter", 1, self.lora_path)
+
             chat_template_kwargs = {"enable_thinking": self.enable_thinking}
             if self.chat_template is not None:
                 if os.path.isfile(self.chat_template):
@@ -301,9 +323,9 @@ class VLLM_Qwen3VL(lmms):
                         chat_template = f.read()
                 else:
                     chat_template = self.chat_template
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template, chat_template_kwargs=chat_template_kwargs)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template, chat_template_kwargs=chat_template_kwargs, lora_request=lora_request)
             else:
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template_kwargs=chat_template_kwargs)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template_kwargs=chat_template_kwargs, lora_request=lora_request)
                 
             # NOTE: In vLLM 0.8.5+, for Qwen3 thinking models, CompletionOutput splits output into:
             #   - reasoning_content: content inside <think>...</think> (may be empty if thinking disabled)

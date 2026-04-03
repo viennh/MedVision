@@ -66,6 +66,12 @@ def parse_args():
         help="Name of the model to evaluate.",
     )
     parser.add_argument(
+        "--lora_path",
+        default=None,
+        type=str,
+        help="Hugging Face path to LoRA adapter (if using LoRA). If not using LoRA, set to empty string or leave unset.",
+    )
+    parser.add_argument(
         "--reshape_image_hw",
         default=None,
         type=str,
@@ -145,6 +151,7 @@ def main():
     # Configuration
     model_hf = args.model_hf_id
     model_name = args.model_name
+    lora_path = args.lora_path
     tasks_list_json_path = args.tasks_list_json_path
     result_dir = args.results_dir
     task_status_json_path = args.task_status_json_path
@@ -190,7 +197,8 @@ def main():
         # NOTE: adjust max_new_tokens according to your task
         vllm_model_args = (
             f"model_hf={model_hf},"
-            f"gpu_memory_utilization={gpu_memory_utilization},"
+            + (f"lora_path={lora_path}," if lora_path is not None else "")
+            + f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
             "dtype=float16,"

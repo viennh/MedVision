@@ -17,6 +17,7 @@ from tqdm import tqdm
 NUM_SECONDS_TO_SLEEP = 5
 
 from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
 
 
 @register_model("vllm_llava_onevision")
@@ -137,6 +138,7 @@ class VLLM_Llava_OneVision(lmms):
     def __init__(
         self,
         model_hf: str = "llava-hf/llava-onevision-qwen2-72b-ov-hf",
+        lora_path: Optional[str] = None,
         tensor_parallel_size: int = 1,
         gpu_memory_utilization: float = 0.8,
         batch_size: int = 1,
@@ -156,6 +158,7 @@ class VLLM_Llava_OneVision(lmms):
         self.max_new_tokens = max_new_tokens
         self.threads = threads
         self.chat_template = chat_template
+        self.lora_path = lora_path
 
         # Convert any string arguments that start with { and end with } to dictionaries
         for key, value in kwargs.items():
@@ -169,11 +172,26 @@ class VLLM_Llava_OneVision(lmms):
         kwargs.pop("reshape_image_hw", None)
 
         # Set up vllm client
+        lora_kwargs = {}
+        if self.lora_path is not None:
+            adapter_config_path = os.path.join(self.lora_path, "adapter_config.json")
+            if os.path.isfile(adapter_config_path):
+                with open(adapter_config_path, "r") as f:
+                    adapter_config = json.load(f)
+                lora_rank = adapter_config.get("r", None)
+                if lora_rank is None:
+                    raise ValueError(f"LoRA rank 'r' not found in adapter_config.json at {adapter_config_path}. Please ensure the file contains the necessary configuration for LoRA.")
+            else:
+                raise FileNotFoundError(f"adapter_config.json not found at {self.lora_path}. Please ensure the file exists and contains the necessary configuration for LoRA.")
+            lora_kwargs["enable_lora"] = True
+            lora_kwargs["max_lora_rank"] = lora_rank
+
         self.client = LLM(
             model=self.model_hf,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             trust_remote_code=trust_remote_code,
+            **lora_kwargs,
             **kwargs,
         )
 
@@ -285,15 +303,19 @@ class VLLM_Llava_OneVision(lmms):
             # - vllm chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
             # The logic here is similar to the vllm implementation as shown here (https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat)
             # - vllm implementation: https://github.com/vllm-project/vllm/blob/d97841078b6e0dde8da36d5a2b8e8857a2c37944/vllm/entrypoints/chat_utils.py#L829
+            lora_request = None
+            if self.lora_path is not None:
+                lora_request = LoRARequest("adapter", 1, self.lora_path)
+
             if self.chat_template is not None:
                 if os.path.isfile(self.chat_template):
                     with open(self.chat_template, "r") as f:
                         chat_template = f.read()
                 else:
                     chat_template = self.chat_template
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template, lora_request=lora_request)
             else:
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, lora_request=lora_request)
             response_text = [o.outputs[0].text for o in response]
 
             assert len(response_text) == len(batch_requests)
