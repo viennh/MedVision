@@ -231,11 +231,9 @@ def main():
         # install_vllm(data_dir, version="0.14.0")
         install_vllm(data_dir, version="0.10.0")
 
-
         # NOTE: Reinstall packages to overwrite potentially incompatible versions
         # install_transformers_accelerate_for_qwen25vl(transformers_version="5.0.0.rc2", accelerate_version="1.9.0")
         install_transformers_accelerate_for_qwen25vl(transformers_version="4.54.1", accelerate_version="1.9.0")
-
 
         if args.env_setup_only:
             print(
@@ -260,6 +258,7 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
+
         vllm_model_args = (
             f"model_hf={model_hf},"
             + (f"lora_path={lora_path}," if lora_path is not None else "")
@@ -267,7 +266,6 @@ def main():
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
             f"hf_overrides={hf_overrides_json},"
-            "dtype=bfloat16,"
             f"max_new_tokens={max_new_tokens}"
         )
 

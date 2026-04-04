@@ -194,6 +194,7 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
+
         vllm_model_args = (
             f"model_hf={model_hf},"
             + (f"lora_path={lora_path}," if lora_path is not None else "")
@@ -203,7 +204,6 @@ def main():
             # "max_model_len=1024," # (optional) maximum input length
             # for InternVL3, https://github.com/vllm-project/vllm/blob/f3137cdd81cae3a48282c22130fbcadcfc64ea95/examples/offline_inference/vision_language.py#L393
             'limit_mm_per_prompt={"image": 1},'
-            "dtype=bfloat16,"  # https://huggingface.co/OpenGVLab/InternVL3-38B
             f"max_new_tokens={max_new_tokens}"
         )
 

@@ -194,13 +194,13 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
+
         vllm_model_args = (
             f"model_hf={model_hf},"
             + (f"lora_path={lora_path}," if lora_path is not None else "")
             + f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
-            "dtype=float16,"
             f"max_new_tokens={max_new_tokens}"
         )
 
