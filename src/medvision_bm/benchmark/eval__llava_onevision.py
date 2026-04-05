@@ -72,6 +72,12 @@ def parse_args():
         help="Hugging Face path to LoRA adapter (if using LoRA). If not using LoRA, set to empty string or leave unset.",
     )
     parser.add_argument(
+        "--dtype",
+        default="auto",
+        type=str,
+        help="Data type for model weights (e.g., float32, float16, bfloat16). Default is 'auto', which uses the model config or falls back to fp16 in vllm for fp16/32 models.",
+    )
+    parser.add_argument(
         "--reshape_image_hw",
         default=None,
         type=str,
@@ -152,6 +158,7 @@ def main():
     model_hf = args.model_hf_id
     model_name = args.model_name
     lora_path = args.lora_path
+    dtype = args.dtype
     tasks_list_json_path = args.tasks_list_json_path
     result_dir = args.results_dir
     task_status_json_path = args.task_status_json_path
@@ -202,7 +209,8 @@ def main():
             + f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
-            f"max_new_tokens={max_new_tokens}"
+            f"max_new_tokens={max_new_tokens},"
+            f"dtype={dtype}"
         )
 
         # add reshape_image_hw to modle args if specified, with normalization to ensure correct parsing

@@ -125,6 +125,12 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
+    parser.add_argument(
+        "--dtype",
+        default="auto",
+        type=str,
+        help="Data type for model weights (e.g., float32, float16, bfloat16). Default is 'auto', which uses the model config or falls back to fp16 in vllm for fp16/32 models.",
+    )
     # set reshape_image_hw
     parser.add_argument(
         "--reshape_image_hw",
@@ -206,6 +212,7 @@ def main():
     # Configuration
     model_hf = args.model_hf_id
     model_name = args.model_name
+    dtype = args.dtype
     lora_path = args.lora_path
     tasks_list_json_path = args.tasks_list_json_path
     result_dir = args.results_dir
@@ -266,7 +273,8 @@ def main():
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
             f"hf_overrides={hf_overrides_json},"
-            f"max_new_tokens={max_new_tokens}"
+            f"max_new_tokens={max_new_tokens},"
+            f"dtype={dtype}"
         )
 
         # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing

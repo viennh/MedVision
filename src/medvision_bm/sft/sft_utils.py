@@ -2096,17 +2096,18 @@ def load_split_limit_dataset(
 
 
 def format_dataset(
-    dataset, mapping_func, mapping_func_args, num_workers_format_dataset
+    dataset, mapping_func, mapping_func_args, num_workers_format_dataset, writer_batch_size=1000
 ):
     # Format the dataset with parallelism
     # Use conservative parallelism for formatting to avoid OOM
     available_cpus = get_cgroup_limited_cpus()
     format_workers = min(num_workers_format_dataset, available_cpus)
-    print(f"\n[Info] Formatting dataset with {format_workers} workers...")
+    print(f"\n[Info] Formatting dataset with {format_workers} workers (writer_batch_size={writer_batch_size})...")
     dataset = dataset.map(
         mapping_func,
         fn_kwargs=mapping_func_args,
         num_proc=format_workers,
+        writer_batch_size=writer_batch_size,
         desc="Formatting dataset",
     )
     return dataset
@@ -2489,17 +2490,19 @@ def merge_models(
 
     print("\n[Info] Starting model merge process (CPU-only)...")
 
-    # 1) Load base model on CPU
+    # 1) Load base model on CPU in fp32 so the LoRA delta (<<BF16 step size) is
+    #    representable during merge. We cast back to bf16 before saving.
     model = AutoModelForImageTextToText.from_pretrained(
         base_model_hf,
         low_cpu_mem_usage=True,
-        torch_dtype=torch.bfloat16,  # or float16/float32 as appropriate
+        torch_dtype=torch.float32,
         device_map="cpu",
     )
 
-    # 2) Load LoRA adapter and merge
+    # 2) Load LoRA adapter and merge; safe_merge=True raises on NaN/inf
     peft_model = PeftModel.from_pretrained(model, lora_checkpoint_dir)
-    merged_model = peft_model.merge_and_unload()
+    peft_model = peft_model.to(torch.float32)
+    merged_model = peft_model.merge_and_unload(safe_merge=True)
 
     # Drop references to base + peft wrapper
     del model, peft_model
