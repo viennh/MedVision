@@ -493,24 +493,24 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, model_hf, new_shape_hw=N
     # Get 2D image info
     image_description = task_info["image_description"]
 
-    # Read NIfTI image
+    # [!] Read NIfTI image with explicit resizing to the specified new_shape_hw (if not None)
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(
+    pixel_size_hw, img_explicit_resize_2d = _load_resize_nifti_2d(
         img_path, slice_dim, slice_idx, new_shape_hw
-    )  # explicit resizing
-    img_shape = img_2d_raw.shape
+    )
+    img_shape = img_explicit_resize_2d.shape
 
-    # Get resized image shape
-    img_shape_resized = get_resized_img_shape(
-        model_name, img_2d_raw, {"model_hf":model_hf}
-    )  # implicit/dynamic resizing from VLM
+    # [!] Get resized image shape (implicit/dynamic resizing from VLM)
+    img_shape_implicit_resize = get_resized_img_shape(
+        model_name, img_explicit_resize_2d, {"model_hf":model_hf}
+    ) 
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
-    resized_img_h, resized_img_w = img_shape_resized
+    resized_img_h, resized_img_w = img_shape_implicit_resize
     resize_ratio_h = resized_img_h / original_height
     resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
@@ -616,6 +616,10 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, model_hf, new_shape_hw=N
     #   - P1': (x_1, y_1) = (idx_dim1, image_size_height - idx_dim0)
     # --------------------------------------
 
+    # [!] Get the raw image shape (before explicit and implicit resizing) 
+    _, img_raw_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    raw_img_h, raw_img_w = img_raw_2d.shape
+
     # NOTE: keys should be in the "COT_TEMPLATE_DISTANCE" or "COT_TEMPLATE_ANGLE" from medvision_bm.sft.sft_prompts
     if metric_type == "distance":
         # Gather values to fill in the CoT template
@@ -623,13 +627,13 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, model_hf, new_shape_hw=N
             doc, lms
         )  # this coordinates are indices in array space
         # Convert to relative coordinates in image space
-        x1_relative_coord = landmarks_coords["landmark_" + lms[0]][1] / original_width
+        x1_relative_coord = landmarks_coords["landmark_" + lms[0]][1] / raw_img_w
         y1_relative_coord = 1.0 - (
-            landmarks_coords["landmark_" + lms[0]][0] / original_height
+            landmarks_coords["landmark_" + lms[0]][0] / raw_img_h
         )
-        x2_relative_coord = landmarks_coords["landmark_" + lms[1]][1] / original_width
+        x2_relative_coord = landmarks_coords["landmark_" + lms[1]][1] / raw_img_w
         y2_relative_coord = 1.0 - (
-            landmarks_coords["landmark_" + lms[1]][0] / original_height
+            landmarks_coords["landmark_" + lms[1]][0] / raw_img_h
         )
         # Recalculate the distance based on the adjusted pixel size and resized image size
         distance = np.sqrt(
@@ -672,28 +676,28 @@ def _doc_to_text_AngleDistanceTask_CoT(doc, model_name, model_hf, new_shape_hw=N
         )  # this coordinates are indices in array space
         # Convert to relative coordinates in image space
         x1_line1_relative_coord = (
-            line1_landmarks_coords["landmark_" + line1_lms[0]][1] / original_width
+            line1_landmarks_coords["landmark_" + line1_lms[0]][1] / raw_img_w
         )
         y1_line1_relative_coord = 1.0 - (
-            line1_landmarks_coords["landmark_" + line1_lms[0]][0] / original_height
+            line1_landmarks_coords["landmark_" + line1_lms[0]][0] / raw_img_h
         )
         x2_line1_relative_coord = (
-            line1_landmarks_coords["landmark_" + line1_lms[1]][1] / original_width
+            line1_landmarks_coords["landmark_" + line1_lms[1]][1] / raw_img_w
         )
         y2_line1_relative_coord = 1.0 - (
-            line1_landmarks_coords["landmark_" + line1_lms[1]][0] / original_height
+            line1_landmarks_coords["landmark_" + line1_lms[1]][0] / raw_img_h
         )
         x1_line2_relative_coord = (
-            line2_landmarks_coords["landmark_" + line2_lms[0]][1] / original_width
+            line2_landmarks_coords["landmark_" + line2_lms[0]][1] / raw_img_w
         )
         y1_line2_relative_coord = 1.0 - (
-            line2_landmarks_coords["landmark_" + line2_lms[0]][0] / original_height
+            line2_landmarks_coords["landmark_" + line2_lms[0]][0] / raw_img_h
         )
         x2_line2_relative_coord = (
-            line2_landmarks_coords["landmark_" + line2_lms[1]][1] / original_width
+            line2_landmarks_coords["landmark_" + line2_lms[1]][1] / raw_img_w
         )
         y2_line2_relative_coord = 1.0 - (
-            line2_landmarks_coords["landmark_" + line2_lms[1]][0] / original_height
+            line2_landmarks_coords["landmark_" + line2_lms[1]][0] / raw_img_h
         )
         # Recalculate the angle based on the adjusted pixel size and resized image size
         v1 = np.array(
@@ -1162,14 +1166,14 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, model_hf, new_shape_hw=Non
     # Get 2D image info
     image_description = task_info["image_description"]
 
-    # Read NIfTI image
+    # [!] Read NIfTI image with explicit resizing to the specified new_shape_hw (if not None)
     img_path = doc["image_file"]
     slice_dim = doc["slice_dim"]
     slice_idx = doc["slice_idx"]
-    pixel_size_hw, img_2d_raw = _load_resize_nifti_2d(
+    pixel_size_hw, img_explicit_resize_2d = _load_resize_nifti_2d(
         img_path, slice_dim, slice_idx, new_shape_hw
-    )  # explicit resizing
-    img_shape = img_2d_raw.shape
+    )
+    img_shape = img_explicit_resize_2d.shape
 
     # Get biometrics profile for this case
     biometric_profile = doc["biometric_profile"]
@@ -1185,15 +1189,15 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, model_hf, new_shape_hw=Non
     else:
         raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
 
-    # Get resized image shape
-    img_shape_resized = get_resized_img_shape(
-        model_name, img_2d_raw, {"model_hf":model_hf}
-    )  # implicit resizing from VLM
+    # [!] Get resized image shape (implicit resizing from VLM)
+    img_shape_implicit_resize = get_resized_img_shape(
+        model_name, img_explicit_resize_2d, {"model_hf":model_hf}
+    ) 
 
     # Adjust pixel size based on the resize ratio
     original_height, original_width = img_shape
     pixel_height, pixel_width = pixel_size_hw
-    resized_img_h, resized_img_w = img_shape_resized
+    resized_img_h, resized_img_w = img_shape_implicit_resize
     resize_ratio_h = resized_img_h / original_height
     resize_ratio_w = resized_img_w / original_width
     adjusted_pixel_height = pixel_height / resize_ratio_h
@@ -1245,20 +1249,26 @@ def _doc_to_text_TumorLesionTask_CoT(doc, model_name, model_hf, new_shape_hw=Non
     #   - P1': (x_1, y_1) = (idx_dim1, image_size_height - idx_dim0)
     # --------------------------------------
     # Gather values to fill in the CoT template
+
+    # [!] Get the raw image shape (before explicit and implicit resizing) 
+    _, img_raw_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
+    raw_img_h, raw_img_w = img_raw_2d.shape
+
+    # NOTE: landmarks_coords are calculated based on the original image size (raw_image_2d) before resizing
     landmarks_coords = _get_landmarks_coords(doc, ["P1", "P2", "P3", "P4"])
 
     # Caveat:
     # 1. x is the width direction, y is the height direction
     # 2. use relative coordinates
-    # 3. recalculate the major and minor axis lengths based on adjusted pixel size and resized image size; marginal error may exist compared to the original values due to rounding errors
-    x1_major = landmarks_coords["landmark_P1"][1] / original_width
-    y1_major = 1 - landmarks_coords["landmark_P1"][0] / original_height
-    x2_major = landmarks_coords["landmark_P2"][1] / original_width
-    y2_major = 1 - landmarks_coords["landmark_P2"][0] / original_height
-    x1_minor = landmarks_coords["landmark_P3"][1] / original_width
-    y1_minor = 1 - landmarks_coords["landmark_P3"][0] / original_height
-    x2_minor = landmarks_coords["landmark_P4"][1] / original_width
-    y2_minor = 1 - landmarks_coords["landmark_P4"][0] / original_height
+    # 3. (minor;optional) recalculate the major and minor axis lengths based on adjusted pixel size and resized image size; marginal error may exist compared to the original values due to rounding errors
+    x1_major = landmarks_coords["landmark_P1"][1] / raw_img_w
+    y1_major = 1 - landmarks_coords["landmark_P1"][0] / raw_img_h
+    x2_major = landmarks_coords["landmark_P2"][1] / raw_img_w
+    y2_major = 1 - landmarks_coords["landmark_P2"][0] / raw_img_h
+    x1_minor = landmarks_coords["landmark_P3"][1] / raw_img_w
+    y1_minor = 1 - landmarks_coords["landmark_P3"][0] / raw_img_h
+    x2_minor = landmarks_coords["landmark_P4"][1] / raw_img_w
+    y2_minor = 1 - landmarks_coords["landmark_P4"][0] / raw_img_h
     major_axis_length = math.sqrt(
         ((x2_major - x1_major) * resized_img_w * adjusted_pixel_width) ** 2
         + ((y2_major - y1_major) * resized_img_h * adjusted_pixel_height) ** 2
@@ -2234,6 +2244,116 @@ def recompute_total_max_steps(trainer):
     return new_max_steps
 
 
+def _make_temperature_sampler_trainer(SFTTrainer):
+    """Return a TemperatureSamplerSFTTrainer class bound to the given SFTTrainer base.
+
+    Defined as a factory so the import of SFTTrainer (from trl) stays lazy and
+    local to the caller, while the class itself is shared between prepare_trainer()
+    and prepare_trainer_fullFT().
+    """
+
+    # NOTE: We override only the train sampler behavior while keeping SFTTrainer unchanged.
+    # This keeps compatibility with existing trainer setup/checkpoint logic.
+    class TemperatureSamplerSFTTrainer(SFTTrainer):
+        """SFTTrainer variant that uses temperature-based weighted sampling."""
+
+        def __init__(self, *args, sample_weights, num_samples, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._temperature_sample_weights = sample_weights
+            self._temperature_num_samples = num_samples
+
+        def _get_train_sampler(self, *args, **kwargs):
+            # replacement=True is required so minority-task samples can be drawn more often
+            # than their raw cardinality in one epoch.
+            return WeightedRandomSampler(
+                weights=self._temperature_sample_weights,
+                num_samples=self._temperature_num_samples,
+                replacement=True,
+            )
+
+    return TemperatureSamplerSFTTrainer
+
+
+def _build_temperature_sampler_trainer(
+    *,
+    SFTTrainer,
+    trainer_kwargs,
+    data,
+    temperature_sampler_T,
+    temperature_sampler_task_column,
+    temperature_sampler_num_samples,
+):
+    """Compute temperature-weighted sample probabilities and return a trainer.
+
+    Shared by prepare_trainer() (LoRA) and prepare_trainer_fullFT() (full FT).
+    Returns a plain SFTTrainer when only one task is present.
+    """
+    if temperature_sampler_T <= 0:
+        raise ValueError("temperature_sampler_T must be > 0.")
+
+    train_dataset = data["train"]
+    if temperature_sampler_task_column not in train_dataset.column_names:
+        raise ValueError(
+            f"Temperature sampler requires column '{temperature_sampler_task_column}' in train dataset. "
+            "Regenerate prepared dataset with task labels or disable temperature sampler."
+        )
+
+    task_labels = train_dataset[temperature_sampler_task_column]
+    task_counts = defaultdict(int)
+    for task_label in task_labels:
+        task_counts[str(task_label)] += 1
+
+    if len(task_counts) <= 1:
+        # With a single task there is nothing to rebalance; use default trainer path.
+        safe_print(
+            "[Info] Temperature sampler enabled but only one task found; falling back to standard sampling."
+        )
+        return SFTTrainer(**trainer_kwargs)
+
+    count_tensor = torch.tensor(
+        [float(c) for c in task_counts.values()],
+        dtype=torch.float,
+    )
+    task_probs = count_tensor.pow(1.0 / float(temperature_sampler_T))
+    task_probs = task_probs / task_probs.sum()
+
+    # Per-sample weight for examples in task i:
+    #   weight_i = p(task_i) / count(task_i)
+    # This guarantees task-level sampling probability follows task_probs.
+    weight_per_task = {
+        task_name: float(task_probs[idx] / count_tensor[idx])
+        for idx, task_name in enumerate(task_counts.keys())
+    }
+    sample_weights = torch.DoubleTensor(
+        [weight_per_task[str(task_label)] for task_label in task_labels]
+    )
+
+    # Number of draws per epoch. Default (<=0) keeps the previous epoch length,
+    # while still changing the task composition within each epoch.
+    num_samples = (
+        len(train_dataset)
+        if temperature_sampler_num_samples is None
+        or int(temperature_sampler_num_samples) <= 0
+        else int(temperature_sampler_num_samples)
+    )
+
+    safe_print(
+        f"[Info] Using temperature sampler (T={temperature_sampler_T}) with task counts: {dict(task_counts)}"
+    )
+    safe_print(
+        f"[Info] Temperature-sampled per-task probabilities: "
+        f"{ {k: round(float(task_probs[i]), 6) for i, k in enumerate(task_counts.keys())} }"
+    )
+    safe_print(f"[Info] Temperature sampler num_samples per epoch: {num_samples}")
+
+    TemperatureSamplerSFTTrainer = _make_temperature_sampler_trainer(SFTTrainer)
+    return TemperatureSamplerSFTTrainer(
+        sample_weights=sample_weights,
+        num_samples=num_samples,
+        **trainer_kwargs,
+    )
+
+
 def prepare_trainer(
     *,
     run_name,
@@ -2266,31 +2386,6 @@ def prepare_trainer(
         BitsAndBytesConfig,
     )
     from trl import SFTConfig, SFTTrainer
-
-    # NOTE: We override only the train sampler behavior while keeping SFTTrainer unchanged.
-    # This keeps compatibility with existing trainer setup/checkpoint logic.
-    class TemperatureSamplerSFTTrainer(SFTTrainer):
-        """SFTTrainer variant that uses temperature-based weighted sampling."""
-
-        def __init__(
-            self,
-            *args,
-            sample_weights,
-            num_samples,
-            **kwargs,
-        ):
-            super().__init__(*args, **kwargs)
-            self._temperature_sample_weights = sample_weights
-            self._temperature_num_samples = num_samples
-
-        def _get_train_sampler(self, *args, **kwargs):
-            # replacement=True is required so minority-task samples can be drawn more often
-            # than their raw cardinality in one epoch.
-            return WeightedRandomSampler(
-                weights=self._temperature_sample_weights,
-                num_samples=self._temperature_num_samples,
-                replacement=True,
-            )
 
     # Check if GPU supports bfloat16
     if torch.cuda.get_device_capability()[0] < 8:
@@ -2402,76 +2497,131 @@ def prepare_trainer(
     # Temperature sampler path (optional): rebalance multi-task sampling by sampling tasks
     # according to p(task) ~ count(task)^(1/T) instead of raw dataset proportion.
     if enable_temperature_sampler:
-        if temperature_sampler_T <= 0:
-            raise ValueError("temperature_sampler_T must be > 0.")
-
-        train_dataset = data["train"]
-        # The train scripts add this column when preparing datasets.
-        # It is required to group examples by task and compute per-task counts.
-        if temperature_sampler_task_column not in train_dataset.column_names:
-            raise ValueError(
-                f"Temperature sampler requires column '{temperature_sampler_task_column}' in train dataset. "
-                "Regenerate prepared dataset with task labels or disable temperature sampler."
-            )
-
-        task_labels = train_dataset[temperature_sampler_task_column]
-        task_counts = defaultdict(int)
-        for task_label in task_labels:
-            task_counts[str(task_label)] += 1
-
-        if len(task_counts) <= 1:
-            # With a single task there is nothing to rebalance; use default trainer path.
-            safe_print(
-                "[Info] Temperature sampler enabled but only one task found; falling back to standard sampling."
-            )
-            trainer = SFTTrainer(**trainer_kwargs)
-            return trainer
-
-        count_tensor = torch.tensor(
-            [float(c) for c in task_counts.values()],
-            dtype=torch.float,
-        )
-        task_probs = count_tensor.pow(1.0 / float(temperature_sampler_T))
-        task_probs = task_probs / task_probs.sum()
-
-        # Per-sample weight for examples in task i:
-        #   weight_i = p(task_i) / count(task_i)
-        # This guarantees task-level sampling probability follows task_probs.
-        weight_per_task = {
-            task_name: float(task_probs[idx] / count_tensor[idx])
-            for idx, task_name in enumerate(task_counts.keys())
-        }
-        sample_weights = torch.DoubleTensor(
-            [weight_per_task[str(task_label)] for task_label in task_labels]
-        )
-
-        # Number of draws per epoch. Default (<=0) keeps the previous epoch length,
-        # while still changing the task composition within each epoch.
-        num_samples = (
-            len(train_dataset)
-            if temperature_sampler_num_samples is None
-            or int(temperature_sampler_num_samples) <= 0
-            else int(temperature_sampler_num_samples)
-        )
-
-        safe_print(
-            f"[Info] Using temperature sampler (T={temperature_sampler_T}) with task counts: {dict(task_counts)}"
-        )
-        safe_print(
-            f"[Info] Temperature-sampled per-task probabilities: "
-            f"{ {k: round(float(task_probs[i]), 6) for i, k in enumerate(task_counts.keys())} }"
-        )
-        safe_print(f"[Info] Temperature sampler num_samples per epoch: {num_samples}")
-
-        trainer = TemperatureSamplerSFTTrainer(
-            sample_weights=sample_weights,
-            num_samples=num_samples,
-            **trainer_kwargs,
+        return _build_temperature_sampler_trainer(
+            SFTTrainer=SFTTrainer,
+            trainer_kwargs=trainer_kwargs,
+            data=data,
+            temperature_sampler_T=temperature_sampler_T,
+            temperature_sampler_task_column=temperature_sampler_task_column,
+            temperature_sampler_num_samples=temperature_sampler_num_samples,
         )
     else:
-        trainer = SFTTrainer(**trainer_kwargs)
+        return SFTTrainer(**trainer_kwargs)
 
-    return trainer
+
+def prepare_trainer_fullFT(
+    *,
+    run_name,
+    base_model_hf,
+    checkpoint_dir,
+    data,
+    make_collate_fn,
+    per_device_train_batch_size=1,
+    per_device_eval_batch_size=1,
+    gradient_accumulation_steps=16,
+    use_flash_attention_2=True,
+    num_train_epochs=1,
+    save_steps=100,
+    eval_steps=50,
+    logging_steps=50,
+    save_total_limit=5,
+    dataloader_num_workers=4,
+    gradient_checkpointing=True,
+    dataloader_pin_memory=True,
+    push_model=False,
+    enable_temperature_sampler=False,
+    temperature_sampler_T=3.0,
+    temperature_sampler_task_column="__task_name",
+    temperature_sampler_num_samples=-1,
+):
+    """Prepare an SFTTrainer for full parameter finetuning (no LoRA, no quantization).
+
+    Loads the model in BF16 without any PEFT adapter. All parameters are trained.
+    Use a lower learning rate and cosine scheduler compared to the LoRA variant.
+    """
+    from transformers import AutoModelForImageTextToText, AutoProcessor
+    from trl import SFTConfig, SFTTrainer
+
+    # Check if GPU supports bfloat16
+    if torch.cuda.get_device_capability()[0] < 8:
+        raise ValueError(
+            "GPU does not support bfloat16, please use a GPU that supports bfloat16."
+        )
+
+    # Set the device string for multi-gpu training using accelerate's PartialState
+    # ref: https://github.com/huggingface/trl/blob/main/docs/source/sft_trainer.md#multi-gpu-training
+    attn_impl = "flash_attention_2" if use_flash_attention_2 else "eager"
+    model_kwargs = dict(
+        attn_implementation=attn_impl,
+        torch_dtype=torch.bfloat16,
+        device_map={"": PartialState().process_index},
+        trust_remote_code=True,
+    )
+
+    # Load the model in BF16 without quantization — all parameters will be trained
+    model = AutoModelForImageTextToText.from_pretrained(base_model_hf, **model_kwargs)
+
+    # Initialize processor
+    processor = AutoProcessor.from_pretrained(base_model_hf)
+
+    # Use right padding to avoid issues during training
+    processor.tokenizer.padding_side = "right"
+
+    args = SFTConfig(
+        run_name=run_name,
+        output_dir=checkpoint_dir,
+        num_train_epochs=num_train_epochs,
+        per_device_train_batch_size=per_device_train_batch_size,
+        per_device_eval_batch_size=per_device_eval_batch_size,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        # Gradient checkpointing is on by default for full FT — required at 7B+ scale
+        gradient_checkpointing=gradient_checkpointing,
+        optim="adamw_torch_fused",
+        logging_steps=logging_steps,
+        save_strategy="steps",
+        save_steps=save_steps,
+        save_total_limit=save_total_limit,
+        eval_strategy="steps",
+        eval_steps=eval_steps,
+        learning_rate=2e-5,
+        bf16=True,
+        max_grad_norm=1.0,
+        warmup_ratio=0.03,
+        lr_scheduler_type="cosine",
+        push_to_hub=push_model,
+        hub_private_repo=True,
+        report_to="wandb",
+        gradient_checkpointing_kwargs={"use_reentrant": False},
+        dataset_kwargs={"skip_prepare_dataset": True},
+        remove_unused_columns=False,
+        label_names=["labels"],
+        dataloader_num_workers=dataloader_num_workers,
+        dataloader_pin_memory=dataloader_pin_memory,
+        dataloader_persistent_workers=False,
+    )
+
+    trainer_kwargs = dict(
+        model=model,
+        args=args,
+        train_dataset=data["train"],
+        eval_dataset=data["validation"],
+        processing_class=processor,
+        data_collator=make_collate_fn(processor),
+    )
+
+    # Temperature sampler path (optional): rebalance multi-task sampling by sampling tasks
+    # according to p(task) ~ count(task)^(1/T) instead of raw dataset proportion.
+    if enable_temperature_sampler:
+        return _build_temperature_sampler_trainer(
+            SFTTrainer=SFTTrainer,
+            trainer_kwargs=trainer_kwargs,
+            data=data,
+            temperature_sampler_T=temperature_sampler_T,
+            temperature_sampler_task_column=temperature_sampler_task_column,
+            temperature_sampler_num_samples=temperature_sampler_num_samples,
+        )
+    else:
+        return SFTTrainer(**trainer_kwargs)
 
 
 def merge_models(
