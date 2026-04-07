@@ -597,11 +597,14 @@ def prepare_dataset_for_verl(
         "model_hf": model_hf,
         "new_shape_hw": new_shape_hw,
     }
+    # Use small writer_batch_size because images are embedded as PIL objects (not paths).
+    # Each worker buffers writer_batch_size PIL images in RAM before flushing to Arrow.
     dataset = format_dataset(
         dataset=dataset,
         mapping_func=mapping_func,
         mapping_func_args=mapping_func_args,
         num_workers_format_dataset=num_workers_format_dataset,
+        writer_batch_size=50,
     )
 
     # Clean dataset to keep only necessary keys
@@ -655,11 +658,14 @@ def prepare_dataset_for_verl_with_testset(
         "model_hf": model_hf,
         "new_shape_hw": new_shape_hw,
     }
+    # Use small writer_batch_size because images are embedded as PIL objects (not paths).
+    # Each worker buffers writer_batch_size PIL images in RAM before flushing to Arrow.
     dataset = format_dataset(
         dataset=dataset,
         mapping_func=mapping_func,
         mapping_func_args=mapping_func_args,
         num_workers_format_dataset=num_workers_format_dataset,
+        writer_batch_size=50,
     )
 
     # Clean dataset to keep only necessary keys

@@ -362,8 +362,7 @@ def main(
             trainer.train()
 
         # Save the trained model
-        if is_main_process():
-            trainer.save_model()
+        trainer.save_model()
 
     # Free VRAM
     # Safe delete trainer only if it exists (prevents NameError when trainer was never created)
