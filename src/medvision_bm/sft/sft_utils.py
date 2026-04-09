@@ -2178,6 +2178,7 @@ def prepare_dataset(
         mapping_func=mapping_func,
         mapping_func_args=mapping_func_args,
         num_workers_format_dataset=num_workers_format_dataset,
+        writer_batch_size=50,
     )
 
     # Clean dataset to keep only necessary keys

@@ -28,7 +28,6 @@ from llava.constants import (
     DEFAULT_IM_END_TOKEN,
     DEFAULT_IM_START_TOKEN,
     DEFAULT_IMAGE_TOKEN,
-    IGNORE_INDEX,
     IMAGE_TOKEN_INDEX,
 )
 from llava.mm_utils import tokenizer_image_token
@@ -55,7 +54,6 @@ class HealthGPT_XL32(lmms):
     Github:
         - https://github.com/DCDmllm/HealthGPT
 
-    (Default)
     HealthGPT-XL32:
         Base Model: Qwen2.5-32B-Instruct
             - https://huggingface.co/Qwen/Qwen2.5-32B-Instruct
@@ -64,14 +62,14 @@ class HealthGPT_XL32(lmms):
         HLORA Weights:
             - https://huggingface.co/lintw/HealthGPT-XL32/tree/main
 
+    dtype: FP16 (https://github.com/ZJU4HealthCare/HealthGPT)
     """
 
     def __init__(
         self,
-        base_model_hf: str = "microsoft/phi-4",
+        base_model_hf: str = "Qwen/Qwen2.5-32B-Instruct",
         vision_model_hf: str = "openai/clip-vit-large-patch14-336",
         hlora_weights_local: str = None,
-        dtype: str = "FP16",
         attn_implementation: str = "flash_attention_2",
         hlora_r: int = 32,
         hlora_alpha: int = 64,
@@ -91,7 +89,7 @@ class HealthGPT_XL32(lmms):
         self.base_model_hf = base_model_hf
         self.vision_model_hf = vision_model_hf
         self.hlora_weights_local = hlora_weights_local
-        self.dtype = dtype
+        self.model_dtype = torch.float16 # use model dtype (https://github.com/ZJU4HealthCare/HealthGPT) 
         self.attn_implementation = attn_implementation
         self.hlora_r = hlora_r
         self.hlora_alpha = hlora_alpha
@@ -140,20 +138,12 @@ class HealthGPT_XL32(lmms):
         self.accelerator = Accelerator()
         self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
 
-        assert self.dtype in ["FP16", "FP32", "BF16"], ValueError(f"Unsupported dtype: {self.dtype}, should be one of [FP16, FP32, BF16]")
-        if self.dtype == "BF16":
-            model_dtype = torch.bfloat16
-        elif self.dtype == "FP16":
-            model_dtype = torch.float16
-        elif self.dtype == "FP32":
-            model_dtype = torch.float32
-
         # Optimize model loading with better device_map and config
         load_config = {
             "low_cpu_mem_usage": True,
             "use_safetensors": True,  # Prioritize safetensors format if available
             "attn_implementation": self.attn_implementation,
-            "torch_dtype": model_dtype,
+            "torch_dtype": self.model_dtype,
         }
         # Always load to the specific device to avoid cross-device issues
         load_config["device_map"] = {"": self.device}
@@ -187,13 +177,13 @@ class HealthGPT_XL32(lmms):
         com_vision_args.version = self.instruct_template
 
         self._model.get_model().initialize_vision_modules(model_args=com_vision_args)
-        self._model.get_vision_tower().to(dtype=model_dtype)
+        self._model.get_vision_tower().to(dtype=self.model_dtype)
 
         self._model = load_weights(self._model, self.hlora_weights_local)
         self._model.eval()
 
         # Set up model on the target device
-        self._model.to(model_dtype).to(self.device)
+        self._model.to(self.model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -253,9 +243,8 @@ class HealthGPT_XL32(lmms):
         max_new_tokens: int = None,
     ):
         _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
-        model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
-        if pil_img:
+        if pil_img is not None:
             qs = DEFAULT_IMAGE_TOKEN + "\n" + question
         else:
             qs = question
@@ -264,15 +253,15 @@ class HealthGPT_XL32(lmms):
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
         input_ids = tokenizer_image_token(prompt, self._tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").to(self.device).unsqueeze_(0)
-        if pil_img:
+        if pil_img is not None:
             image = pil_img.convert("RGB")
             image = expand2square(image, tuple(int(x * 255) for x in self._model.get_vision_tower().image_processor.image_mean))
             image_tensor = self._model.get_vision_tower().image_processor.preprocess(image, return_tensors="pt")["pixel_values"][0].unsqueeze_(0)
         with torch.inference_mode():
             output_ids = self._model.base_model.model.generate(
                 input_ids,
-                images=image_tensor.to(dtype=model_dtype, device=self.device, non_blocking=True) if pil_img else None,
-                image_sizes=image.size if pil_img else None,
+                images=image_tensor.to(dtype=self.model_dtype, device=self.device, non_blocking=True) if pil_img is not None else None,
+                image_sizes=image.size if pil_img is not None else None,
                 do_sample=self.do_sample,
                 temperature=self.temperature,
                 top_p=self.top_p,

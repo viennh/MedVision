@@ -24,6 +24,8 @@ class MedGemma(lmms):
     MedGemma Model
 
     - HF: https://huggingface.co/collections/google/medgemma-release-680aade845f90bec6a3f60c4
+
+    dtype: BF16 (https://huggingface.co/google/medgemma-27b-it/blob/main/config.json)
     """
 
     def __init__(

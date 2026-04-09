@@ -29,12 +29,10 @@ class HuatuoGPT_Vision(lmms):
     def __init__(
         self,
         model_hf: str = "FreedomIntelligence/HuatuoGPT-Vision-34B",
-        dtype: str = "FP16",
         **kwargs,
     ) -> None:
         super().__init__()
         self.model_hf = model_hf
-        self.dtype = dtype
         self.prepare_model()
 
     @property
@@ -69,9 +67,6 @@ class HuatuoGPT_Vision(lmms):
         # Set up accelerator and device assignment using standard practice
         self.accelerator = Accelerator()
         self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
-
-        self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
-
         # Load model
         self.huatuo_chatbot = HuatuoChatbot(self.model_hf, device=self._device)
 

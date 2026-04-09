@@ -308,8 +308,7 @@ def main():
             f"hlora_alpha={hlora_alpha},"
             f"hlora_nums={hlora_nums},"
             f"vq_idx_nums={vq_idx_nums},"
-            f"max_new_tokens={max_new_tokens},"
-            "dtype=FP16"  # ["FP16", "FP32", "BF16"]
+            f"max_new_tokens={max_new_tokens}"
         )
 
         # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing

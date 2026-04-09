@@ -178,6 +178,8 @@ class LLaVA_Med(lmms):
             image_tensor = image_tensor.unsqueeze(0).to(self.device)
         elif self.dtype == "FP16":
             image_tensor = image_tensor.unsqueeze(0).half().to(self.device)
+        else:  # BF16
+            image_tensor = image_tensor.unsqueeze(0).to(torch.bfloat16).to(self.device)
 
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]

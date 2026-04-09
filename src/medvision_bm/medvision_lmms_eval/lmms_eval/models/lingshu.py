@@ -23,6 +23,8 @@ class Lingshu(lmms):
     Lingshu Model
 
     - HF: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B
+
+    dtype: BF16 (https://huggingface.co/lingshu-medical-mllm/Lingshu-32B)   
     """
 
     def __init__(
@@ -40,7 +42,7 @@ class Lingshu(lmms):
         self.use_flash_attention_2 = use_flash_attention_2
         self.max_new_tokens = max_new_tokens
         self.num_workers = num_workers
-        self.model_dtype = torch.bfloat16
+        self.model_dtype = torch.bfloat16 # use model dtype (https://huggingface.co/lingshu-medical-mllm/Lingshu-32B)
         self.prepare_model()
 
     @property

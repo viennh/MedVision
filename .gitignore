@@ -219,3 +219,6 @@ dev-*
 
 .claude
 CLAUDE.md
+
+# Git worktrees
+.worktrees/
