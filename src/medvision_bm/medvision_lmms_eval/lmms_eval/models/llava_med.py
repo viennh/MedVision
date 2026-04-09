@@ -35,6 +35,8 @@ from lmms_eval.models.model_utils.device_utils import setup_device_with_accelera
 class LLaVA_Med(lmms):
     """
     LLaVA-Med Model
+
+    dtype: BF16 (https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json) 
     """
 
     def __init__(
@@ -46,7 +48,6 @@ class LLaVA_Med(lmms):
         top_p: float = None,
         num_beams: int = 1,
         max_new_tokens: int = 4096,
-        dtype: str = "FP16",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -57,7 +58,7 @@ class LLaVA_Med(lmms):
         self.top_p = top_p
         self.num_beams = num_beams
         self.max_new_tokens = max_new_tokens
-        self.dtype = dtype
+        self.model_dtype = torch.bfloat16 # use model dtype (https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json)
         self.prepare_model()
 
     @property
@@ -93,8 +94,6 @@ class LLaVA_Med(lmms):
         self.accelerator = Accelerator()
         self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
 
-        model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
-
         # Add loading progress information
         eval_logger.info(f"Loading base model from {self.model_hf}...")
 
@@ -107,7 +106,7 @@ class LLaVA_Med(lmms):
 
         # Set up model — device placement is handled by load_pretrained_model;
         # move to the correct dtype and device explicitly
-        self._model.to(model_dtype).to(self.device)
+        self._model.to(self.model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -174,12 +173,8 @@ class LLaVA_Med(lmms):
         input_ids = tokenizer_image_token(prompt, self._tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
 
         image_tensor = process_images([pil_img], self._image_processor, self._model.config)[0]
-        if self.dtype == "FP32":
-            image_tensor = image_tensor.unsqueeze(0).to(self.device)
-        elif self.dtype == "FP16":
-            image_tensor = image_tensor.unsqueeze(0).half().to(self.device)
-        else:  # BF16
-            image_tensor = image_tensor.unsqueeze(0).to(torch.bfloat16).to(self.device)
+        # The model expects images in BF16 on the same device, so convert and move the image tensor accordingly
+        image_tensor = image_tensor.unsqueeze(0).to(torch.bfloat16).to(self.device)
 
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]

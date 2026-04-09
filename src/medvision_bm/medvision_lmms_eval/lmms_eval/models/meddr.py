@@ -29,19 +29,20 @@ IMG_CONTEXT_TOKEN = "<IMG_CONTEXT>"
 class MedDr(lmms):
     """
     LLaVA-Med Model
+
+    dtype: BF16 (https://huggingface.co/Sunanhe/MedDr_0401/blob/main/config.json)
     """
 
     def __init__(
         self,
         model_hf: str = "Sunanhe/MedDr_0401",
-        dtype: str = "FP16",
         attn_implementation: str = "flash_attention_2",
         max_new_tokens: Optional[int] = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
         self.model_hf = model_hf
-        self.dtype = dtype
+        self.model_dtype = torch.bfloat16 # use model dtype (https://huggingface.co/Sunanhe/MedDr_0401/blob/main/config.json)
         self.attn_implementation = attn_implementation
         self.max_new_tokens = max_new_tokens
         self.prepare_model()
@@ -78,8 +79,6 @@ class MedDr(lmms):
         # Set up accelerator and device assignment using standard practice
         self.accelerator = Accelerator()
         self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
-
-        self.model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Add loading progress information
         eval_logger.info(f"Loading base model from {self.model_hf}...")
