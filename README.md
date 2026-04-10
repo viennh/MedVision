@@ -10,10 +10,10 @@ For full upstream documentation (Docker, SLURM, SFT, etc.), see [`README-MedVisi
 
 1. On GitHub, open [YongchengYAO/MedVision](https://github.com/YongchengYAO/MedVision) and use **Fork** to create your copy under your account (or your course organization).
 
-2. Clone **your** fork locally (replace `YOUR_USER`):
+2. Clone **your** fork locally:
 
    ```bash
-   git clone https://github.com/YOUR_USER/MedVision.git
+   git clone https://github.com/viennh/MedVision.git
    cd MedVision
    ```
 
