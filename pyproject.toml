@@ -5,20 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "medvision_bm"
 dynamic = ["version"]
-description = "medvision_bm, a codebase for the MedVision benchmark"
+description = "medvision_bm: a codebase for the MedVision benchmark"
 requires-python = ">=3.9"
 authors = [{ name = "Yongcheng Yao", email = "yc.yao@ed.ac.uk" }]
-license = { text = "CC-BY-NC 4.0" }
+license = "CC-BY-NC-4.0"
 dependencies = [
-    "datasets==3.6.0",
-    "huggingface_hub==0.36.0",
+    "datasets>=3.6.0",
+    "huggingface_hub>=0.36.0",
     "nibabel",
-    "torch",
-    "torchvision",
-    "accelerate",
-    "psutil",
-    "scipy",
-    "matplotlib",
+    "aiohttp<3.11; python_version < '3.10'",
 ]
 
 [project.urls]

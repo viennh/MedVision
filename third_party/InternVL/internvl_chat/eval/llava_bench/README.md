@@ -32,7 +32,7 @@ data/llava-bench-in-the-wild
 ├── bing_chat_0629.jsonl
 ├── context.jsonl
 ├── questions.jsonl
-└── README.md
+└── MedVision-README.md
 ```
 
 ## 🏃 Evaluation Execution

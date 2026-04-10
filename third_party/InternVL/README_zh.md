@@ -26,7 +26,7 @@
 
 [\[📖 2.0 中文解读\]](https://zhuanlan.zhihu.com/p/706547971)  [\[📖 1.5 中文解读\]](https://zhuanlan.zhihu.com/p/699439759)  [\[📖 1.0 中文解读\]](https://zhuanlan.zhihu.com/p/702946079)
 
-[Switch to the English version (切换至英文版)](/README.md)
+[Switch to the English version (切换至英文版)](/MedVision-README.md)
 
 <a href="https://trendshift.io/repositories/9803" target="_blank"><img src="https://trendshift.io/api/badge/repositories/9803" alt="OpenGVLab%2FInternVL | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 <img height="55" alt="image" src="https://github.com/user-attachments/assets/bd62ab46-f0ea-40c6-ab10-7fde671716cc">

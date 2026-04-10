@@ -48,7 +48,7 @@ data/MVBench
 │   ├── scene_transition.json
 │   ├── state_change.json
 │   └── unexpected_action.json
-├── README.md
+├── MedVision-README.md
 └── video
     ├── clevrer
     ├── FunQA_test

@@ -26,7 +26,7 @@ data/MMVP
  ├── MMVP Images
  ├── Questions.csv
  ├── Questions.xlsx
- └── README.md
+ └── MedVision-README.md
 ```
 
 ## 🏃 Evaluation Execution
