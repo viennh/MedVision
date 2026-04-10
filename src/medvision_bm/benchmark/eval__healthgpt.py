@@ -1,8 +1,11 @@
 import argparse
+import json
 import os
 import subprocess
 
 from huggingface_hub import snapshot_download
+
+from medvision_bm.benchmark.eval_utils import parse_sample_indices
 
 from medvision_bm.utils import (
     ensure_hf_hub_installed,
@@ -135,6 +138,7 @@ def run_evaluation_for_task(
     batch_size: int,
     sample_limit: int,
     output_path: str,
+    sample_indices: list = None,
 ):
     print(f"\nRunning task: {task}\n")
     subprocess.run("conda env list", check=True, shell=True)
@@ -160,6 +164,8 @@ def run_evaluation_for_task(
         "--output_path",
         output_path,
     ]
+    if sample_indices is not None:
+        cmd += ["--sample_indices", json.dumps(sample_indices)]
     cmd_result = subprocess.run(cmd, check=False)
     print(f"Command executed with return code: {cmd_result.returncode}")
     return cmd_result.returncode
@@ -221,6 +227,17 @@ def parse_args():
         default=1000,
         type=int,
         help="Maximum number of samples to evaluate per task.",
+    )
+    parser.add_argument(
+        "--sample_indices",
+        default=None,
+        type=str,
+        metavar="[start:stop]|[start,stop,step]",
+        help=(
+            "Select a subset of samples by index for partial inference. "
+            "Accepted formats: [start:stop] (range) or [start,stop,step] (range with step). "
+            "When set, overrides --sample_limit for sample selection."
+        ),
     )
     # debugging and control arguments
     parser.add_argument(
@@ -330,6 +347,10 @@ def main():
         elif model_name == "HealthGPT-XL32":
             module = "healthgpt_xl32"
 
+        parsed_sample_indices = None
+        if args.sample_indices is not None:
+            parsed_sample_indices = parse_sample_indices(args.sample_indices)
+
         rc = run_evaluation_for_task(
             num_processes=num_processes,
             lmmseval_module=module,
@@ -338,6 +359,7 @@ def main():
             batch_size=batch_size,
             sample_limit=sample_limit,
             output_path=os.path.join(result_dir, model_name),
+            sample_indices=parsed_sample_indices,
         )
 
         if rc == 0:

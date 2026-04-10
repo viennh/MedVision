@@ -392,6 +392,7 @@ class Task(abc.ABC):
         fewshot_as_multiturn: bool = False,
         chat_template: Optional[Callable] = None,
         tokenizer_name: str = "",
+        sample_indices: Optional[set] = None,
     ) -> None:
         """Build a set of Instances for a task, and store them in task.instances"""
         if self.has_test_docs():
@@ -430,10 +431,16 @@ class Task(abc.ABC):
         if cache_requests and (not cached_instances or rewrite_requests_cache) and limit is not None:
             limit = None
 
-        doc_id_docs = utils.create_iterator(enumerate(self.eval_docs_no_media), rank=rank, limit=int(limit) if limit else None, world_size=world_size)
-        doc_iterator_for_counting = itertools.islice(range(len(self.test_docs())), rank, limit, world_size) if self.has_test_docs() else itertools.islice(range(len(self.validation_docs())), rank, limit, world_size)
-
-        num_docs = sum(1 for _ in doc_iterator_for_counting)
+        if sample_indices is not None:
+            # Partial inference: select only the requested indices, distributed across ranks
+            _sorted_indices = sorted(sample_indices)
+            _rank_indices = set(_sorted_indices[rank::world_size])
+            doc_id_docs = ((doc_id, doc) for doc_id, doc in enumerate(self.eval_docs_no_media) if doc_id in _rank_indices)
+            num_docs = len(_rank_indices)
+        else:
+            doc_id_docs = utils.create_iterator(enumerate(self.eval_docs_no_media), rank=rank, limit=int(limit) if limit else None, world_size=world_size)
+            doc_iterator_for_counting = itertools.islice(range(len(self.test_docs())), rank, limit, world_size) if self.has_test_docs() else itertools.islice(range(len(self.validation_docs())), rank, limit, world_size)
+            num_docs = sum(1 for _ in doc_iterator_for_counting)
 
         for doc_id, doc in tqdm(
             doc_id_docs,
@@ -462,8 +469,8 @@ class Task(abc.ABC):
             instances.append(inst)
 
         # now flatten, this is to allow slicing to work with pickles
-
-        sliced_instances = instances[:og_limit]
+        # When sample_indices is active, all built instances are already the desired set—skip og_limit slice
+        sliced_instances = instances if sample_indices is not None else instances[:og_limit]
 
         flattened_instances = [instance for instance_group in sliced_instances for instance in instance_group]
 
