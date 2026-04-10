@@ -174,7 +174,7 @@ class Gemini__2_5(lmms):
             if self.json_output:
                 question = contexts
             else:
-                question = contexts + "\nPlease put the final answer after 'Answer:'\n\n"
+                question = contexts + "\n\Please put the final answer after 'Answer:'\n\n"
             resp = self._generate_content_with_retry(visual, question)
             res.append(resp)
             pbar.update(1)

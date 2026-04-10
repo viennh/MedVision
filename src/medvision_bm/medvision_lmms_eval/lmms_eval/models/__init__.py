@@ -2,6 +2,7 @@ import importlib
 import os
 import sys
 
+import hf_transfer
 from loguru import logger
 
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
@@ -9,57 +10,30 @@ os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 logger.remove()
 logger.add(sys.stdout, level="WARNING")
 
-# Commented out models are not fully tested
-# ---
-# NOTE:
-# In the MedVision benchmark (https://medvision-vlm.github.io),
-# we use the vllm inference engine for some models (e.g., Gemma3, InternVL3, Llama-3.2-Vision, Llava-OneVision, Qwen2.5-VL).
-# Commented out models are those not included in MedVision Benchmark.
-# ---
 AVAILABLE_MODELS = {
-    # Gemini
-    "gemini__2_5": "Gemini__2_5",
-    "gemini__2_5_woTool": "Gemini__2_5_woTool",
-    # Gemma3
     "vllm_gemma3": "VLLM_Gemma3",
-    # HealthGPT
-    "healthgpt": "HealthGPT",
+    "vllm_internvl3": "VLLM_InternVL3",
+    "vllm_llama_3_2_vision": "VLLM_Llama_3_2_Vision",
+    "vllm_llava_onevision": "VLLM_Llava_OneVision",
+    "vllm_qwen25vl": "VLLM_Qwen25VL",
+    "lingshu": "Lingshu",
+    "medgemma": "MedGemma",
+    "biomedgpt": "BiomedGPT",
     "healthgpt_l14": "HealthGPT_L14",
     "healthgpt_xl32": "HealthGPT_XL32",
-    # HuatuoGPT-Vision
-    "huatuogpt_vision": "HuatuoGPT_Vision",
-    # InternVL3
-    "vllm_internvl3": "VLLM_InternVL3",
-    # "internvl3": "InternVL3",
-    # Lingshu
-    "lingshu": "Lingshu",
-    # Llama
-    "llama_vision": "LlamaVision",
-    "vllm_llama_3_2_vision": "VLLM_Llama_3_2_Vision",
-    # "llama4": "Llama4",
-    # LLaVA-Med
+    "healthgpt": "HealthGPT",
     "llava_med": "LLaVA_Med",
-    # LLaVA-OneVision
-    # "llava_onevision": "Llava_OneVision",
-    "vllm_llava_onevision": "VLLM_Llava_OneVision",
-    # MedDr
     "meddr": "MedDr",
-    # MedGemma
-    "medgemma": "MedGemma",
-    # Qwen2.5-VL
-    # "qwen2_5_vl": "Qwen2_5_VL",
-    "vllm_qwen25vl": "VLLM_Qwen25VL",
-    # Qwen3-VL
-    "qwen3vl": "Qwen3VL",
-    # "vllm_qwen3vl": "VLLM_Qwen3VL",
-    # BiomedGPT
-    # "biomedgpt": "BiomedGPT",
+    "huatuogpt_vision": "HuatuoGPT_Vision",
+    "gemini__2_5_woTool": "Gemini__2_5_woTool",
+    "gemini__2_5": "Gemini__2_5",
+    "internvl3": "InternVL3",
+    "llama_vision": "LlamaVision",
+    "llama4": "Llama4",
+    "llava_onevision": "Llava_OneVision",
+    "qwen2_5_vl": "Qwen2_5_VL",
+    "vllm": "VLLM",
 }
-
-
-def get_available_model_names():
-    """Return available model identifiers as a plain list."""
-    return list(AVAILABLE_MODELS.keys())
 
 
 def get_model(model_name):

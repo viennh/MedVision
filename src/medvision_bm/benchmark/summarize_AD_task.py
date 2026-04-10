@@ -112,9 +112,7 @@ def _update_mae_counters(value, counters):
         - Only processes non-NaN values
         - Threshold buckets: i covers [i*0.1, (i+1)*0.1), bucket 9 covers [0.9, ∞)
     """
-    # Guard against non-finite values (inf, -inf, nan) that cannot be
-    # converted to int or meaningfully summed.
-    if np.isfinite(value):
+    if not np.isnan(value):
         counters["sum_MAE"] += value
         counters["count_valid_AE"] += 1
 
@@ -137,9 +135,7 @@ def _update_mre_counters(value, counters):
         - Only processes non-NaN values
         - Threshold buckets: i covers [i*0.1, (i+1)*0.1), bucket 9 covers [0.9, ∞)
     """
-    # Guard against non-finite values (inf, -inf, nan) that cannot be
-    # converted to int or meaningfully summed.
-    if np.isfinite(value):
+    if not np.isnan(value):
         counters["sum_MRE"] += value
         counters["count_valid_RE"] += 1
 
@@ -159,13 +155,12 @@ def _update_metric_counters_AD_task(metrics_dict, counters):
         metrics_dict (dict): Dictionary containing avgMAE, avgMRE, and SuccessRate metrics
         counters (dict): Counter dictionary to update in-place
     """
-    # Update MAE counters (skip nan and inf — non-finite values are unparseable
-    # responses and should not contribute to the running average)
-    if np.isfinite(metrics_dict["avgMAE"]["MAE"]):
+    # Update MAE counters
+    if not np.isnan(metrics_dict["avgMAE"]["MAE"]):
         _update_mae_counters(metrics_dict["avgMAE"]["MAE"], counters)
 
     # Update MRE counters
-    if np.isfinite(metrics_dict["avgMRE"]["MRE"]):
+    if not np.isnan(metrics_dict["avgMRE"]["MRE"]):
         _update_mre_counters(metrics_dict["avgMRE"]["MRE"], counters)
 
     # Update success count
@@ -479,17 +474,9 @@ def process_parsed_file_in_model_folder(
     """
     # Locate parsed files directory
     parsed_files_dir = os.path.join(model_dir, "parsed")
-
-    # # Option 1: Early exit if parsed directory does not exist
-    # assert os.path.exists(
-    #     parsed_files_dir
-    # ), f"Parsed files directory does not exist: {parsed_files_dir}"
-
-    # Option 2: Warning and skip if parsed directory does not exist
-    if not os.path.exists(parsed_files_dir):
-        print(f"Parsed files directory does not exist: {parsed_files_dir}, skipping...")
-        return
-
+    assert os.path.exists(
+        parsed_files_dir
+    ), f"Parsed files directory does not exist: {parsed_files_dir}"
     grouped_files = find_and_group_jsonl_files(parsed_files_dir)
 
     # Collect all data from the parsed JSONL files
@@ -515,21 +502,21 @@ def process_parsed_file_in_model_folder(
     )
 
     # Save raw values JSON file (targets and predictions for each sample)
-    values_filename = SUMMARY_FILENAME_AD_VALUES if limit is None else f"{SUMMARY_FILENAME_AD_VALUES.removesuffix('.json')}_limit{limit}.json" 
-    values_path = os.path.join(parsed_files_dir, values_filename)
-    with open(values_path, "w") as f:
+    # Output: parsed/summary_AD_values.json
+    output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_AD_VALUES)
+    with open(output_path, "w") as f:
         json.dump(convert_numpy_to_python(all_data), f, indent=2)
-    print(f"Saved target and model-predicted values to {values_path}")
+    print(f"Saved target and model-predicted values to {output_path}")
 
     # Save aggregated metrics JSON file (metrics per label)
-    metrics_filename = SUMMARY_FILENAME_AD_METRICS if limit is None else f"{SUMMARY_FILENAME_AD_METRICS.removesuffix('.json')}_limit{limit}.json"
-    metrics_path = os.path.join(parsed_files_dir, metrics_filename)
-    with open(metrics_path, "w") as f:
+    # Output: parsed/summary_AD_metrics.json
+    output_path = os.path.join(parsed_files_dir, SUMMARY_FILENAME_AD_METRICS)
+    with open(output_path, "w") as f:
         json.dump(convert_numpy_to_python(summary_metrics), f, indent=2)
-    print(f"Saved summary metrics to {metrics_path}")
+    print(f"Saved summary metrics to {output_path}")
 
 
-def print_model_summaries(task_dir, limit=None, skip_model_wo_parsed_files=False):
+def print_model_summaries(task_dir, skip_model_wo_parsed_files=False):
     """
     Print and save summary metrics for all models in a task directory.
 
@@ -542,7 +529,6 @@ def print_model_summaries(task_dir, limit=None, skip_model_wo_parsed_files=False
 
     Args:
         task_dir (str): Path to the task directory containing model folders
-        limit (int, optional): Maximum number of samples to process per file
         skip_model_wo_parsed_files (bool): Whether to skip models without parsed folders
 
     Input:
@@ -556,8 +542,7 @@ def print_model_summaries(task_dir, limit=None, skip_model_wo_parsed_files=False
     model_dirs = get_subfolders(task_dir)
 
     # Prepare output file path
-    output_filename = f"summary_AD_task{'_limit' + str(limit) if limit is not None else ''}.txt"
-    output_file_path = os.path.join(task_dir, output_filename)
+    output_file_path = os.path.join(task_dir, "summary_AD_task.txt")
 
     # Collect all output lines
     output_lines = []
@@ -579,8 +564,7 @@ def print_model_summaries(task_dir, limit=None, skip_model_wo_parsed_files=False
             print(f"\nSkipping model directory (no parsed folder): {model_dir}")
             continue
 
-        metrics_filename = SUMMARY_FILENAME_AD_METRICS if limit is None else f"{SUMMARY_FILENAME_AD_METRICS.removesuffix('.json')}_limit{limit}.json"
-        metrics_file = os.path.join(parsed_dir, metrics_filename)
+        metrics_file = os.path.join(parsed_dir, SUMMARY_FILENAME_AD_METRICS)
 
         with open(metrics_file, "r") as f:
             metrics = json.load(f)
@@ -928,7 +912,7 @@ def _process_task_directory(
         process_parsed_file_in_model_folder(model_dir, limit, processes=processes)
 
     # Print summary metrics at the end
-    print_model_summaries(task_dir, limit, skip_model_wo_parsed_files)
+    print_model_summaries(task_dir, skip_model_wo_parsed_files)
 
 
 def _process_single_model_directory(model_dir, limit, processes=None):

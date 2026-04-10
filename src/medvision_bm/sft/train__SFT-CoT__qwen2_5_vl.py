@@ -78,7 +78,6 @@ def main(
 
     if not kwargs.get("merge_only"):
         # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
-        # ---
         # Parse sample limits
         (
             train_limit_AD,
@@ -89,7 +88,6 @@ def main(
             val_limit_TL,
             train_limit_total,
         ) = parse_sample_limits(**kwargs)
-        # ---
 
         # Print a clear runtime warning on the main process so users notice this requirement
         if is_main_process():
@@ -105,37 +103,26 @@ def main(
                 "Reusing a dataset prepared with different settings or a different model may lead to incorrect results."
             )
 
-        # ---
-        # NOTE: Keep it here (out of the is_main_process() block below) as it is used in all processes for dataset loading later
-        # ---
-        # Prepare the dataset directory path, which will be used to save the prepared dataset for all processes to load later
-        new_shape_hw = kwargs.get("new_shape_hw")
         if kwargs.get("prepared_ds_dir") is not None:
-            # User-specified folder
+            # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
             prepared_ds_dir = kwargs.get("prepared_ds_dir")
             if is_main_process():
                 print(
                     f"[Info] Using user-specified prepared dataset directory: {prepared_ds_dir}\n"
                 )
         else:
-            # Default folder with naming convention encoding model identifier and sample limits
+            # NOTE: Keep it here (out of the main process block) as it is used in all processes for dataset loading later
             prepared_ds_dir = os.path.join(
                 data_dir,
                 "SFT-CoT_datasets",
                 model_family_name,
                 f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}",
             )
-            if new_shape_hw is not None:
-                prepared_ds_dir += f"__resized-wh-{new_shape_hw[1]}x{new_shape_hw[0]}" 
-            else:
-                prepared_ds_dir += f"__original"
-
             if is_main_process():
                 os.makedirs(prepared_ds_dir, exist_ok=True)
                 print(
                     f"[Info] Using default prepared dataset directory: {prepared_ds_dir}\n"
                 )
-        # ---
 
         # Prepare the dataset on the main process ONLY
         if is_main_process():
@@ -152,7 +139,6 @@ def main(
                         limit_val_sample=val_limit_AD,
                         mapping_func=_format_data_AngleDistanceTask_CoT,
                         model_family_name=model_family_name,
-                        base_model_hf=base_model_hf,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -168,13 +154,6 @@ def main(
                         new_shape_hw=kwargs.get("new_shape_hw"),
                         download_mode=kwargs.get("ds_download_mode"),
                     )
-                    # Keep task label for optional temperature-based sampling.
-                    dataset_AD["train"] = dataset_AD["train"].add_column(
-                        kwargs.get("temperature_sampler_task_column"), ["AD"] * len(dataset_AD["train"])
-                    )
-                    dataset_AD["validation"] = dataset_AD["validation"].add_column(
-                        kwargs.get("temperature_sampler_task_column"), ["AD"] * len(dataset_AD["validation"])
-                    )
                     train_ds_list.append(dataset_AD["train"])
                     val_ds_list.append(dataset_AD["validation"])
 
@@ -186,7 +165,6 @@ def main(
                         limit_val_sample=val_limit_detect,
                         mapping_func=_format_data_DetectionTask_CoT,
                         model_family_name=model_family_name,
-                        base_model_hf=base_model_hf,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -202,17 +180,6 @@ def main(
                         new_shape_hw=kwargs.get("new_shape_hw"),
                         download_mode=kwargs.get("ds_download_mode"),
                     )
-                    # Keep task label for optional temperature-based sampling.
-                    dataset_detect["train"] = dataset_detect["train"].add_column(
-                        kwargs.get("temperature_sampler_task_column"),
-                        ["Detection"] * len(dataset_detect["train"]),
-                    )
-                    dataset_detect["validation"] = dataset_detect[
-                        "validation"
-                    ].add_column(
-                        kwargs.get("temperature_sampler_task_column"),
-                        ["Detection"] * len(dataset_detect["validation"]),
-                    )
                     train_ds_list.append(dataset_detect["train"])
                     val_ds_list.append(dataset_detect["validation"])
 
@@ -224,7 +191,6 @@ def main(
                         limit_val_sample=val_limit_TL,
                         mapping_func=_format_data_TumorLesionTask_CoT,
                         model_family_name=model_family_name,
-                        base_model_hf=base_model_hf,
                         num_workers_concat_datasets=kwargs.get(
                             "num_workers_concat_datasets"
                         ),
@@ -240,13 +206,6 @@ def main(
                         new_shape_hw=kwargs.get("new_shape_hw"),
                         download_mode=kwargs.get("ds_download_mode"),
                     )
-                    # Keep task label for optional temperature-based sampling.
-                    dataset_TL["train"] = dataset_TL["train"].add_column(
-                        kwargs.get("temperature_sampler_task_column"), ["TL"] * len(dataset_TL["train"])
-                    )
-                    dataset_TL["validation"] = dataset_TL["validation"].add_column(
-                        kwargs.get("temperature_sampler_task_column"), ["TL"] * len(dataset_TL["validation"])
-                    )
                     train_ds_list.append(dataset_TL["train"])
                     val_ds_list.append(dataset_TL["validation"])
 
@@ -255,42 +214,17 @@ def main(
                 dataset["train"] = concatenate_datasets(train_ds_list)
                 dataset["validation"] = concatenate_datasets(val_ds_list)
 
-                # Limit the training samples (allow sampling with replacement if limit exceeds dataset size)
-                train_limit = kwargs.get("train_sample_limit")
-                if train_limit > 0:
-                    train_size = len(dataset["train"])
-                    if train_limit > train_size:
-                        import numpy as np
-                        np.random.seed(SEED)
-                        indices = np.random.choice(train_size, size=train_limit, replace=True)
-                        dataset["train"] = dataset["train"].select(indices)
-                    else:
-                        dataset["train"] = (
-                            dataset["train"]
-                            .shuffle(seed=SEED)
-                            .select(range(train_limit))
-                        )
-                else:
-                    dataset["train"] = dataset["train"].shuffle(seed=SEED)
-
-                # Limit the validation samples (allow sampling with replacement if limit exceeds dataset size)
-                val_limit = kwargs.get("val_sample_limit")
-                if val_limit > 0:
-                    val_size = len(dataset["validation"])
-                    if val_limit > val_size:
-                        # Allow sampling with replacement if limit exceeds dataset size
-                        import numpy as np
-                        np.random.seed(SEED)
-                        indices = np.random.choice(val_size, size=val_limit, replace=True)
-                        dataset["validation"] = dataset["validation"].select(indices)
-                    else:
-                        dataset["validation"] = (
-                            dataset["validation"]
-                            .shuffle(seed=SEED)
-                            .select(range(val_limit))
-                        )
-                else:
-                    dataset["validation"] = dataset["validation"].shuffle(seed=SEED)
+                # Limit the total number of samples if specified
+                dataset["train"] = (
+                    dataset["train"]
+                    .shuffle(seed=SEED)
+                    .select(range(kwargs.get("train_sample_limit")))
+                )
+                dataset["validation"] = (
+                    dataset["validation"]
+                    .shuffle(seed=SEED)
+                    .select(range(kwargs.get("val_sample_limit")))
+                )
 
                 # Save the prepared dataset to disk for other processes to load
                 os.makedirs(prepared_ds_dir, exist_ok=True)
@@ -331,19 +265,12 @@ def main(
             gradient_checkpointing=kwargs.get("gradient_checkpointing"),
             dataloader_pin_memory=kwargs.get("dataloader_pin_memory"),
             push_LoRA=kwargs.get("push_LoRA"),
-            enable_temperature_sampler=kwargs.get("enable_temperature_sampler"),
-            temperature_sampler_T=kwargs.get("temperature_sampler_T"),
-            temperature_sampler_task_column=kwargs.get(
-                "temperature_sampler_task_column"
-            ),
-            temperature_sampler_num_samples=kwargs.get(
-                "temperature_sampler_num_samples"
-            ),
         )
 
         # Train the model (DO NOT guard this with is_main_process())
         if kwargs.get("resume_from_checkpoint"):
             # Create LoRA checkpoint directory if it doesn't exist
+            # This is needed even if this is the first run
             os.makedirs(lora_checkpoint_dir, exist_ok=True)
 
             last_checkpoint = get_last_checkpoint(lora_checkpoint_dir)
@@ -362,7 +289,8 @@ def main(
             trainer.train()
 
         # Save the trained model
-        trainer.save_model()
+        if is_main_process():
+            trainer.save_model()
 
     # Free VRAM
     # Safe delete trainer only if it exists (prevents NameError when trainer was never created)

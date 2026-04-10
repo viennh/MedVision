@@ -24,7 +24,7 @@ dependencies = [
     "accelerate>=0.29.1",
     "black>=24.1.0",
     "isort>=5.13.2",
-    "datasets==3.6.0", # `trust_remote_code` is not supported in datasets>=4.0.0
+    "datasets>=3.6.0,<4.0.0",
     "evaluate>=0.4.0",
     "httpx>=0.23.3",
     "jsonlines",
@@ -44,6 +44,7 @@ dependencies = [
     "openai",
     "opencv-python-headless",
     "av",
+    "eva-decord",
     "hf_transfer",
     "nltk",
     "sentencepiece>=0.1.99",
@@ -52,6 +53,7 @@ dependencies = [
     "tqdm-multiprocess",
     "transformers",
     "transformers-stream-generator",
+    "huggingface_hub>=0.34.0,<1.0",
     "zstandard",
     "pillow",
     "pyyaml",
@@ -68,13 +70,9 @@ dependencies = [
     "pre-commit",
     "pydantic",
     "packaging",
-    "decord",
-    "zss", 
-    "protobuf==3.20.0",
+    "zss",
+    "protobuf>=4.25.8,<8.0.0",
     "sentence_transformers",
-    "qwen-vl-utils[decord]>=0.0.8", # For Qwen models
-    "deepspeed",
-    "bitsandbytes",
     "backoff",
 ]
 
@@ -94,6 +92,10 @@ metrics = [
     "capture_metric",
     "Levenshtein",
 ]
+gpu = [
+    "deepspeed",
+    "bitsandbytes",
+]
 meddr=[
     "bitsandbytes==0.45.2",
 ]
@@ -107,18 +109,13 @@ huatuogpt_vision =[
 llava_med = [
     "transformers==4.37.2",
     "numpy==1.26.4",
-    "protobuf==3.20",
 ]
 qwen2_5_vl = [
     "transformers==4.54.1",
     "accelerate==1.9.0",
-    "decord",
+    "eva-decord",
     "qwen_vl_utils",
-    "qwen-vl-utils[decord]>=0.0.8",
-]
-qwen3_vl = [
-    "transformers==4.57.0",
-    "qwen-vl-utils==0.0.14",
+    "qwen-vl-utils>=0.0.8",
 ]
 gemini = [
     "google-genai",
@@ -128,9 +125,9 @@ reka = [
     "reka-api",
 ]
 qwen = [
-    "decord",
+    "eva-decord",
     "qwen_vl_utils",
-    "qwen-vl-utils[decord]>=0.0.8",
+    "qwen-vl-utils>=0.0.8",
 ]
 mmsearch = [
     "playwright",

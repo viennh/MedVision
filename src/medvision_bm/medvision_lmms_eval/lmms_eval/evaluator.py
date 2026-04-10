@@ -1,24 +1,25 @@
-import ast
 import collections
 import inspect
 import itertools
 import json
 import os
 import random
-import re
 import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Set, Union
+from typing import List, Optional, Union
 
-import lmms_eval.api
-import lmms_eval.api.metrics
-import lmms_eval.api.registry
 import numpy as np
 import torch
 import torch.distributed as dist
 from datasets import Image, Sequence
+from loguru import logger as eval_logger
+from tqdm import tqdm
+
+import lmms_eval.api
+import lmms_eval.api.metrics
+import lmms_eval.api.registry
 from lmms_eval.evaluator_utils import (
     consolidate_group_results,
     consolidate_results,
@@ -43,8 +44,6 @@ from lmms_eval.utils import (
     run_task_tests,
     simple_parse_args_string,
 )
-from loguru import logger as eval_logger
-from tqdm import tqdm
 
 
 @positional_deprecated
@@ -79,7 +78,6 @@ def simple_evaluate(
     fewshot_random_seed: int = 1234,
     datetime_str: str = get_datetime_str(),
     cli_args=None,
-    sample_indices: Optional[str] = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -167,16 +165,8 @@ def simple_evaluate(
     if model_args is None:
         model_args = ""
 
-    # Parse model_hf early so it can be injected into lmms_eval_specific_kwargs
-    # during task initialization (ConfigurableTask.__init__ calls doc_to_text which
-    # may need model_hf to compute resized image shapes for prompt generation).
-    _early_parsed = simple_parse_args_string(model_args) if model_args else {}
-    _early_model_hf = _early_parsed.get("model_hf", None)
-
     if task_manager is None:
-        task_manager = TaskManager(verbosity, model_name=model, model_hf=_early_model_hf)
-    elif _early_model_hf is not None and getattr(task_manager, "model_hf", None) is None:
-        task_manager.model_hf = _early_model_hf
+        task_manager = TaskManager(verbosity, model_name=model)
 
     task_dict = get_task_dict(tasks, task_manager)
 
@@ -255,16 +245,6 @@ def simple_evaluate(
             fewshot_as_multiturn=fewshot_as_multiturn,
         )
 
-    # Parse sample_indices JSON string into a set of ints if provided
-    parsed_sample_indices = None
-    if sample_indices is not None:
-        import json as _json
-        parsed_sample_indices = set(_json.loads(sample_indices))
-        if limit is not None:
-            eval_logger.warning(
-                "--sample_indices and --limit are both set. --sample_indices takes precedence; --limit will be ignored for sample selection."
-            )
-
     results = evaluate(
         lm=lm,
         task_dict=task_dict,
@@ -279,7 +259,6 @@ def simple_evaluate(
         fewshot_as_multiturn=fewshot_as_multiturn,
         verbosity=verbosity,
         cli_args=cli_args,
-        sample_indices=parsed_sample_indices,
     )
 
     if lm.rank == 0:
@@ -341,7 +320,6 @@ def evaluate(
     fewshot_as_multiturn: bool = False,
     verbosity: str = "INFO",
     cli_args=None,
-    sample_indices: Optional[Set[int]] = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -399,58 +377,10 @@ def evaluate(
         if not all("bypass" not in getattr(task_output.task, "_metric_fn_list", {}).keys() for task_output in eval_tasks):
             raise ValueError("log_samples must be True for 'bypass' metric-only tasks")
 
-    # Extract model info from cli_args.model_args
-    # ---
-    _parsed_model_args = simple_parse_args_string(cli_args.model_args) if cli_args is not None and hasattr(cli_args, "model_args") and cli_args.model_args else {}
-    _model_arg_model_hf = _parsed_model_args.get("model_hf", None)
-
-    # Parse reshape_image_hw from cli_args.model_args if provided. Accept formats like:
-    # - a Python list/tuple string: "[896,896]" or "(896,896)"
-    # - single integer: "896" -> interpreted as [896,896]
-    _reshape_image_hw = None  # Initialize to avoid UnboundLocalError
-    _model_arg_reshape_image_hw = _parsed_model_args.get("reshape_image_hw", None)
-    if _model_arg_reshape_image_hw is not None:
-        try:
-            raw = _model_arg_reshape_image_hw
-            if isinstance(raw, (list, tuple)):
-                _reshape_image_hw = [int(raw[0]), int(raw[1])] if len(raw) >= 2 else [int(raw[0]), int(raw[0])]
-            elif isinstance(raw, int):
-                _reshape_image_hw = [int(raw), int(raw)]
-            elif isinstance(raw, str):
-                try:
-                    parsed = ast.literal_eval(raw)
-                    if isinstance(parsed, (list, tuple)):
-                        _reshape_image_hw = [int(parsed[0]), int(parsed[1])] if len(parsed) >= 2 else [int(parsed[0]), int(parsed[0])]
-                    elif isinstance(parsed, int):
-                        _reshape_image_hw = [int(parsed), int(parsed)]
-                except Exception:
-                    parts = [p for p in re.split(r"[^0-9]+", raw) if p]
-                    if len(parts) >= 2:
-                        _reshape_image_hw = [int(parts[0]), int(parts[1])]
-                    elif len(parts) == 1:
-                        _reshape_image_hw = [int(parts[0]), int(parts[0])]
-        except Exception:
-            _reshape_image_hw = None
-    # ---
-
-    # The registered model name from --model CLI arg (e.g. "meddr", "qwen2_5_vl", "vllm_qwen25vl")
-    _model_name = cli_args.model if cli_args is not None and hasattr(cli_args, "model") else None
-
-    skipped_task_names: Set[str] = set()
     for task_output in eval_tasks:
         task: Task = task_output.task
         task_name = task_output.task_name
         task.args = cli_args
-
-        # Inject model info into lmms_eval_specific_kwargs
-        if task.lmms_eval_specific_kwargs is None:
-            task.lmms_eval_specific_kwargs = {}
-        if _model_arg_model_hf is not None:
-            task.lmms_eval_specific_kwargs["model_hf"] = _model_arg_model_hf
-        if _model_name is not None:
-            task.lmms_eval_specific_kwargs["model_name"] = _model_name
-        if _reshape_image_hw is not None:
-            task.lmms_eval_specific_kwargs["reshape_image_hw"] = _reshape_image_hw
 
         name_to_task[task_name] = task
 
@@ -480,19 +410,6 @@ def evaluate(
         if ("group_alias" in configs[task_name]) and (group_name not in task_group_alias) and (group_name is not None):
             task_group_alias[group_name] = configs[task_name]["group_alias"]
 
-        # Guard: if sample_indices is set and all requested indices fall beyond the dataset,
-        # skip this task rather than building zero requests and crashing.
-        if sample_indices is not None:
-            _dataset_size = len(task.eval_docs_no_media)
-            _valid_indices = {i for i in sample_indices if i < _dataset_size}
-            if not _valid_indices:
-                eval_logger.warning(
-                    f"Skipping task '{task_name}': no sample_indices overlap with dataset "
-                    f"(dataset size={_dataset_size}, min requested index={min(sample_indices)})."
-                )
-                skipped_task_names.add(task_name)
-                continue
-
         limit = get_sample_size(task, limit)
         task.build_all_requests(
             limit=limit,
@@ -505,7 +422,6 @@ def evaluate(
             fewshot_as_multiturn=fewshot_as_multiturn,
             chat_template=getattr(lm, "apply_chat_template") if apply_chat_template else None,
             tokenizer_name=getattr(lm, "tokenizer_name", "") if apply_chat_template else "",
-            sample_indices=sample_indices,
         )
         eval_logger.debug(f"Task: {task_output.task_name}; number of requests on this rank: {len(task._instances)}")
         if write_out:
@@ -553,8 +469,6 @@ def evaluate(
     ### Postprocess outputs ###
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output in eval_tasks:
-        if task_output.task_name in skipped_task_names:
-            continue
         task = task_output.task
         task.apply_filters()
 
@@ -570,24 +484,12 @@ def evaluate(
             instances.sort(key=lambda x: x.idx)
         # iterate over different filters used
         for filter_key in task.instances[0].filtered_resps.keys():
-            if sample_indices is not None:
-                # Partial inference: yield only the selected indices, distributed across ranks
-                _sorted_indices = sorted(sample_indices)
-                _rank_indices = _sorted_indices[RANK::WORLD_SIZE]
-                _index_set = set(_rank_indices)
-                if not cli_args.process_with_media:
-                    doc_iterator = ((doc_id, doc) for doc_id, doc in enumerate(task.eval_docs_no_media) if doc_id in _index_set)
-                else:
-                    doc_iterator = ((doc_id, doc) for doc_id, doc in enumerate(task.eval_docs) if doc_id in _index_set)
-                total_docs = len(_rank_indices)
-            elif not cli_args.process_with_media:
+            if not cli_args.process_with_media:
                 doc_iterator = create_iterator(enumerate(task.eval_docs_no_media), rank=RANK, limit=int(limit) if limit else None, world_size=WORLD_SIZE)
-                doc_iterator_for_counting = itertools.islice(range(len(task.test_docs())), RANK, limit, WORLD_SIZE) if task.has_test_docs() else itertools.islice(range(len(task.validation_docs())), RANK, limit, WORLD_SIZE)
-                total_docs = sum(1 for _ in doc_iterator_for_counting)
             else:
                 doc_iterator = task.doc_iterator(rank=RANK, limit=limit, world_size=WORLD_SIZE)
-                doc_iterator_for_counting = itertools.islice(range(len(task.test_docs())), RANK, limit, WORLD_SIZE) if task.has_test_docs() else itertools.islice(range(len(task.validation_docs())), RANK, limit, WORLD_SIZE)
-                total_docs = sum(1 for _ in doc_iterator_for_counting)
+            doc_iterator_for_counting = itertools.islice(range(len(task.test_docs())), RANK, limit, WORLD_SIZE) if task.has_test_docs() else itertools.islice(range(len(task.validation_docs())), RANK, limit, WORLD_SIZE)
+            total_docs = sum(1 for _ in doc_iterator_for_counting)
             pbar = tqdm(total=total_docs, desc=f"Postprocessing", disable=(RANK != 0))
             for doc_id, doc in doc_iterator:
                 requests = instances_by_doc_id[doc_id]

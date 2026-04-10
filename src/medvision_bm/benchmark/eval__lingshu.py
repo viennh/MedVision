@@ -1,9 +1,10 @@
-import argparse
-import json
-import os
-import subprocess
+from __future__ import annotations
 
-from medvision_bm.benchmark.eval_utils import parse_sample_indices
+import argparse
+import platform
+import subprocess
+import sys
+
 from medvision_bm.utils import (
     ensure_hf_hub_installed,
     install_flash_attention_torch_and_deps_py311_v2,
@@ -13,6 +14,7 @@ from medvision_bm.utils import (
     load_tasks_status,
     set_cuda_num_processes,
     setup_env_hf_medvision_ds,
+    subprocess_env_with_medvision_data,
     update_task_status,
 )
 
@@ -25,12 +27,12 @@ def run_evaluation_for_task(
     batch_size: int,
     sample_limit: int,
     output_path: str,
-    sample_indices: list = None,
+    data_dir: str | None = None,
 ):
     print(f"\nRunning task: {task}\n")
     subprocess.run("conda env list", check=True, shell=True)
     cmd = [
-        "python3",
+        sys.executable,
         "-m",
         "accelerate.commands.launch",
         f"--num_processes={num_processes}",
@@ -51,9 +53,9 @@ def run_evaluation_for_task(
         "--output_path",
         output_path,
     ]
-    if sample_indices is not None:
-        cmd += ["--sample_indices", json.dumps(sample_indices)]
-    cmd_result = subprocess.run(cmd, check=False)
+    cmd_result = subprocess.run(
+        cmd, check=False, env=subprocess_env_with_medvision_data(data_dir)
+    )
     print(f"Command executed with return code: {cmd_result.returncode}")
     return cmd_result.returncode
 
@@ -73,20 +75,13 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
-    parser.add_argument(
-        "--reshape_image_hw",
-        default=None,
-        type=str,
-        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
-    )
-    # set max_new_tokens
-    parser.add_argument(
-        "--max_new_tokens",
-        default=4096,
-        type=int,
-        help="Maximum number of new tokens to generate per sample.",
-    )
     # resource-specific arguments
+    parser.add_argument(
+        "--minimum_gpu",
+        default=1,
+        type=int,
+        help="Minimum number of GPUs to use.",
+    )
     parser.add_argument(
         "--batch_size_per_gpu",
         default=10,
@@ -122,17 +117,6 @@ def parse_args():
         type=int,
         help="Maximum number of samples to evaluate per task.",
     )
-    parser.add_argument(
-        "--sample_indices",
-        default=None,
-        type=str,
-        metavar="[start:stop]|[start,stop,step]",
-        help=(
-            "Select a subset of samples by index for partial inference. "
-            "Accepted formats: [start:stop] (range) or [start,stop,step] (range with step). "
-            "When set, overrides --sample_limit for sample selection."
-        ),
-    )
     # debugging and control arguments
     parser.add_argument(
         "--skip_env_setup",
@@ -163,9 +147,8 @@ def main():
     task_status_json_path = args.task_status_json_path
     data_dir = args.data_dir
     sample_limit = args.sample_limit
-    max_new_tokens = args.max_new_tokens
 
-    num_processes = set_cuda_num_processes()
+    num_processes = set_cuda_num_processes(minimum_gpu=args.minimum_gpu)
 
     # NOTE: DO NOT change the order of these calls
     # ------
@@ -196,27 +179,12 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
+        use_flash = "True" if platform.system() == "Linux" else "False"
         model_args = (
-            f"model_hf={model_hf},"
-            "use_flash_attention_2=True,"
-            f"max_new_tokens={max_new_tokens},"
+            f"model_path={model_hf},"
+            f"use_flash_attention_2={use_flash},"
+            "max_new_tokens=1024,"
         )
-
-        # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing
-        if args.reshape_image_hw is not None:
-            raw = args.reshape_image_hw
-            if isinstance(raw, str):
-                s = raw.strip()
-                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
-                if not (s.startswith("[") or s.startswith("(")) and "," in s:
-                    s = f"[{s}]"
-            else:
-                s = raw
-            model_args += f",reshape_image_hw={s}"
-
-        parsed_sample_indices = None
-        if args.sample_indices is not None:
-            parsed_sample_indices = parse_sample_indices(args.sample_indices)
 
         rc = run_evaluation_for_task(
             num_processes=num_processes,
@@ -225,13 +193,12 @@ def main():
             task=task,
             batch_size=batch_size,
             sample_limit=sample_limit,
-            output_path=os.path.join(result_dir, model_name),
-            sample_indices=parsed_sample_indices,
+            output_path=result_dir,
+            data_dir=data_dir,
         )
 
-        if rc == 0:
-            if not args.skip_update_status:
-                update_task_status(task_status_json_path, model_name, task)
+        if rc == 0 and not args.skip_update_status:
+            update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

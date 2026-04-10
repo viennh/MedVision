@@ -106,53 +106,6 @@ def doc_to_visual_wBox(doc, lmms_eval_specific_kwargs=None):
     return [pil_img]
 
 
-def doc_to_visual_wBox_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Read NIfTI image, create a black canvas, and convert to PIL Image with bounding box overlay.
-
-    In short, the input image would be the contour of a box on a black canvas.
-    """
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-    image_size_2d = doc["image_size_2d"]
-
-    # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    # Create a 2D black canvas with the same shape as the image slice 
-    black_canvas = np.zeros_like(img_2d, dtype=np.uint8)
-
-    # Convert to PIL Image in grayscale mode
-    pil_img = Image.fromarray(black_canvas, mode="L")
-    # Convert to RGB mode
-    pil_img = pil_img.convert("RGB")
-
-    # Read bbox info, considering possibel resizing
-    # NOTE: bbox_*_coords is in (idx_dim0, idx_dim1) <=> (height, width) format
-    bbox_min_coords = doc["bounding_boxes"]["min_coords"][0]
-    bbox_max_coords = doc["bounding_boxes"]["max_coords"][0]
-    # Considering possible resizing, adjust bbox coordinates
-    if reshape_image_hw is not None:
-        orig_h, orig_w = image_size_2d
-        new_h, new_w = reshape_image_hw
-        scale_h = new_h / orig_h
-        scale_w = new_w / orig_w
-        bbox_min_coords = (int(bbox_min_coords[0] * scale_h), int(bbox_min_coords[1] * scale_w))
-        bbox_max_coords = (int(bbox_max_coords[0] * scale_h), int(bbox_max_coords[1] * scale_w))
-
-    # Overlay the bounding box on the pil_img
-    pil_img = add_bbox_overlay(pil_img, bbox_min_coords, bbox_max_coords)
-
-    return [pil_img]
-
-
 def doc_to_visual_wMask(doc, lmms_eval_specific_kwargs=None):
     """
     Read NIfTI image, normalize, and convert to PIL Image with mask overlay.
@@ -182,46 +135,6 @@ def doc_to_visual_wMask(doc, lmms_eval_specific_kwargs=None):
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
-    # Convert to RGB mode
-    pil_img = pil_img.convert("RGB")
-
-    # Overlay the mask contour on the pil_img
-    pil_img = add_mask_overlay_contour(pil_img, mask_2d)
-
-    return [pil_img]
-
-
-def doc_to_visual_wMask_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Read NIfTI image, create a black canvas, and convert to PIL Image with mask overlay.
-
-    In short, the input image would be a mask contour on a black canvas.
-    """
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    mask_path = doc["mask_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-
-    # [Image] Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    # [Mask] Load 2D slice from NIfTI file, with optional resizing
-    if reshape_image_hw is not None:
-        _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx)
-
-    # Create a 2D black canvas with the same shape as the image slice 
-    black_canvas = np.zeros_like(img_2d, dtype=np.uint8)
-
-    # Convert to PIL Image in grayscale mode
-    pil_img = Image.fromarray(black_canvas, mode="L")
     # Convert to RGB mode
     pil_img = pil_img.convert("RGB")
 
@@ -282,77 +195,7 @@ def doc_to_visual_wVisualPrompt_TLTask(doc, lmms_eval_specific_kwargs=None):
 
     # Overlay the major and minor axes of the ellipse fitted to the tumor/lesion on the pil_img
     # Major axis line: green (#00FF00); Minor axis line: blue (#0000FF); Landmarks: red (#FF0000)
-    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#F58D31", point_color="#FF0000")
-    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p3, coords_p4, line_color="#0000FF", point_color="#FF0000")
-
-    return [pil_img]
-
-
-def doc_to_visual_wVisualPrompt_TLTask_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Read NIfTI image, create a black canvas, and convert to PIL Image with visual prompt overlay for tumor/lesion size estimation task.
-    The visual prompt includes 2 lines representing the longest, its perpendicular distances of an ellipse enclosing the tumor/lesion, 
-    and the mask contour of the tumor/lesion.
-
-    In short, the input image would be 4 landmark points, 2 lines, and a mask contour on a black canvas.
-    """
-    from medvision_bm.sft.sft_utils import _get_landmarks_coords
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    mask_path = doc["mask_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-    image_size_2d = doc["image_size_2d"]
-
-    # [Image] Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    # [Mask] Load 2D slice from NIfTI file, with optional resizing
-    if reshape_image_hw is not None:
-        _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, mask_2d = _load_nifti_2d(mask_path, slice_dim, slice_idx)
-
-    # Create a 2D black canvas with the same shape as the image slice 
-    black_canvas = np.zeros_like(img_2d, dtype=np.uint8)
-
-    # Convert to PIL Image in grayscale mode
-    pil_img = Image.fromarray(black_canvas, mode="L")
-    # Convert to RGB mode
-    pil_img = pil_img.convert("RGB")
-
-    # Get endpoint coordinates for the 2 lines, considering possible resizing
-    # ------
-    # Gather landmark coordinates in (idx_dim0, idx_dim1) <=> (height, width) format
-    landmarks_coords = _get_landmarks_coords(doc, ["P1", "P2", "P3", "P4"])
-    coords_p1 = landmarks_coords["landmark_P1"]
-    coords_p2 = landmarks_coords["landmark_P2"]
-    coords_p3 = landmarks_coords["landmark_P3"]
-    coords_p4 = landmarks_coords["landmark_P4"]
-
-    # Considering possible resizing, adjust landmark coordinates
-    if reshape_image_hw is not None:
-        orig_h, orig_w = image_size_2d
-        new_h, new_w = reshape_image_hw
-        scale_h = new_h / orig_h
-        scale_w = new_w / orig_w
-        coords_p1 = (int(coords_p1[0] * scale_h), int(coords_p1[1] * scale_w))
-        coords_p2 = (int(coords_p2[0] * scale_h), int(coords_p2[1] * scale_w))
-        coords_p3 = (int(coords_p3[0] * scale_h), int(coords_p3[1] * scale_w))
-        coords_p4 = (int(coords_p4[0] * scale_h), int(coords_p4[1] * scale_w))
-    # ------
-
-    # Overlay the mask contour (in green) on the pil_img
-    pil_img = add_mask_overlay_contour(pil_img, mask_2d)
-
-    # Overlay the major and minor axes of the ellipse fitted to the tumor/lesion on the pil_img
-    # Major axis line: green (#00FF00); Minor axis line: blue (#0000FF); Landmarks: red (#FF0000)
-    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#F58D31", point_color="#FF0000")
+    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#00FF00", point_color="#FF0000")
     pil_img = add_landmarks_and_line_overlay(pil_img, coords_p3, coords_p4, line_color="#0000FF", point_color="#FF0000")
 
     return [pil_img]
@@ -383,79 +226,6 @@ def doc_to_visual_wVisualPrompt_distanceTask(doc, lmms_eval_specific_kwargs=None
 
     # Convert to PIL Image in grayscale mode
     pil_img = Image.fromarray(img_2d_normalized, mode="L")
-    # Convert to RGB mode
-    pil_img = pil_img.convert("RGB")
-
-    # Get endpoint coordinates for the target line, considering possible resizing
-    # ------
-    # Import the dataset-specific module from medvision_ds.datasets
-    dataset_name = doc["dataset_name"]
-    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
-    if dataset_module is None:
-        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
-    preprocess_biometry_module = importlib.import_module(f"medvision_ds.datasets.{dataset_module}.preprocess_biometry")
-
-    # Get task info
-    taskID = doc["taskID"]
-    bm_plan = preprocess_biometry_module.benchmark_plan
-    task_info = bm_plan["tasks"][int(taskID) - 1]
-
-    # Get biometrics profile for this case
-    biometric_profile = doc["biometric_profile"]
-    metric_type = biometric_profile["metric_type"]
-    metric_map_name = biometric_profile["metric_map_name"]
-    metric_key = biometric_profile["metric_key"]
-
-    # Gather landmark coordinates in (idx_dim0, idx_dim1) <=> (height, width) format
-    lines_map = task_info[metric_map_name]
-    line_dict = lines_map[metric_key]
-    lms = line_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
-    landmarks_coords = _get_landmarks_coords(doc, lms)
-    coords_p1 = landmarks_coords["landmark_" + lms[0]]
-    coords_p2 = landmarks_coords["landmark_" + lms[1]]
-
-    # Considering possible resizing, adjust landmark coordinates
-    if reshape_image_hw is not None:
-        orig_h, orig_w = image_size_2d
-        new_h, new_w = reshape_image_hw
-        scale_h = new_h / orig_h
-        scale_w = new_w / orig_w
-        coords_p1 = (int(coords_p1[0] * scale_h), int(coords_p1[1] * scale_w))
-        coords_p2 = (int(coords_p2[0] * scale_h), int(coords_p2[1] * scale_w))
-    # ------
-
-    # Overlay the target line and its endpoints (landmarks) on the pil_img
-    # Target line: green (#00FF00); Landmarks: red (#FF0000)
-    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#00FF00", point_color="#FF0000")
-
-    return [pil_img]
-
-
-def doc_to_visual_wVisualPrompt_distanceTask_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Read NIfTI image, create a black canvas, and convert to PIL Image with visual prompt overlay for distance estimation task.
-    The visual prompt includes one line representing the target distance.
-    """
-    from medvision_bm.sft.sft_utils import _get_landmarks_coords
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-    image_size_2d = doc["image_size_2d"]
-
-    # [Image] Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    # Create a 2D black canvas with the same shape as the image slice 
-    black_canvas = np.zeros_like(img_2d, dtype=np.uint8)
-
-    # Convert to PIL Image in grayscale mode
-    pil_img = Image.fromarray(black_canvas, mode="L")
     # Convert to RGB mode
     pil_img = pil_img.convert("RGB")
 
@@ -548,6 +318,7 @@ def doc_to_visual_wVisualPrompt_angleTask(doc, lmms_eval_specific_kwargs=None):
 
     # Get biometrics profile for this case
     biometric_profile = doc["biometric_profile"]
+    metric_type = biometric_profile["metric_type"]
     metric_map_name = biometric_profile["metric_map_name"]
     metric_key = biometric_profile["metric_key"]
 
@@ -559,93 +330,10 @@ def doc_to_visual_wVisualPrompt_angleTask(doc, lmms_eval_specific_kwargs=None):
     lines_map = task_info[lines_map_name]
     line1_dict = lines_map[line_keys[0]]
     line1_lms = line1_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
-    line2_dict = lines_map[line_keys[1]]
-    line2_lms = line2_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
-    line1_landmarks_coords = _get_landmarks_coords(doc, line1_lms)
-    line2_landmarks_coords = _get_landmarks_coords(doc, line2_lms)
-
-    # Mark line 1 endpoints as P1 and P2
-    coords_p1 = line1_landmarks_coords["landmark_" + line1_lms[0]]
-    coords_p2 = line1_landmarks_coords["landmark_" + line1_lms[1]]
-    # Mark line 2 endpoints as P3 and P4
-    coords_p3 = line2_landmarks_coords["landmark_" + line2_lms[0]]
-    coords_p4 = line2_landmarks_coords["landmark_" + line2_lms[1]]
-
-    # Considering possible resizing, adjust landmark coordinates
-    if reshape_image_hw is not None:
-        orig_h, orig_w = image_size_2d
-        new_h, new_w = reshape_image_hw
-        scale_h = new_h / orig_h
-        scale_w = new_w / orig_w
-        coords_p1 = (int(coords_p1[0] * scale_h), int(coords_p1[1] * scale_w))
-        coords_p2 = (int(coords_p2[0] * scale_h), int(coords_p2[1] * scale_w))
-        coords_p3 = (int(coords_p3[0] * scale_h), int(coords_p3[1] * scale_w))
-        coords_p4 = (int(coords_p4[0] * scale_h), int(coords_p4[1] * scale_w))
-    # ------
-
-    # Overlay the 2 lines forming the target angle
-    # Line 1: green (#00FF00); Line 2: blue (#0000FF); Landmarks: red (#FF0000)
-    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p1, coords_p2, line_color="#00FF00", point_color="#FF0000")
-    pil_img = add_landmarks_and_line_overlay(pil_img, coords_p3, coords_p4, line_color="#0000FF", point_color="#FF0000")
-
-    return [pil_img]
-
-
-def doc_to_visual_wVisualPrompt_angleTask_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Read NIfTI image, create a black canvas, and convert to PIL Image with visual prompt overlay for angle estimation task.
-    The visual prompt includes 2 lines representing the two lines forming the target angle.
-    """
-    from medvision_bm.sft.sft_utils import _get_landmarks_coords
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-    image_size_2d = doc["image_size_2d"]
-
-    # [Image] Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        _, img_2d = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    # Create a 2D black canvas with the same shape as the image slice 
-    black_canvas = np.zeros_like(img_2d, dtype=np.uint8)
-
-    # Convert to PIL Image in grayscale mode
-    pil_img = Image.fromarray(black_canvas, mode="L")
-    # Convert to RGB mode
-    pil_img = pil_img.convert("RGB")
-
-    # Get endpoint coordinates for the target line, considering possible resizing
-    # ------
-    # Import the dataset-specific module from medvision_ds.datasets
-    dataset_name = doc["dataset_name"]
-    dataset_module = DATASETS_NAME2PACKAGE.get(dataset_name)
-    if dataset_module is None:
-        raise ValueError(f"Dataset {dataset_name} not found in DATASETS_NAME2PACKAGE.")
-    preprocess_biometry_module = importlib.import_module(f"medvision_ds.datasets.{dataset_module}.preprocess_biometry")
-
-    # Get task info
-    taskID = doc["taskID"]
-    bm_plan = preprocess_biometry_module.benchmark_plan
-    task_info = bm_plan["tasks"][int(taskID) - 1]
-
-    # Get biometrics profile for this case
-    biometric_profile = doc["biometric_profile"]
-    metric_map_name = biometric_profile["metric_map_name"]
-    metric_key = biometric_profile["metric_key"]
-
-    # Get line 1 and line 2 coordinates in (idx_dim0, idx_dim1) <=> (height, width) format
-    angles_map = task_info[metric_map_name]
-    angle_dict = angles_map[metric_key]
-    lines_map_name = angle_dict["element_map_name"]
-    line_keys = angle_dict["element_keys"]
-    lines_map = task_info[lines_map_name]
-    line1_dict = lines_map[line_keys[0]]
-    line1_lms = line1_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
+    line1_lms_map_name = line1_dict["element_map_name"]
+    line1_lms_map = task_info[line1_lms_map_name]
+    line1_p1_name = line1_lms_map[line1_lms[0]]
+    line1_p2_name = line1_lms_map[line1_lms[1]]
     line2_dict = lines_map[line_keys[1]]
     line2_lms = line2_dict["element_keys"]  # list of 2 strings -- names of points (landmarks)
     line1_landmarks_coords = _get_landmarks_coords(doc, line1_lms)
@@ -702,7 +390,7 @@ def create_doc_to_text_BoxCoordinate(preprocess_detection_module):
         question = (
             f"Task:\n"
             f"Given the input medical image{image_prompt}, "
-            f"return the coordinates of the lower-left and upper-right corners of the bounding box for the {label_name}.\n"
+            f"return the coordinates of the lower-left and upper-right corner of the bounding box for the {label_name}.\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_BOX_COORDINATES}"
         )
@@ -735,7 +423,7 @@ def create_doc_to_text_BoxCoordinate_wBox(preprocess_detection_module):
         question = (
             f"Task:\n"
             f"Given the input medical image{image_prompt}, and the highlighted bounding box enclosing the {label_name}, "
-            f"return the coordinates of the lower-left and upper-right corners of the bounding box.\n"
+            f"return the coordinates of the lower-left and upper-right corner of the bounding box.\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_BOX_COORDINATES}"
         )
@@ -744,40 +432,10 @@ def create_doc_to_text_BoxCoordinate_wBox(preprocess_detection_module):
     return doc_to_text_BoxCoordinate_wBox
 
 
-def doc_to_text_BoxCoordinate_wBox_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Convert document to text.
-    This is only used for ablation study to evaluate the model's ability to understand the visual prompt (the highlighted bounding box) without the medical image.
-
-    NOTE: 
-    Keep the input argument format consistent with other doc_to_text functions for easier ablation study, 
-    even though the image info in the document will not be used in this function.
-    """
-    question = (
-        f"Task:\n"
-        f"Return the coordinates of the lower-left and upper-right corners of the highlighted bounding box in the image.\n"
-        f"Format requirement:\n"
-        f"{FORMAT_PROMPT_BOX_COORDINATES}"
-    )
-    return question
-
-
 def _process_img_qwen25vl(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
-    processed_visual = img_processor([img_PIL])
-    image_grid_thw = processed_visual["image_grid_thw"][0]
-    patch_size = img_processor.patch_size
-    img_shape_resized_hw = (image_grid_thw[1] * patch_size, image_grid_thw[2] * patch_size)
-    print(f"\nOriginal image size (HxW): {img_PIL.size[::-1]}; Resized image size (HxW): {img_shape_resized_hw}")
-    return img_shape_resized_hw
-
-
-def _process_img_qwen3vl(img_2d_raw, extra_kwargs):
-    img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "Qwen/Qwen2.5-VL-32B-Instruct")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor([img_PIL])
     image_grid_thw = processed_visual["image_grid_thw"][0]
     patch_size = img_processor.patch_size
@@ -788,8 +446,8 @@ def _process_img_qwen3vl(img_2d_raw, extra_kwargs):
 
 def _process_img_lingshu(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "lingshu-medical-mllm/Lingshu-32B")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor([img_PIL])
     image_grid_thw = processed_visual["image_grid_thw"][0]
     patch_size = img_processor.patch_size
@@ -800,8 +458,8 @@ def _process_img_lingshu(img_2d_raw, extra_kwargs):
 
 def _process_img_medgemma(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "google/medgemma-4b-it")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
@@ -817,8 +475,8 @@ def _process_img_meddr(img_2d_raw, extra_kwargs):
     from src.model.internvl_chat import InternVLChatModel
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    model = InternVLChatModel.from_pretrained(model_hf, low_cpu_mem_usage=True).eval()
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "Sunanhe/MedDr_0401")
+    model = InternVLChatModel.from_pretrained(sample_model_hf, low_cpu_mem_usage=True).eval()
     image_size = model.config.force_image_size or model.config.vision_config.image_size
     pad2square = model.config.pad2square
     image_processor = build_transform(is_train=False, input_size=image_size, pad2square=pad2square)
@@ -831,8 +489,8 @@ def _process_img_llavaonevision(img_2d_raw, extra_kwargs):
     from transformers.image_processing_utils import select_best_resolution
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "llava-hf/llava-onevision-qwen2-72b-ov-hf")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
 
     # NOTE:
     # Llave-OneVision dynamically resize the image to a shape that can fit in patches of size [384,384]
@@ -849,9 +507,9 @@ def _process_img_llavamed(img_2d_raw, extra_kwargs):
     from llava.model.builder import load_pretrained_model
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    model_name = get_model_name_from_path(model_hf)
-    _, model, image_processor, _ = load_pretrained_model(model_hf, None, model_name)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "microsoft/llava-med-v1.5-mistral-7b")
+    model_name = get_model_name_from_path(sample_model_hf)
+    _, model, image_processor, _ = load_pretrained_model(sample_model_hf, None, model_name)
 
     image_tensor = process_images([img_PIL], image_processor, model.config)[0]
     img_shape_resized_hw = image_tensor.shape[-2:]  # (height, width)
@@ -968,10 +626,10 @@ def _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs):
     # then resizes the image to the selected resolution, and pads the image and extract patches.
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "meta-llama/Llama-3.2-11B-Vision-Instruct")
 
     # Create custom image processor with the loaded config
-    custom_img_processor = custom_MllamaImageProcessor.from_pretrained(model_hf)
+    custom_img_processor = custom_MllamaImageProcessor.from_pretrained(sample_model_hf)
 
     # Use the custom method to calculate resized image shape
     batch_resized_shapes = custom_img_processor.cal_resized_image_shape(images=[img_PIL])
@@ -986,8 +644,8 @@ def _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs):
 
 def _process_img_internvl3(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "OpenGVLab/InternVL3-38B")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
@@ -1002,12 +660,12 @@ def _process_img_huatuogpt_vision(img_2d_raw, extra_kwargs):
     from llava.model.language_model.llava_qwen2 import LlavaQwen2ForCausalLM
 
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    model, _ = LlavaQwen2ForCausalLM.from_pretrained(model_hf, init_vision_encoder_from_ckpt=True, output_loading_info=True, torch_dtype=torch.bfloat16)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "FreedomIntelligence/HuatuoGPT-Vision-34B")
+    model, _ = LlavaQwen2ForCausalLM.from_pretrained(sample_model_hf, init_vision_encoder_from_ckpt=True, output_loading_info=True, torch_dtype=torch.bfloat16)
     vision_tower = model.get_vision_tower()
     if not vision_tower.is_loaded:
         vision_tower.load_model()
-        vision_tower.vision_tower = vision_tower.vision_tower.from_pretrained(model_hf)
+        vision_tower.vision_tower = vision_tower.vision_tower.from_pretrained(sample_model_hf)
     vision_tower.to(dtype=torch.bfloat16)
     image_processor = vision_tower.image_processor
     processed_visual = image_processor.preprocess(img_PIL, return_tensors="pt")
@@ -1101,8 +759,8 @@ def _process_img_healthgpt_L14(img_2d_raw, extra_kwargs):
 
 def _process_img_gemma3(img_2d_raw, extra_kwargs):
     img_PIL = Image.fromarray(img_2d_raw).convert("RGB")
-    model_hf = extra_kwargs["model_hf"]
-    img_processor = AutoImageProcessor.from_pretrained(model_hf)
+    sample_model_hf = extra_kwargs.get("sample_model_hf", "google/gemma-3-27b-it")
+    img_processor = AutoImageProcessor.from_pretrained(sample_model_hf)
     processed_visual = img_processor.preprocess(images=[img_PIL], return_tensors="pt")
     pv_shape = processed_visual["pixel_values"].shape
     img_shape_resized_hw = (pv_shape[-2], pv_shape[-1])
@@ -1111,21 +769,13 @@ def _process_img_gemma3(img_2d_raw, extra_kwargs):
 
 
 def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
-    # NOTE 1: usage in MedVision benchamrk 
-    # The model_name is the same as the key in AVAILABLE_MODELS. If you add new models, the strings in the if conditions below should be consistent with the keys in AVAILABLE_MODELS.
-    # NOTE 2: usage in SFT training 
-    # When this function get_resized_img_shape() is not used in the MedVision benchmark, for example, if it is used for SFT model training,
-    # the model_name could be different from AVAILABLE_MODELS. For example, we use the model name "vllm_qwen25vl" to refer to the 
-    # vllm inference backend of Qwen2.5VL in the MedVision benchmark. While in SFT code (e.g., check the usage of model_family_name in medvision_bm.sft.sft_utils for more details), we can use "qwen25vl" as "model_family_name" 
-    # NOTE 3: TODO/Maintainance: Supported model_name is hardcoded, could be improved 
-    # For either case, the model_name should be consistent with the string used in the if conditions in this function to ensure the correct image processing method is called to get the resized image shape for pixel size adjustment. 
-
-    assert model_name is not None, "[Error] model_name cannot be None. Please provide a valid model_name to get_resized_img_shape()."
+    # Supported models
+    supported_models = ["qwen2_5_vl", "medgemma", "meddr", "llava_onevision", "llava_med", "llama_3_2_vision", "internvl3", "huatuogpt_vision", "healthgpt_l14", "gemma3", "lingshu"]
+    if model_name not in supported_models:
+        raise ValueError(f"Model {model_name} is not supported for tumor/lesion size estimation task.\n You need to add model-specific implementation in this function: doc_to_text_TumorLesionSize().")
 
     # Get reshaped image size so that we can adjust the pixel size dynamically
-    if model_name in ["qwen3vl", "vllm_qwen3vl"]:
-        img_shape_resized_hw = _process_img_qwen3vl(img_2d_raw, extra_kwargs) 
-    elif model_name in ["vllm_qwen25vl", "qwen25vl"]:
+    if model_name == "qwen2_5_vl":
         # NOTE: Qwen2.5-VL resizes images to a size divisible by patch_size (default 14) * merge_size (default 2) = 28
         # Preprocessor config: https://huggingface.co/Qwen/Qwen2.5-VL-32B-Instruct/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
@@ -1135,18 +785,18 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # Preprocessor config: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B/blob/main/preprocessor_config.json
         # Image processor - Qwen2VLImageProcessor: https://github.com/huggingface/transformers/blob/v4.56.1/src/transformers/models/qwen2_vl/image_processing_qwen2_vl.py#L84
         img_shape_resized_hw = _process_img_lingshu(img_2d_raw, extra_kwargs)
-    elif model_name in ["vllm_llama_3_2_vision", "llama_3_2_vision"]:
+    elif model_name == "llama_3_2_vision":
         # NOTE: Llama-3.2-Vision dynamically resize the image to a shape that can fit in patches of size [560, 560].
         # Preprocessor config: https://huggingface.co/meta-llama/Llama-3.2-11B-Vision-Instruct/blob/main/preprocessor_config.json
         # Image processor - MllamaImageProcessor: https://github.com/huggingface/transformers/blob/main/src/transformers/models/mllama/image_processing_mllama.py#L536
         img_shape_resized_hw = _process_img_llama_3_2_vision(img_2d_raw, extra_kwargs)
-    elif model_name in ["vllm_llava_onevision", "llava_onevision"]:
+    elif model_name == "llava_onevision":
         # NOTE: Llava-OneVision dynamically resize the image to a shape that can fit in patches of size [384,384]
         # NOTE: The current probing method only work for single image input, as padding is enabled for multiple image inputs
         # Preprocessor config: https://huggingface.co/llava-hf/llava-onevision-qwen2-72b-ov-hf/blob/main/preprocessor_config.json
         # Image processor - LlavaOnevisionImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/llava_onevision/image_processing_llava_onevision.py#L108
         img_shape_resized_hw = _process_img_llavaonevision(img_2d_raw, extra_kwargs)
-    elif model_name in ["vllm_gemma3", "gemma3"]:
+    elif model_name == "gemma3":
         # NOTE: HealthGPT resize images to a fixed size [896, 896]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/google/gemma-3-27b-it/blob/main/preprocessor_config.json
         # Image processor - Gemma3ImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/gemma3/image_processing_gemma3.py#L53
@@ -1168,7 +818,7 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # Check the fixed size in the model config: https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json
         img_shape_resized_hw = [336, 336]
         # img_shape_resized_hw = _process_img_llavamed(img_2d_raw, extra_kwargs) # for debugging only
-    elif model_name in ["vllm_internvl3", "internvl3"]:
+    elif model_name == "internvl3":
         # NOTE: InternVL3 resizes images to a fixed size [448, 448]. We used this size for pixel size adjustment.
         # Preprocessor config: https://huggingface.co/OpenGVLab/InternVL3-38B/blob/main/preprocessor_config.json
         # Image processor - CLIPImageProcessor: https://github.com/huggingface/transformers/blob/91393fe4cc3266a05bc0d129e34ff5f761bb46e2/src/transformers/models/clip/image_processing_clip.py#L54
@@ -1184,8 +834,6 @@ def get_resized_img_shape(model_name, img_2d_raw, extra_kwargs):
         # NOTE: HealthGPT resize images to a fixed size [336, 336]. We used this size for pixel size adjustment.
         img_shape_resized_hw = [336, 336]
         # img_shape_resized_hw = _process_img_healthgpt_L14(img_2d_raw, extra_kwargs)  # for debugging only
-    else:
-        raise ValueError(f"[Error] {model_name} is not recognised/supported.")
     return img_shape_resized_hw
 
 
@@ -1214,7 +862,6 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         slice_idx = doc["slice_idx"]
 
         # Load 2D slice from NIfTI file, with optional resizing
-        # NOTE: reshape_image_hw is the shape of input image
         reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
         if reshape_image_hw is not None:
             pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
@@ -1240,23 +887,17 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
-
-        # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1271,7 +912,6 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
             f"Given the input medical image{image_prompt}, "
             f"estimate the major and minor axis lengths of the ellipse enclosing the {label_name}, in {metric_unit}.\n"
             f"Additional information:\n"
-            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1279,82 +919,6 @@ def create_doc_to_text_TumorLesionSize(preprocess_biometry_module):
         return question
 
     return doc_to_text_TumorLesionSize
-
-
-def doc_to_text_TumorLesionSize_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Convert document to text.
-    This is only used for ablation study to see how the model perform without the medical image input, 
-    so the question is generated without the medical image description.
-
-    NOTE: 
-    Keep the input argument format consistent with other doc_to_text functions for easier ablation study, 
-    even though the image info in the document will not be used in this function.
-    """
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-
-    # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    img_shape_hw = img_2d_raw.shape
-
-    # Get biometrics profile for this case
-    biometric_profile = doc["biometric_profile"]
-    metric_unit = biometric_profile["metric_unit"]
-    if isinstance(metric_unit, list):
-        assert len(metric_unit) == 1, "metric_unit list should have only one element."
-        metric_unit = metric_unit[0]
-    elif isinstance(metric_unit, str):
-        if metric_unit == "mm":
-            metric_unit = "millimeters"
-        elif metric_unit == "cm":
-            metric_unit = "centimeters"
-    else:
-        raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
-
-    # -------------
-    # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
-    # -------------
-    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-    model_name = lmms_eval_specific_kwargs.get("model_name")
-    img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
-
-    # Adjust pixel size based on the resize ratio
-    original_height, original_width = img_shape_hw
-    pixel_height, pixel_width = pixel_size_hw
-    resized_img_h, resized_img_w = img_shape_resized_hw
-    resize_ratio_h = resized_img_h / original_height
-    resize_ratio_w = resized_img_w / original_width
-    adjusted_pixel_height = pixel_height / resize_ratio_h
-    adjusted_pixel_width = pixel_width / resize_ratio_w
-
-    # Include image size information in the question text
-    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
-    # Include pixel size information in question text
-    pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-    # -------------
-
-    # Question
-    question = (
-        f"Task:\n"
-        f"Estimate the major and minor axis lengths of the ellipse enclosing the highlighted region, in {metric_unit}.\n"
-        f"Additional information:\n"
-        f"{image_size_text}\n"
-        f"{pixel_size_text}\n"
-        f"Format requirement:\n"
-        f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
-    )
-    return question
 
 
 def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module):
@@ -1407,23 +971,17 @@ def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module)
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
-
-        # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1438,7 +996,6 @@ def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module)
             f"Given the input medical image{image_prompt}, and the two lines indicating the major and minor axes of the ellipse enclosing the {label_name}, "
             f"estimate the major and minor axis lengths in {metric_unit}.\n"
             f"Additional information:\n"
-            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
@@ -1446,83 +1003,6 @@ def create_doc_to_text_TumorLesionSize_wVisualPrompt(preprocess_biometry_module)
         return question
 
     return doc_to_text_TumorLesionSize_wVisualPrompt
-
-
-def doc_to_text_TumorLesionSize_wVisualPrompt_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Convert document to text.
-    This is only used for ablation study to see how the model perform without the medical image input, 
-    so the question is generated without the medical image description.
-
-    NOTE: 
-    Keep the input argument format consistent with other doc_to_text functions for easier ablation study, 
-    even though the image info in the document will not be used in this function.
-    """
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-
-    # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    img_shape_hw = img_2d_raw.shape
-
-    # Get biometrics profile for this case
-    biometric_profile = doc["biometric_profile"]
-    metric_unit = biometric_profile["metric_unit"]
-    if isinstance(metric_unit, list):
-        assert len(metric_unit) == 1, "metric_unit list should have only one element."
-        metric_unit = metric_unit[0]
-    elif isinstance(metric_unit, str):
-        if metric_unit == "mm":
-            metric_unit = "millimeters"
-        elif metric_unit == "cm":
-            metric_unit = "centimeters"
-    else:
-        raise ValueError(f"Unsupported metric_unit type: {type(metric_unit)}")
-
-    # -------------
-    # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
-    # -------------
-    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-    model_name = lmms_eval_specific_kwargs.get("model_name")
-    img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
-
-    # Adjust pixel size based on the resize ratio
-    original_height, original_width = img_shape_hw
-    pixel_height, pixel_width = pixel_size_hw
-    resized_img_h, resized_img_w = img_shape_resized_hw
-    resize_ratio_h = resized_img_h / original_height
-    resize_ratio_w = resized_img_w / original_width
-    adjusted_pixel_height = pixel_height / resize_ratio_h
-    adjusted_pixel_width = pixel_width / resize_ratio_w
-
-    # Include image size information in the question text
-    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
-    # Include pixel size information in question text
-    pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-    # -------------
-
-    # Question
-    question = (
-        f"Task:\n"
-        f"Given the two lines indicating the major and minor axes of the ellipse enclosing the highlighted region, "
-        f"estimate the major and minor axis lengths in {metric_unit}.\n"
-        f"Additional information:\n"
-        f"{image_size_text}\n"
-        f"{pixel_size_text}\n"
-        f"Format requirement:\n"
-        f"{FORMAT_PROMPT_TUMOR_LESION_SIZE}"
-    )
-    return question
 
 
 def create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry_module):
@@ -1577,22 +1057,20 @@ def create_doc_to_text_TumorLesionSize_CoT_woInstruct(preprocess_biometry_module
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
@@ -1674,22 +1152,20 @@ def create_doc_to_text_TumorLesionSize_CoT(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
@@ -1754,23 +1230,17 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
-
-        # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -1785,7 +1255,6 @@ def create_doc_to_text_MaskSize(preprocess_segmentation_module):
             f"Given the input medical image{image_prompt}, "
             f"estimate the physical size of the {label_name} in square millimeters.\n"
             f"Additional information:\n"
-            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_MASK_SIZE}"
@@ -1831,26 +1300,20 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
-
-        # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-        # ------------- 
+        # -------------
 
         # Question
         if image_description != "" and image_description is not None:
@@ -1862,7 +1325,6 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
             f"Given the input medical image{image_prompt}, and the segmentation mask of the {label_name}, "
             f"estimate the physical size of the mask in square millimeters.\n"
             f"Additional information:\n"
-            f"{image_size_text}\n"
             f"{pixel_size_text}\n"
             f"Format requirement:\n"
             f"{FORMAT_PROMPT_MASK_SIZE}"
@@ -1870,68 +1332,6 @@ def create_doc_to_text_MaskSize_wMask(preprocess_segmentation_module):
         return question
 
     return doc_to_text_MaskSize_wMask
-
-
-def doc_to_text_MaskSize_wMask_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Convert document to text.
-    This is only used for ablation study to see how the model perform without the medical image input, 
-    so the question is generated without the medical image description.
-
-    NOTE: 
-    Keep the input argument format consistent with other doc_to_text functions for easier ablation study, 
-    even though the image info in the document will not be used in this function.
-    """
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-
-    # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    img_shape_hw = img_2d_raw.shape
-
-    # -------------
-    # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
-    # -------------
-    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-    model_name = lmms_eval_specific_kwargs.get("model_name")
-    img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
-
-    # Adjust pixel size based on the resize ratio
-    original_height, original_width = img_shape_hw
-    pixel_height, pixel_width = pixel_size_hw
-    resized_img_h, resized_img_w = img_shape_resized_hw
-    resize_ratio_h = resized_img_h / original_height
-    resize_ratio_w = resized_img_w / original_width
-    adjusted_pixel_height = pixel_height / resize_ratio_h
-    adjusted_pixel_width = pixel_width / resize_ratio_w
-
-    # Include image size information in the question text
-    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
-    # Include pixel size information in question text
-    pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-    # -------------
-
-    # Question
-    question = (
-        f"Task:\n"
-        f"Estimate the physical size of the highlighted region in square millimeters.\n"
-        f"Additional information:\n"
-        f"{image_size_text}\n"
-        f"{pixel_size_text}\n"
-        f"Format requirement:\n"
-        f"{FORMAT_PROMPT_MASK_SIZE}"
-    )
-    return question
 
 
 def _get_biometric_prompt_angle(biometrics_name, l1p1, l1p2, l2p1, l2p2, metric_unit):
@@ -1986,23 +1386,17 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
-
-        # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -2047,14 +1441,7 @@ def create_doc_to_text_BiometricsFromLandmarks(preprocess_biometry_module):
             image_prompt = ": " + image_description
         else:
             image_prompt = ""
-        question = (
-            f"Task:\n" 
-            f"Given the input medical image{image_prompt}, {task_prompt}" 
-            f"Additional information:\n" 
-            f"{image_size_text}\n"
-            f"{pixel_size_text}\n" 
-            f"Format requirement:\n" 
-            f"{FORMAT_PROMPT_BIOMETRICS}")
+        question = f"Task:\n" f"Given the input medical image{image_prompt}, " f"{task_prompt}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
         return question
 
     return doc_to_text_BiometricsFromLandmarks
@@ -2095,23 +1482,17 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
-
-        # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
         # -------------
@@ -2132,11 +1513,7 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
             p1_name = lms_map[lms[0]]
             p2_name = lms_map[lms[1]]
             # Task description for distance measurement with visual prompt
-            task_description = (
-                f"Task:\n" 
-                f"Given the input medical image{image_prompt}, and a line connecting {p1_name} and {p2_name}, " 
-                f"estimate the physical distance of the line in {metric_unit}.\n"
-                )
+            task_description = f"Task:\n" f"Given the input medical image{image_prompt}, and a line connecting {p1_name} and {p2_name}, " f"estimate the physical distance of the line in {metric_unit}.\n"
         if metric_type == "angle":
             angles_map = task_info[metric_map_name]
             angle_dict = angles_map[metric_key]
@@ -2165,96 +1542,10 @@ def create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt(preprocess_biometry
                 f"estimate the angle between the two lines in {metric_unit}.\n"
             )
 
-        question = (
-            f"{task_description}" 
-            f"Additional information:\n" 
-            f"{image_size_text}\n"
-            f"{pixel_size_text}\n" 
-            f"Format requirement:\n" 
-            f"{FORMAT_PROMPT_BIOMETRICS}"
-            )
+        question = f"{task_description}" f"Additional information:\n" f"{pixel_size_text}\n" f"Format requirement:\n" f"{FORMAT_PROMPT_BIOMETRICS}"
         return question
 
     return doc_to_text_BiometricsFromLandmarks_wVisualPrompt
-
-
-def doc_to_text_BiometricsFromLandmarks_wVisualPrompt_woMedImg(doc, lmms_eval_specific_kwargs=None):
-    """
-    Convert document to text.
-    This is only used for ablation study to see how the model perform without the medical image input, 
-    so the question is generated without the medical image description.
-
-    NOTE: 
-    Keep the input argument format consistent with other doc_to_text functions for easier ablation study, 
-    even though the image info in the document will not be used in this function.
-    """
-
-    # Get biometrics profile for this case
-    biometric_profile = doc["biometric_profile"]
-    metric_type = biometric_profile["metric_type"]
-    metric_unit = biometric_profile["metric_unit"]
-
-    # Read NIfTI image
-    img_path = doc["image_file"]
-    slice_dim = doc["slice_dim"]
-    slice_idx = doc["slice_idx"]
-
-    # Load 2D slice from NIfTI file, with optional resizing
-    reshape_image_hw = lmms_eval_specific_kwargs.get("reshape_image_hw") if lmms_eval_specific_kwargs is not None else None
-    if reshape_image_hw is not None:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx, new_shape_hw=reshape_image_hw)
-    else:
-        pixel_size_hw, img_2d_raw = _load_nifti_2d(img_path, slice_dim, slice_idx)
-
-    img_shape_hw = img_2d_raw.shape
-
-    # -------------
-    # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
-    # -------------
-    # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-    # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-    model_name = lmms_eval_specific_kwargs.get("model_name")
-    img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
-
-    # Adjust pixel size based on the resize ratio
-    original_height, original_width = img_shape_hw
-    pixel_height, pixel_width = pixel_size_hw
-    resized_img_h, resized_img_w = img_shape_resized_hw
-    resize_ratio_h = resized_img_h / original_height
-    resize_ratio_w = resized_img_w / original_width
-    adjusted_pixel_height = pixel_height / resize_ratio_h
-    adjusted_pixel_width = pixel_width / resize_ratio_w
-
-    # Include image size information in the question text
-    image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
-
-    # Include pixel size information in question text
-    pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-    # -------------
-
-    # Question
-    if metric_type == "distance":
-        # Task description for distance measurement with visual prompt
-        task_description = (
-            f"Task:\n" 
-            f"Estimate the physical distance of the line in {metric_unit}.\n"
-            )
-    if metric_type == "angle":
-        # Task description for angle measurement with visual prompt
-        task_description = (
-            f"Task:\n"
-            f"Estimate the angle between the two lines in {metric_unit}.\n"
-        )
-
-    question = (
-        f"{task_description}" 
-        f"Additional information:\n" 
-        f"{image_size_text}\n"
-        f"{pixel_size_text}\n" 
-        f"Format requirement:\n" 
-        f"{FORMAT_PROMPT_BIOMETRICS}"
-        )
-    return question
 
 
 def create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(preprocess_biometry_module):
@@ -2294,22 +1585,20 @@ def create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct(preprocess_biometr
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
@@ -2422,26 +1711,24 @@ def create_doc_to_text_BiometricsFromLandmarks_CoT(preprocess_biometry_module):
         # -------------
         # NOTE: To get the reshaped image size and adjust pixel size information in the prompt, a model-specific processing is needed
         # -------------
-        # NOTE: img_shape_resized_hw is the shape of image after model-specific processing, which could be dynamic or fixed depending on the model. 
-        # We will use img_shape_resized_hw to adjust the pixel size information in the prompt to make it consistent with the image size input to the model.
-        model_name = lmms_eval_specific_kwargs.get("model_name")
+        model_name = lmms_eval_specific_kwargs.get("model") if lmms_eval_specific_kwargs is not None else None
+        assert model_name is not None, "Missing lmms_eval_specific_kwargs: 'model', check the base yaml file for this task."
         img_shape_resized_hw = get_resized_img_shape(model_name, img_2d_raw, lmms_eval_specific_kwargs)
 
         # Adjust pixel size based on the resize ratio
         original_height, original_width = img_shape_hw
         pixel_height, pixel_width = pixel_size_hw
-        resized_img_h, resized_img_w = img_shape_resized_hw
-        resize_ratio_h = resized_img_h / original_height
-        resize_ratio_w = resized_img_w / original_width
+        resize_ratio_h = img_shape_resized_hw[0] / original_height
+        resize_ratio_w = img_shape_resized_hw[1] / original_width
         adjusted_pixel_height = pixel_height / resize_ratio_h
         adjusted_pixel_width = pixel_width / resize_ratio_w
 
         # Include image size information in the question text
-        image_size_text = f"The image size is {resized_img_w} pixels (width) x {resized_img_h} pixels (height)."
+        image_size_text = f"The image size is {img_shape_resized_hw[1]} pixels (width) x {img_shape_resized_hw[0]} pixels (height)."
 
         # Include pixel size information in question text
         pixel_size_text = f"The pixel size for this image is {adjusted_pixel_width:.3f} mm (width) x {adjusted_pixel_height:.3f} mm (height)."
-        # ------------- 
+        # -------------
 
         # Question
         if metric_type == "distance":
@@ -2547,7 +1834,7 @@ def doc_to_target_BoxCoordinate(doc, lmms_eval_specific_kwargs=None):
 
      In summary, the conversion involves:
      Based on the upper-left and lower-right corner coordinates (P1 & P2) in the format of array indices [idx_dim0, idx_dim1] from the benchmark planner,
-     we calculate the lower-left and upper-right corners coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
+     we calculate the lower-left and upper-right corner coordinates (P1' & P2') in the format of image space indices [idx_width, idx_height] as follows:
 
          #-----------------------------+
          |   * (P1)         @ (P2')    |
@@ -2657,7 +1944,7 @@ def process_results_BoxCoordinate(doc, results):
         else:
             absolute_error = np.abs(pred_metrics - target_metric)
             mean_absolute_error = np.mean(absolute_error)
-            mean_relative_error = np.mean(absolute_error / (target_metric + 1e-15))
+            mean_relative_error = np.mean(absolute_error / target_metric)
             success = True
     except Exception as e:
         mean_absolute_error = np.nan
@@ -2687,7 +1974,7 @@ def process_results_TumorLesionSize(doc, results):
         else:
             absolute_error = np.abs(pred_metrics - target_metric)
             mean_absolute_error = np.mean(absolute_error)
-            mean_relative_error = np.mean(absolute_error / (target_metric + 1e-15))
+            mean_relative_error = np.mean(absolute_error / target_metric)
             success = True
     except Exception as e:
         mean_absolute_error = np.nan
@@ -2837,8 +2124,54 @@ def aggregate_results_SuccessRate(results):
     return success_rate
 
 
+def _medvision_data_dir_candidates():
+    """Roots that contain ``Datasets/<name>/...`` (same as ``--data_dir``)."""
+    for key in ("MedVision_DATA_DIR", "MEDVISION_DATA_DIR"):
+        v = os.environ.get(key)
+        if v:
+            yield os.path.abspath(os.path.expanduser(v))
+    home = os.environ.get("MEDVISION_HOME")
+    if home:
+        yield os.path.abspath(os.path.join(os.path.expanduser(home), "Data"))
+
+
+def _resolve_medvision_nifti_path(nii_path: str) -> str:
+    """
+    Remap absolute paths baked into HF dataset caches from another machine onto the
+    current ``MedVision_DATA_DIR`` (the ``--data_dir`` passed to eval scripts).
+
+    Parquet/arrow rows often store full paths like
+    ``/Volumes/.../MedVision/Data/Datasets/...``; on Colab or another host the same
+    files live under a different root but share the ``Datasets/...`` suffix.
+    """
+    if not nii_path:
+        return nii_path
+    if os.path.exists(nii_path):
+        return os.path.normpath(nii_path)
+
+    sep = os.path.sep
+    norm = os.path.normpath(nii_path)
+    sep_norm = norm.replace("\\", "/")
+    # Align with layout: <data_dir>/Datasets/<dataset>/...
+    key = "/Datasets/"
+    j = sep_norm.find(key)
+    if j == -1:
+        return nii_path
+
+    rel_from_datasets = sep_norm[j + len(key) :].lstrip("/")
+    for root in _medvision_data_dir_candidates():
+        candidate = os.path.normpath(
+            os.path.join(root, "Datasets", rel_from_datasets.replace("/", sep))
+        )
+        if os.path.exists(candidate):
+            return candidate
+
+    return nii_path
+
+
 def _load_nifti_2d(nii_path, slice_dim, slice_idx, new_shape_hw=None):
     """Map function to load 2D slice from a 3D NIFTI images."""
+    nii_path = _resolve_medvision_nifti_path(nii_path)
     if not os.path.exists(nii_path):
         raise FileNotFoundError(f"Image file {nii_path} does not exist.")
     img_nib = nib.load(nii_path)

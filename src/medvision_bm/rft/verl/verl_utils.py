@@ -5,22 +5,15 @@ from medvision_bm.sft.sft_utils import (
     _doc_to_target_AngleDistanceTask,
     _doc_to_text_AngleDistanceTask_CoT,
     _doc_to_text_AngleDistanceTask,
-    _doc_to_target_DetectionTask,
-    _doc_to_text_DetectionTask_CoT,
-    _doc_to_text_DetectionTask,
     format_dataset,
-    clean_dataset,
     img_proccessor_nii2png_save2dataset,
     load_split_limit_dataset,
 )
-
-from medvision_bm.dataset.ds_utils import load_split_limit_dataset_tr_val_ts
 
 
 def _format_data_TumorLesionTask_CoT_verl(
     example,
     model_name,
-    model_hf,
     new_shape_hw=None,
 ):
     """
@@ -45,7 +38,7 @@ def _format_data_TumorLesionTask_CoT_verl(
     
     # Reuse existing function for SFT with CoT for TumorLesionTask
     # We can extract GT landmark coordinates from value_dict
-    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name, model_hf, new_shape_hw)
+    prompt, values_dict = _doc_to_text_TumorLesionTask_CoT(example, model_name, new_shape_hw)
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
 
@@ -115,7 +108,6 @@ def _format_data_TumorLesionTask_CoT_verl(
 def _format_data_TumorLesionTask_verl(
     example,
     model_name,
-    model_hf,
     new_shape_hw=None,
 ):
     """
@@ -139,7 +131,7 @@ def _format_data_TumorLesionTask_verl(
     from medvision_bm.rft.verl.rft_prompts import SYSTEM_PROMPT_LITE
     
     # Reuse existing function for SFT without CoT for TumorLesionTask
-    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name, model_hf, new_shape_hw)
+    prompt, _ = _doc_to_text_TumorLesionTask(example, model_name, new_shape_hw)
     target = _doc_to_target_TumorLesionTask(example)
     target_str = ", ".join([f"{value:.3f}" for value in target])
 
@@ -188,7 +180,6 @@ def _format_data_TumorLesionTask_verl(
 def _format_data_AngleDistanceTask_CoT_verl(
     example,
     model_name,
-    model_hf,
     new_shape_hw=None,
 ):
     """
@@ -213,7 +204,7 @@ def _format_data_AngleDistanceTask_CoT_verl(
     
     # Reuse existing function for SFT with CoT for TumorLesionTask
     # We can extract GT landmark coordinates from value_dict
-    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name, model_hf, new_shape_hw)
+    prompt, values_dict = _doc_to_text_AngleDistanceTask_CoT(example, model_name, new_shape_hw)
     target = _doc_to_target_AngleDistanceTask(example)
     if not isinstance(target, list):
         target = [target]
@@ -310,7 +301,6 @@ def _format_data_AngleDistanceTask_CoT_verl(
 def _format_data_AngleDistanceTask_verl(
     example,
     model_name,
-    model_hf,
     new_shape_hw=None,
 ):
     """
@@ -335,7 +325,7 @@ def _format_data_AngleDistanceTask_verl(
     
     # Reuse existing function for SFT with CoT for TumorLesionTask
     # We can extract GT landmark coordinates from value_dict
-    prompt = _doc_to_text_AngleDistanceTask(example, model_name, model_hf, new_shape_hw)
+    prompt = _doc_to_text_AngleDistanceTask(example, model_name, new_shape_hw)
     target = _doc_to_target_AngleDistanceTask(example)
     if not isinstance(target, list):
         target = [target]
@@ -387,184 +377,16 @@ def _format_data_AngleDistanceTask_verl(
     return example
 
 
-# NOTE: The arguments "model_name" and "model_hf" are not used,
-# but we keep them in the function signature for consistency and future flexibility
-# To check why we keep these arguments, please refer to medvision_bm/rft/verl/verl_utils/prepare_dataset_for_verl
-def _format_data_DetectionTask_CoT_verl(
-    example,
-    model_name,
-    model_hf,
-    new_shape_hw=None,
-):
-    """
-    NOTE: The function is tailored for Verl framework.
-
-    Format data for Detection Task with CoT reasoning.
-
-    Feilds required by Verl:
-        - prompt: List of messages with roles and content.
-        - ground_truth: Target string.
-        - data_source: Data source identifier.
-        - ability: Ability identifier.
-        - reward_model: Reward model information.
-        - extra_info: Additional information.
-
-    Reference:
-    RLHFDataset class in Verl
-    (https://github.com/YongchengYAO/verl/blob/670aeea7cd6af2de0ce7da9ae8d3fd0c522d0f0e/verl/utils/dataset/rl_dataset.py#L69)
-
-    """
-    from medvision_bm.rft.verl.rft_prompts import SYSTEM_PROMPT
-
-    # Reuse existing function for SFT with CoT for Detection Task
-    # We can extract GT landmark coordinates from value_dict
-    prompt, values_dict = _doc_to_text_DetectionTask_CoT(example)
-    target = _doc_to_target_DetectionTask(example)
-    if not isinstance(target, list):
-        target = [target]
-    target_str = ", ".join([f"{value:.3f}" for value in target])
-
-    # Build: "prompt"
-    example["prompt"] = [
-        {
-            "role": "system",
-            "content": [{"type": "text", "text": SYSTEM_PROMPT}],
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                },
-                {
-                    "type": "text",
-                    "text": prompt,
-                },
-            ],
-        },
-    ]
-
-    # Build: "images", embedded processed image list
-    example["images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
-
-    # Build: "extra_info", used for medvision-detection reward
-    # ---
-    # Required fields:
-    #   - lowerleft_corner_wh
-    #   - upperright_corner_wh
-    # Dimensions definition:
-    #   - *_corner_wh: [relative width, relative height]
-    # Note: the origin of coordinate depends on _doc_to_text_DetectionTask_CoT()
-    # ---
-    extra_info = {
-        "lowerleft_corner_wh": [
-            float(values_dict["<coor0_w>"]),
-            float(values_dict["<coor0_h>"]),
-        ],
-        "upperright_corner_wh": [
-            float(values_dict["<coor1_w>"]),
-            float(values_dict["<coor1_h>"]),
-        ],
-    }
-
-    # Other fields required by Verl
-    example["ground_truth"] = target_str
-    example["data_source"] = "medvision-detection"
-    example["ability"] = "medvision-detection"
-    example["reward_model"] = {"style": "rule", "ground_truth": target_str}
-    example["extra_info"] = extra_info
-
-    return example
+def _format_data_DetectionTask_CoT_verl():
+    raise NotImplementedError(
+        "Mapping function for the detection task not implemented yet."
+    )
 
 
-# NOTE: The arguments "model_name" and "model_hf" are not used,
-# but we keep them in the function signature for consistency and future flexibility
-# To check why we keep these arguments, please refer to medvision_bm/rft/verl/verl_utils/prepare_dataset_for_verl
-def _format_data_DetectionTask_verl(
-    example,
-    model_name,
-    model_hf,
-    new_shape_hw=None,
-):
-    """
-    NOTE: The function is tailored for Verl framework.
-
-    Format data for Detection Task with CoT reasoning.
-
-    Feilds required by Verl:
-        - prompt: List of messages with roles and content.
-        - ground_truth: Target string.
-        - data_source: Data source identifier.
-        - ability: Ability identifier.
-        - reward_model: Reward model information.
-        - extra_info: Additional information.
-
-    Reference:
-    RLHFDataset class in Verl
-    (https://github.com/YongchengYAO/verl/blob/670aeea7cd6af2de0ce7da9ae8d3fd0c522d0f0e/verl/utils/dataset/rl_dataset.py#L69)
-
-    """
-    from medvision_bm.rft.verl.rft_prompts import SYSTEM_PROMPT_LITE
-
-    # Reuse existing function for SFT with CoT for Detection Task
-    # We can extract GT landmark coordinates from value_dict
-    prompt, values_dict = _doc_to_text_DetectionTask(example)
-    target = _doc_to_target_DetectionTask(example)
-    if not isinstance(target, list):
-        target = [target]
-    target_str = ", ".join([f"{value:.3f}" for value in target])
-
-    # Build: "prompt"
-    example["prompt"] = [
-        {
-            "role": "system",
-            "content": [{"type": "text", "text": SYSTEM_PROMPT_LITE}],
-        },
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                },
-                {
-                    "type": "text",
-                    "text": prompt,
-                },
-            ],
-        },
-    ]
-
-    # Build: "images", embedded processed image list
-    example["images"] = img_proccessor_nii2png_save2dataset(example, new_shape_hw)
-
-    # Build: "extra_info", used for medvision-detection reward
-    # ---
-    # Required fields:
-    #   - lowerleft_corner_wh
-    #   - upperright_corner_wh
-    # Dimensions definition:
-    #   - *_corner_wh: [relative width, relative height]
-    # Note: the origin of coordinate depends on _doc_to_text_DetectionTask_CoT()
-    # ---
-    extra_info = {
-        "lowerleft_corner_wh": [
-            float(values_dict["<coor0_w>"]),
-            float(values_dict["<coor0_h>"]),
-        ],
-        "upperright_corner_wh": [
-            float(values_dict["<coor1_w>"]),
-            float(values_dict["<coor1_h>"]),
-        ],
-    }
-
-    # Other fields required by Verl
-    example["ground_truth"] = target_str
-    example["data_source"] = "medvision-detection"
-    example["ability"] = "medvision-detection"
-    example["reward_model"] = {"style": "rule", "ground_truth": target_str}
-    example["extra_info"] = extra_info
-
-    return example
+def _format_data_DetectionTask_verl():
+    raise NotImplementedError(
+        "Mapping function for the detection task not implemented yet."
+    )
 
 
 def prepare_dataset_for_verl(
@@ -574,7 +396,6 @@ def prepare_dataset_for_verl(
     limit_val_sample,
     mapping_func,
     model_family_name,
-    model_hf,
     num_workers_concat_datasets=4,
     num_workers_format_dataset=32,
     tag_ds=None,
@@ -594,93 +415,12 @@ def prepare_dataset_for_verl(
     # Format dataset
     mapping_func_args = {
         "model_name": model_family_name,
-        "model_hf": model_hf,
         "new_shape_hw": new_shape_hw,
     }
-    # Use small writer_batch_size because images are embedded as PIL objects (not paths).
-    # Each worker buffers writer_batch_size PIL images in RAM before flushing to Arrow.
     dataset = format_dataset(
         dataset=dataset,
         mapping_func=mapping_func,
         mapping_func_args=mapping_func_args,
         num_workers_format_dataset=num_workers_format_dataset,
-        writer_batch_size=50,
     )
-
-    # Clean dataset to keep only necessary keys
-    # ---
-    # Feilds required by Verl:
-    #     - prompt: List of messages with roles and content.
-    #     - ground_truth: Target string.
-    #     - data_source: Data source identifier.
-    #     - ability: Ability identifier.
-    #     - reward_model: Reward model information.
-    #     - extra_info: Additional information. 
-    # Additional fields:
-    #     - images: the image (not just image path)
-    # ---
-    keys_to_keep = ["prompt", "ground_truth", "data_source", "ability", "reward_model", "extra_info", "images"]
-    dataset = clean_dataset(dataset, keys_to_keep)
-
-    return dataset
-
-
-# NOTE: Test set is not used in RFT via Verl, but we prepare the dataset with test set for debugging and future flexibility.
-def prepare_dataset_for_verl_with_testset(
-    *,
-    tasks_list_json_path,
-    limit_train_sample,
-    limit_val_sample,
-    mapping_func,
-    model_family_name,
-    model_hf,
-    limit_test_sample=None,
-    num_workers_concat_datasets=4,
-    num_workers_format_dataset=32,
-    tag_ds=None,
-    new_shape_hw=None,
-    download_mode="reuse_dataset_if_exists",
-):
-    # Load and split dataset
-    dataset = load_split_limit_dataset_tr_val_ts(
-        tasks_list_json_path=tasks_list_json_path,
-        limit_train_sample=limit_train_sample,
-        limit_val_sample=limit_val_sample,
-        limit_test_sample=limit_test_sample,
-        num_workers_concat_datasets=num_workers_concat_datasets,
-        tag_ds=tag_ds,
-        download_mode=download_mode,
-    )
-
-    # Format dataset
-    mapping_func_args = {
-        "model_name": model_family_name,
-        "model_hf": model_hf,
-        "new_shape_hw": new_shape_hw,
-    }
-    # Use small writer_batch_size because images are embedded as PIL objects (not paths).
-    # Each worker buffers writer_batch_size PIL images in RAM before flushing to Arrow.
-    dataset = format_dataset(
-        dataset=dataset,
-        mapping_func=mapping_func,
-        mapping_func_args=mapping_func_args,
-        num_workers_format_dataset=num_workers_format_dataset,
-        writer_batch_size=50,
-    )
-
-    # Clean dataset to keep only necessary keys
-    # ---
-    # Feilds required by Verl:
-    #     - prompt: List of messages with roles and content.
-    #     - ground_truth: Target string.
-    #     - data_source: Data source identifier.
-    #     - ability: Ability identifier.
-    #     - reward_model: Reward model information.
-    #     - extra_info: Additional information. 
-    # Additional fields:
-    #     - images: the image (not just image path)
-    # ---
-    keys_to_keep = ["prompt", "ground_truth", "data_source", "ability", "reward_model", "extra_info", "images"]
-    dataset = clean_dataset(dataset, keys_to_keep)
-
     return dataset

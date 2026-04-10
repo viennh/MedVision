@@ -1,23 +1,17 @@
+from __future__ import annotations
+
 import argparse
-import json
 import os
 import subprocess
+import sys
 
 from huggingface_hub import snapshot_download
 
-from medvision_bm.benchmark.eval_utils import parse_sample_indices
-
 from medvision_bm.utils import (
-    ensure_hf_hub_installed,
-    install_flash_attention_torch_and_deps_py311_v2,
-    install_medvision_ds,
-    install_vendored_lmms_eval,
-    load_tasks,
-    load_tasks_status,
-    set_cuda_num_processes,
-    setup_env_hf_medvision_ds,
-    update_task_status,
-)
+    ensure_hf_hub_installed, install_flash_attention_torch_and_deps_py311_v2,
+    install_medvision_ds, install_vendored_lmms_eval, load_tasks,
+    load_tasks_status, set_cuda_num_processes, setup_env_hf_medvision_ds,
+    subprocess_env_with_medvision_data, update_task_status)
 
 
 def install_healthgpt_dependencies_post(dir_third_party: str, model_name: str):
@@ -60,7 +54,7 @@ def install_healthgpt_dependencies_post(dir_third_party: str, model_name: str):
 
     # Workaround for pydantic and deepspeed conflicts
     subprocess.run("pip install pydantic==1.10.24", check=True, shell=True)
-
+    
     # Install requirements
     subprocess.run(
         "pip install -r requirements.txt", cwd=dir_healthgpt, check=True, shell=True
@@ -138,12 +132,12 @@ def run_evaluation_for_task(
     batch_size: int,
     sample_limit: int,
     output_path: str,
-    sample_indices: list = None,
+    data_dir: str | None = None,
 ):
     print(f"\nRunning task: {task}\n")
     subprocess.run("conda env list", check=True, shell=True)
     cmd = [
-        "python3",
+        sys.executable,
         "-m",
         "accelerate.commands.launch",
         f"--num_processes={num_processes}",
@@ -164,9 +158,9 @@ def run_evaluation_for_task(
         "--output_path",
         output_path,
     ]
-    if sample_indices is not None:
-        cmd += ["--sample_indices", json.dumps(sample_indices)]
-    cmd_result = subprocess.run(cmd, check=False)
+    cmd_result = subprocess.run(
+        cmd, check=False, env=subprocess_env_with_medvision_data(data_dir)
+    )
     print(f"Command executed with return code: {cmd_result.returncode}")
     return cmd_result.returncode
 
@@ -180,14 +174,13 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
-    # output length arguments
-    parser.add_argument(
-        "--max_new_tokens",
-        default=4096,
-        type=int,
-        help="Maximum number of new tokens to generate.",
-    )
     # resource-specific arguments
+    parser.add_argument(
+        "--minimum_gpu",
+        default=1,
+        type=int,
+        help="Minimum number of GPUs to use.",
+    )
     parser.add_argument(
         "--batch_size_per_gpu",
         default=20,
@@ -228,17 +221,6 @@ def parse_args():
         type=int,
         help="Maximum number of samples to evaluate per task.",
     )
-    parser.add_argument(
-        "--sample_indices",
-        default=None,
-        type=str,
-        metavar="[start:stop]|[start,stop,step]",
-        help=(
-            "Select a subset of samples by index for partial inference. "
-            "Accepted formats: [start:stop] (range) or [start,stop,step] (range with step). "
-            "When set, overrides --sample_limit for sample selection."
-        ),
-    )
     # debugging and control arguments
     parser.add_argument(
         "--skip_env_setup",
@@ -255,12 +237,6 @@ def parse_args():
         action="store_true",
         help="Only perform environment setup and exit.",
     )
-    parser.add_argument(
-        "--reshape_image_hw",
-        default=None,
-        type=str,
-        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
-    )
     return parser.parse_args()
 
 
@@ -275,15 +251,14 @@ def main():
     task_status_json_path = args.task_status_json_path
     data_dir = args.data_dir
     sample_limit = args.sample_limit
-    max_new_tokens = args.max_new_tokens
 
-    num_processes = set_cuda_num_processes()
+    num_processes = set_cuda_num_processes(minimum_gpu=args.minimum_gpu)
 
     # NOTE: DO NOT change the order of these calls
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
         ensure_hf_hub_installed(hf_hub_version="0.35.3")
         install_vendored_lmms_eval()
         install_medvision_ds(data_dir)
@@ -325,20 +300,9 @@ def main():
             f"hlora_alpha={hlora_alpha},"
             f"hlora_nums={hlora_nums},"
             f"vq_idx_nums={vq_idx_nums},"
-            f"max_new_tokens={max_new_tokens}"
+            "device_map=auto,"
+            "dtype=FP16"  # ["FP16", "FP32", "BF16"]
         )
-
-        # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing
-        if args.reshape_image_hw is not None:
-            raw = args.reshape_image_hw
-            if isinstance(raw, str):
-                s = raw.strip()
-                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
-                if not (s.startswith("[") or s.startswith("(")) and "," in s:
-                    s = f"[{s}]"
-            else:
-                s = raw
-            model_args += f",reshape_image_hw={s}"
 
         batch_size = args.batch_size_per_gpu * num_processes
 
@@ -346,10 +310,6 @@ def main():
             module = "healthgpt_l14"
         elif model_name == "HealthGPT-XL32":
             module = "healthgpt_xl32"
-
-        parsed_sample_indices = None
-        if args.sample_indices is not None:
-            parsed_sample_indices = parse_sample_indices(args.sample_indices)
 
         rc = run_evaluation_for_task(
             num_processes=num_processes,
@@ -359,12 +319,11 @@ def main():
             batch_size=batch_size,
             sample_limit=sample_limit,
             output_path=os.path.join(result_dir, model_name),
-            sample_indices=parsed_sample_indices,
+            data_dir=data_dir,
         )
 
-        if rc == 0:
-            if not args.skip_update_status:
-                update_task_status(task_status_json_path, model_name, task)
+        if rc == 0 and not args.skip_update_status:
+            update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

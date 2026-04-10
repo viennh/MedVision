@@ -13,39 +13,32 @@ def make_collate_fn_Qwen25VL(proc):
             # ------------------------------
             # NOTE: image loading priority: processed_images > image_file_png (png file, load with pillow) > image_file (nii.gz file, load with _doc_to_visual)
             # ------------------------------
-            try:
-                if "processed_images" in example:
-                    images.append(example["processed_images"])
+            if "processed_images" in example:
+                images.append(example["processed_images"])
 
-                elif "image_file_png" in example:
-                    from PIL import Image
+            elif "image_file_png" in example:
+                from PIL import Image
 
-                    pil_image = [
-                        Image.open(f).convert("RGB") for f in example["image_file_png"]
-                    ]
-                    images.append(pil_image)
+                pil_image = [
+                    Image.open(f).convert("RGB") for f in example["image_file_png"]
+                ]
+                images.append(pil_image)
 
-                elif "image_file" in example:
-                    pil_images = _doc_to_visual(example)
-                    images.append(pil_images)
+            elif "image_file" in example:
+                pil_images = _doc_to_visual(example)
+                images.append(pil_images)
 
-                else:
-                    raise ValueError(
-                        "No image found in the example. Please provide 'processed_images', 'image_file_png', or 'image_file'."
-                    )
-                # ------------------------------
-
-                texts.append(
-                    proc.apply_chat_template(
-                        example["messages"], add_generation_prompt=False, tokenize=False
-                    ).strip()
+            else:
+                raise ValueError(
+                    "No image found in the example. Please provide 'processed_images', 'image_file_png', or 'image_file'."
                 )
-            except (OSError, ValueError, Exception) as e:
-                # Skip examples where image loading fails
-                import warnings
+            # ------------------------------
 
-                warnings.warn(f"Skipping example due to image loading error: {e}")
-                continue
+            texts.append(
+                proc.apply_chat_template(
+                    example["messages"], add_generation_prompt=False, tokenize=False
+                ).strip()
+            )
 
         batch = proc(text=texts, images=images, return_tensors="pt", padding=True)
 

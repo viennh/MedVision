@@ -1,5 +1,5 @@
 import os
-import shlex
+
 import subprocess
 import sys
 from importlib.resources import files  # Python 3.9+
@@ -39,7 +39,7 @@ def ensure_hf_hub_installed(hf_hub_version="0.35.3"):
     try:
         from huggingface_hub import snapshot_download  # noqa: F401
     except ImportError:
-        subprocess.run(f"pip install huggingface_hub[cli]=={hf_hub_version}", check=True, shell=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", f"huggingface_hub[cli]=={hf_hub_version}"], check=True)
 
 
 def _install_lmms_eval(
@@ -47,52 +47,46 @@ def _install_lmms_eval(
     editable_install=False,
     proj_dependency=None,
 ):
-    # compose extras text like .[extra]
     extras_txt = f"[{proj_dependency}]" if proj_dependency else ""
+    python = sys.executable
 
-    tmp_build_lock_file = os.path.join(lmms_eval_dir, ".build.lock")
     build_dir = os.path.join(lmms_eval_dir, "build")
     dist_dir = os.path.join(lmms_eval_dir, "dist")
     egg_info_dir = os.path.join(lmms_eval_dir, "lmms_eval.egg-info")
     wheel_dir = os.path.join(lmms_eval_dir, "wheels")
     os.makedirs(wheel_dir, exist_ok=True)
 
-    # Common pip flags
-    base_pip_flags = "--no-cache-dir --force-reinstall"
+    base_pip_flags = ["--no-cache-dir", "--force-reinstall"]
 
     # Case A: Editable install (always from source; extras allowed)
     if editable_install:
-        # Example: pip install -e .[qwen2_5_vl]
-        cmd = (
-            f"flock -w 600 {shlex.quote(tmp_build_lock_file)} bash -lc '"
-            f"python -m pip install {base_pip_flags} -e .{extras_txt}"
-            f"'"
-        )
-        subprocess.run(cmd, check=True, shell=True, cwd=lmms_eval_dir)
+        cmd = [python, "-m", "pip", "install"] + base_pip_flags + ["-e", f".{extras_txt}"]
+        subprocess.run(cmd, check=True, cwd=lmms_eval_dir)
         return
 
     # Case B: Non-editable, NO extras → build wheel once, then install wheel
     if proj_dependency is None:
-        cmd = (
-            f"flock -w 600 {shlex.quote(tmp_build_lock_file)} bash -lc '"
-            f"rm -rf {shlex.quote(build_dir)} {shlex.quote(dist_dir)} {shlex.quote(egg_info_dir)} && "
-            f"python -m pip install --upgrade build && "
-            f"python -m build --wheel --outdir {shlex.quote(wheel_dir)} {shlex.quote(lmms_eval_dir)} && "
-            f"latest_wheel=$(ls -t {shlex.quote(wheel_dir)}/lmms_eval-*.whl | head -n1) && "
-            f'pip install {base_pip_flags} "$latest_wheel"'
-            f"'"
+        import shutil
+        for d in (build_dir, dist_dir, egg_info_dir):
+            shutil.rmtree(d, ignore_errors=True)
+        subprocess.run(
+            [python, "-m", "pip", "install", "--upgrade", "build"],
+            check=True, cwd=lmms_eval_dir,
         )
-        subprocess.run(cmd, check=True, shell=True, cwd=lmms_eval_dir)
+        subprocess.run(
+            [python, "-m", "build", "--wheel", "--outdir", wheel_dir, lmms_eval_dir],
+            check=True, cwd=lmms_eval_dir,
+        )
+        wheels = sorted(Path(wheel_dir).glob("lmms_eval-*.whl"), key=os.path.getmtime, reverse=True)
+        if not wheels:
+            raise FileNotFoundError(f"No lmms_eval wheel found in {wheel_dir}")
+        cmd = [python, "-m", "pip", "install"] + base_pip_flags + [str(wheels[0])]
+        subprocess.run(cmd, check=True, cwd=lmms_eval_dir)
         return
 
     # Case C: Non-editable WITH extras → install from source with extras
-    # (extras on a wheel path is not supported)
-    cmd = (
-        f"flock -w 600 {shlex.quote(tmp_build_lock_file)} bash -lc '"
-        f"python -m pip install {base_pip_flags} .{extras_txt}"
-        f"'"
-    )
-    subprocess.run(cmd, check=True, shell=True, cwd=lmms_eval_dir)
+    cmd = [python, "-m", "pip", "install"] + base_pip_flags + [f".{extras_txt}"]
+    subprocess.run(cmd, check=True, cwd=lmms_eval_dir)
 
 
 def install_lmms_eval(
@@ -175,6 +169,23 @@ def setup_env_hf_medvision_ds(
     setup_env_hf(data_dir)
 
 
+def subprocess_env_with_medvision_data(data_dir=None):
+    """
+    Environment mapping for ``lmms_eval`` / ``accelerate`` child processes.
+
+    Ensures ``MedVision_DATA_DIR`` (and optionally ``MEDVISION_HOME``) are set so
+    :func:`medvision_utils._resolve_medvision_nifti_path` can remap dataset paths
+    baked in from another machine (e.g. macOS ``/Volumes/...``) to the current
+    ``--data_dir`` (e.g. Colab Drive).
+    """
+    env = os.environ.copy()
+    if data_dir:
+        abs_data = os.path.abspath(os.path.expanduser(data_dir))
+        env["MedVision_DATA_DIR"] = abs_data
+        env.setdefault("MEDVISION_HOME", os.path.dirname(abs_data))
+    return env
+
+
 def install_medvision_ds(
     data_dir,
     local_dir=None,
@@ -194,35 +205,28 @@ def install_medvision_ds(
     else:
         dir_bmvqa = os.path.abspath(os.path.join(local_dir, "src"))
 
-    tmp_build_lock_file = os.path.join(dir_bmvqa, ".build.lock")
+    import shutil
+    python = sys.executable
     build_dir = os.path.join(dir_bmvqa, "build")
     dist_dir = os.path.join(dir_bmvqa, "dist")
     egg_info_dir = os.path.join(dir_bmvqa, "medvision_ds.egg-info")
     wheel_dir = os.path.join(dir_bmvqa, "wheels")
     os.makedirs(wheel_dir, exist_ok=True)
-    cmd_w_flock = (
-        f"flock -w 600 {shlex.quote(tmp_build_lock_file)} bash -lc '"
-        f"rm -rf {shlex.quote(build_dir)} {shlex.quote(dist_dir)} {shlex.quote(egg_info_dir)} && "
-        f"python -m pip install --upgrade build && "
-        f"python -m build --wheel --outdir {shlex.quote(wheel_dir)} {shlex.quote(dir_bmvqa)} && "
-        f"latest_wheel=$(ls -t {shlex.quote(wheel_dir)}/medvision_ds-*.whl | head -n1) && "
-        f'pip install --no-cache-dir --force-reinstall "$latest_wheel"\''
-    )
 
-    # Try with flock, fallback to without flock if it fails
-    try:
-        subprocess.run(cmd_w_flock, check=True, shell=True)
-    except subprocess.CalledProcessError:
-        print("Warning: flock failed, attempting installation without file lock...")
-        cmd_no_flock = (
-            f"bash -lc '"
-            f"rm -rf {shlex.quote(build_dir)} {shlex.quote(dist_dir)} {shlex.quote(egg_info_dir)} && "
-            f"python -m pip install --upgrade build && "
-            f"python -m build --wheel --outdir {shlex.quote(wheel_dir)} {shlex.quote(dir_bmvqa)} && "
-            f"latest_wheel=$(ls -t {shlex.quote(wheel_dir)}/medvision_ds-*.whl | head -n1) && "
-            f'pip install --no-cache-dir --force-reinstall "$latest_wheel"\''
-        )
-        subprocess.run(cmd_no_flock, check=True, shell=True)
+    for d in (build_dir, dist_dir, egg_info_dir):
+        shutil.rmtree(d, ignore_errors=True)
+    subprocess.run([python, "-m", "pip", "install", "--upgrade", "build"], check=True)
+    subprocess.run(
+        [python, "-m", "build", "--wheel", "--outdir", wheel_dir, dir_bmvqa],
+        check=True,
+    )
+    wheels = sorted(Path(wheel_dir).glob("medvision_ds-*.whl"), key=os.path.getmtime, reverse=True)
+    if not wheels:
+        raise FileNotFoundError(f"No medvision_ds wheel found in {wheel_dir}")
+    subprocess.run(
+        [python, "-m", "pip", "install", "--no-cache-dir", "--force-reinstall", str(wheels[0])],
+        check=True,
+    )
 
     # Set environment variables for medvision_ds
     setup_env_hf_medvision_ds(data_dir=data_dir)
@@ -234,9 +238,9 @@ def pip_install_medvision_ds():
             '\n[Info] Installing medvision_ds from Hugging Face Datasets repo: pip install "git+https://huggingface.co/datasets/YongchengYAO/MedVision.git#subdirectory=src"'
         )
         subprocess.run(
-            'pip install "git+https://huggingface.co/datasets/YongchengYAO/MedVision.git#subdirectory=src"',
+            [sys.executable, "-m", "pip", "install",
+             "git+https://huggingface.co/datasets/YongchengYAO/MedVision.git#subdirectory=src"],
             check=True,
-            shell=True,
         )
         print("Successfully installed medvision_ds.")
     except subprocess.CalledProcessError as e:
@@ -249,9 +253,9 @@ def pip_install_medvision_bm():
             '\n[Info] Installing medvision_bm from GitHub repo: pip install "git+https://github.com/YongchengYAO/MedVision.git"'
         )
         subprocess.run(
-            'pip install "git+https://github.com/YongchengYAO/MedVision.git"',
+            [sys.executable, "-m", "pip", "install",
+             "git+https://github.com/YongchengYAO/MedVision.git"],
             check=True,
-            shell=True,
         )
         print("Successfully installed medvision_bm.")
     except subprocess.CalledProcessError as e:
@@ -272,7 +276,11 @@ def setup_env_cuda():
 
 
 def install_cuda_toolkit(version="12.4"):
-    """Install CUDA toolkit using conda."""
+    """Install CUDA toolkit using conda (Linux only)."""
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping CUDA toolkit install (not on Linux).")
+        return
     print("Installing CUDA toolkit...")
     subprocess.run(
         ["conda", "install", "-c", "nvidia", f"cuda-toolkit={version}", "-y"],
@@ -282,7 +290,11 @@ def install_cuda_toolkit(version="12.4"):
 
 
 def install_torch_cu121():
-    """Install PyTorch with CUDA support."""
+    """Install PyTorch with CUDA support (Linux only)."""
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping CUDA PyTorch install (not on Linux). Using existing torch.")
+        return
     print("Installing PyTorch...")
     subprocess.run(
         [
@@ -303,7 +315,11 @@ def install_torch_cu121():
 
 
 def install_torch_cu124():
-    """Install PyTorch with CUDA support."""
+    """Install PyTorch with CUDA support (Linux only)."""
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping CUDA PyTorch install (not on Linux). Using existing torch.")
+        return
     print("Installing PyTorch...")
     subprocess.run(
         [
@@ -324,6 +340,10 @@ def install_torch_cu124():
 
 
 def install_flash_attention_torch_and_deps_py39():
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping flash attention + CUDA deps install (not on Linux).")
+        return
     # Install PyTorch with CUDA support
     print("Installing PyTorch with CUDA 12.4...")
     subprocess.run(
@@ -375,6 +395,10 @@ def install_flash_attention_torch_and_deps_py39():
 
 
 def install_flash_attention_torch_and_deps_py39_v2():
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping flash attention + CUDA deps install (not on Linux).")
+        return
     # Install PyTorch with CUDA support
     print("Installing PyTorch with CUDA 12.4...")
     install_torch_cu124()
@@ -397,6 +421,10 @@ def install_flash_attention_torch_and_deps_py39_v2():
 
 
 def install_flash_attention_torch_and_deps_py310():
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping flash attention + CUDA deps install (not on Linux).")
+        return
     # Install PyTorch with CUDA support
     print("Installing PyTorch with CUDA 12.4...")
     subprocess.run(
@@ -448,6 +476,10 @@ def install_flash_attention_torch_and_deps_py310():
 
 
 def install_flash_attention_torch_and_deps_py310_v2():
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping flash attention + CUDA deps install (not on Linux).")
+        return
     # Install PyTorch with CUDA support
     print("Installing PyTorch with CUDA 12.4...")
     install_torch_cu124()
@@ -470,6 +502,10 @@ def install_flash_attention_torch_and_deps_py310_v2():
 
 
 def install_flash_attention_torch_and_deps_py311():
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping flash attention + CUDA deps install (not on Linux).")
+        return
     # Install PyTorch with CUDA support
     print("Installing PyTorch with CUDA 12.4...")
     subprocess.run(
@@ -521,6 +557,10 @@ def install_flash_attention_torch_and_deps_py311():
 
 
 def install_flash_attention_torch_and_deps_py311_v2():
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping flash attention + CUDA deps install (not on Linux).")
+        return
     # Install PyTorch with CUDA support
     print("Installing PyTorch with CUDA 12.4...")
     install_torch_cu124()
@@ -554,13 +594,16 @@ def setup_env_vllm(data_dir):
 
 
 def install_vllm(data_dir, version="0.10.0"):
-    # Install and setup vllm
+    import platform
+    if platform.system() != "Linux":
+        print("Skipping vllm install (not on Linux). vllm requires CUDA.")
+        setup_env_vllm(data_dir)
+        return
     try:
-        subprocess.run("pip install blobfile", check=True, shell=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "blobfile"], check=True)
         subprocess.run(
-            f"pip install vllm=={version}",
+            [sys.executable, "-m", "pip", "install", f"vllm=={version}"],
             check=True,
-            shell=True,
         )
         print("Successfully installed vllm")
 

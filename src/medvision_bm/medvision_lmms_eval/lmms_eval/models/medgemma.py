@@ -24,8 +24,6 @@ class MedGemma(lmms):
     MedGemma Model
 
     - HF: https://huggingface.co/collections/google/medgemma-release-680aade845f90bec6a3f60c4
-
-    dtype: BF16 (https://huggingface.co/google/medgemma-27b-it/blob/main/config.json)
     """
 
     def __init__(
@@ -35,7 +33,7 @@ class MedGemma(lmms):
         batch_size: Optional[Union[int, str]] = 1,
         use_flash_attention_2: Optional[bool] = False,
         use_pipeline: bool = True,
-        max_new_tokens: int = 4096,
+        max_new_tokens: int = 300,
         num_workers: int = 8,
         device: Optional[str] = "cuda",
         device_map: Optional[str] = "auto",
@@ -50,11 +48,16 @@ class MedGemma(lmms):
         self.max_new_tokens = max_new_tokens
         self.num_workers = num_workers
 
-        # NOTE: google/medgemma-4b-it only supports bfloat16, setting data type to others will cause empty output
-        self.model_dtype = torch.bfloat16
+        # NOTE: google/medgemma-4b-it officially supports bfloat16; float16 used here for V100 compatibility (cc 7.0).
+        # If outputs are empty, this model may require A100+ GPUs with bfloat16 support.
+        self.model_dtype = torch.float16
+
+        # Disable cuDNN to avoid "GET was unable to find an engine" errors in SigLIP's Conv2d
+        # patch embedding with float16 on certain GPU/cuDNN combinations (V100, T4).
+        torch.backends.cudnn.enabled = False
 
         if self.use_pipeline:
-            self.prepare_pipeline(device, device_map)
+            self.prepare_pipeline()
         else:
             self.prepare_model(device, device_map)
 
@@ -91,40 +94,44 @@ class MedGemma(lmms):
 
     def _get_model_kwargs(self):
         # Set the device string for multi-gpu training using accelerate's PartialState
-        model_kwargs = dict(
-            torch_dtype=self.model_dtype,
-            device_map=self.device_map,
-            attn_implementation="flash_attention_2" if self.use_flash_attention_2 else "eager",
-        )
+        # ref: https://github.com/huggingface/trl/blob/main/docs/source/sft_trainer.md#multi-gpu-training
+        if self.use_flash_attention_2:
+            model_kwargs = dict(
+                torch_dtype=self.model_dtype,
+                device_map={"": PartialState().process_index},
+                attn_implementation="flash_attention_2",
+            )
+        else:
+            model_kwargs = dict(
+                torch_dtype=self.model_dtype,
+                device_map={"": PartialState().process_index},
+                attn_implementation="eager",
+            )
         return model_kwargs
 
-    def _setup_distributed_inference(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
+    def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
         # Set up accelerator
+        # --------------------------------------
+        # NOTE: to be confirmed
         if self.distributed_type == "fsdp":
             fsdp_plugin = FullyShardedDataParallelPlugin(
                 state_dict_config=FullStateDictConfig(offload_to_cpu=False, rank0_only=False),
                 optim_state_dict_config=FullOptimStateDictConfig(offload_to_cpu=False, rank0_only=False),
             )
             self.accelerator = Accelerator(fsdp_plugin=fsdp_plugin)
-        else:
-            if self.distributed_type != "multi-gpu":
-                eval_logger.warning(f"Unknown distributed_type '{self.distributed_type}', falling back to multi-gpu.")
+        elif self.distributed_type == "multi-gpu":
             self.accelerator = Accelerator()
 
         if self.accelerator.num_processes > 1:
-            # Pin the entire model to this process's GPU
-            self.device_map = {"":  self.accelerator.local_process_index}
-        else:
-            # Single-process: respect user's device_map (e.g., "auto", "cpu", etc.)
+            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
+            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+        elif self.accelerator.num_processes == 1 and device_map == "auto":
+            self._device = torch.device(device)
             self.device_map = device_map
-
-        self._rank = self.accelerator.process_index
-        self._world_size = self.accelerator.num_processes
-        self._device = self.accelerator.device
-
-    def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
-        # Set up distributed training if necessary
-        self._setup_distributed_inference(device=device, device_map=device_map)
+        else:
+            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
+            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+        # --------------------------------------
 
         # Load model
         model_kwargs = self._get_model_kwargs()
@@ -151,17 +158,18 @@ class MedGemma(lmms):
 
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {self.accelerator.num_processes} devices with data parallelism")
+            self._rank = self.accelerator.local_process_index
+            self._world_size = self.accelerator.num_processes
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
+            self._rank = 0
+            self._world_size = 1
 
-    def prepare_pipeline(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
+    def prepare_pipeline(self):
         """
         By setting device_map to "auto", the pipeline will let Accelerate choose the device.
         """
-        # Set up distributed training if necessary
-        self._setup_distributed_inference(device=device, device_map=device_map)
-
         # Load pipeline
         model_kwargs = self._get_model_kwargs()
         self.pipe = pipeline(
@@ -172,8 +180,7 @@ class MedGemma(lmms):
         self.pipe.model.generation_config.do_sample = False
 
     # Code adapted from https://huggingface.co/google/medgemma-4b-it
-    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]], max_new_tokens: int = None) -> Union[str, List[str]]:
-        _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
+    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]]) -> Union[str, List[str]]:
         # Handle single input case
         if isinstance(questions, str):
             questions = [questions]
@@ -186,7 +193,7 @@ class MedGemma(lmms):
             batch_messages.append(messages)
 
         if self.use_pipeline:
-            outputs = self.pipe(text=batch_messages, max_new_tokens=_max_new_tokens, batch_size=self.batch_size)
+            outputs = self.pipe(text=batch_messages, max_new_tokens=self.max_new_tokens, batch_size=self.batch_size)
             responses = [output[0]["generated_text"][-1]["content"] for output in outputs]
         else:
             responses = []
@@ -194,7 +201,7 @@ class MedGemma(lmms):
                 inputs = self._processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors="pt").to(self._model.device, dtype=self.model_dtype)
                 input_len = inputs["input_ids"].shape[-1]
                 with torch.inference_mode():
-                    generation = self._model.generate(**inputs, max_new_tokens=_max_new_tokens, do_sample=False)
+                    generation = self._model.generate(**inputs, max_new_tokens=300, do_sample=False)
                     generation = generation[0][input_len:]
                 resp = self._processor.decode(generation, skip_special_tokens=True)
                 responses.append(resp)
@@ -254,8 +261,7 @@ class MedGemma(lmms):
             batch_contexts, batch_visuals = self.process_batch_parallel(batch_requests)
 
             # Get batch model outputs
-            _gen_kwargs = batch_requests[0].args[1]
-            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals, max_new_tokens=_gen_kwargs.get("max_new_tokens", self.max_new_tokens))
+            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals)
 
             # Ensure batch_responses is a list
             if isinstance(batch_responses, str):

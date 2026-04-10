@@ -1,57 +1,3 @@
-# NOTE:
-# Prompts in this file are used not only for SFT training but also model evaluation in the MedVision benchmark.
-# Therefore, any modification to the prompts in this file may affect both SFT training and evaluation. 
-# Please proceed with caution when editing this file.
-#
-# Caveat: 
-# Some prompts (e.g., FORMAT_PROMPT_TL_REASONING and FORMAT_PROMPT_TUMOR_LESION_SIZE) are similar but used in different vanues. 
-# Do not remove any prompt just because it looks similar to another one.
-
-# ======================================================================================================
-# Prompts used in non-CoT benchmarking
-# ======================================================================================================
-GENERAL_FORMAT_PROMPT = (
-    "The reasoning process and the final answer must be enclosed within <think> </think> and <answer> </answer> tags, respectively. "
-    "For example: <think> reasoning process here </think> <answer> answer here </answer>. "
-)
-
-SYSTEM_PROMPT_LITE = (
-    "A conversation between a User and an Assistant. The User asks a question, and the Assistant solves it. "
-    "The Assistant first thinks through the reasoning process internally, then provides the User with the answer. "
-    f"{GENERAL_FORMAT_PROMPT}"
-)
-
-FORMAT_PROMPT_BOX_COORDINATES = (
-    f"{GENERAL_FORMAT_PROMPT}"
-    "The answer should be four decimal numbers separated by commas without any units or additional text. "
-    "The first two numbers are the coordinates of the lower-left corner and the last two numbers are the coordinates of the upper-right corner of the bounding box. "
-    "Use relative coordinates in the image space, where the origin is at the lower-left corner of the image. "
-    "Relative coordinates should be values between 0 and 1, representing the relative positions in the image."
-)
-
-FORMAT_PROMPT_MASK_SIZE = (
-    f"{GENERAL_FORMAT_PROMPT}"
-    "The answer should be a single decimal number."
-)
-
-FORMAT_PROMPT_TUMOR_LESION_SIZE = (
-    f"{GENERAL_FORMAT_PROMPT}"
-    "The answer should be two decimal numbers separated by a comma. "
-    "The first is the major axis length, and the second is the minor axis length."
-)
-
-FORMAT_PROMPT_BIOMETRICS = (
-    f"{GENERAL_FORMAT_PROMPT}"
-    "The answer should be a single decimal number."
-)
-
-FORMAT_PROMPT_1_DECIMAL_NUMBER = (
-    f"{GENERAL_FORMAT_PROMPT}"
-    "The answer should be a single decimal number."
-)
-# ======================================================================================================
-
-
 # ======================================================================================================
 # Prompts used in SFT on datat with Chain-of-Thought (CoT) reasoning
 # ======================================================================================================
@@ -163,6 +109,14 @@ COT_INSTRUCT_TL_NORM = (
     "<step-k-reasoning> </step-k-reasoning> and <step-k-answer> </step-k-answer> tags. "
 )
 
+# # old version kept for reference
+# FORMAT_PROMPT_BOX_COORDINATES_REASONING = (
+#      "The answer should be four decimal numbers separated by commas without any units or additional text. "
+#     "The first two numbers are the coordinates of the lower-left corner and the last two numbers are the coordinates of the upper-right corner of the bounding box. "
+#     "Use relative coordinates in the image space, where the origin is at the lower-left corner of the image. "
+#     "Relative coordinates should be values between 0 and 1, representing the relative positions in the image."
+# )
+
 FORMAT_PROMPT_AD_REASONING = (
     "The final answer must be enclosed within <answer> </answer> tags. "
     "The answer should be a single decimal number without units or extra text."
@@ -249,36 +203,47 @@ COT_TEMPLATE_ANGLE = (
     "</answer>"
 )
 
-FORMAT_PROMPT_DETECTION_REASONING = (
-    "The final answer must be enclosed within <answer> </answer> tags. "
+# ======================================================================================================
+
+
+# ======================================================================================================
+# Prompts used in non-CoT benchmarking
+# ======================================================================================================
+GENERAL_FORMAT_PROMPT = "The reasoning process and the final answer must be enclosed within <think> </think> and <answer> </answer> tags, respectively. For example: <think> reasoning process here </think> <answer> answer here </answer>. "
+
+SYSTEM_PROMPT_LITE = (
+    "A conversation between a User and an Assistant. The User asks a question, and the Assistant solves it. "
+    "The Assistant first thinks through the reasoning process internally, then provides the User with the answer. "
+    f"{GENERAL_FORMAT_PROMPT}"
+)
+
+FORMAT_PROMPT_BOX_COORDINATES = (
+    f"{GENERAL_FORMAT_PROMPT}"
     "The answer should be four decimal numbers separated by commas without any units or additional text. "
     "The first two numbers are the coordinates of the lower-left corner and the last two numbers are the coordinates of the upper-right corner of the bounding box. "
     "Use relative coordinates in the image space, where the origin is at the lower-left corner of the image. "
     "Relative coordinates should be values between 0 and 1, representing the relative positions in the image."
 )
 
-COT_INSTRUCT_DETECTION = (
-    "Step 1: Identify the relative coordinates of the bounding box. "
-    "The relative coordinates must be written as (x, y), where x is the relative position in width and y is the relative position in height. "
-    "Report the reasoning process and final answer within <think> </think> and <answer> </answer> tags, respectively. "
-    "Inside <think> </think>, include reasoning and step results using "
-    "<step-k-reasoning> </step-k-reasoning> and <step-k-answer> </step-k-answer> tags. "
+FORMAT_PROMPT_MASK_SIZE = (
+    f"{GENERAL_FORMAT_PROMPT}"
+    "The answer should be a single decimal number."
 )
 
-COT_TEMPLATE_DETECTION = (
-    "<think> "
-    "<step-1-reasoning> "
-    "I need to identify the relative coordinates of the bounding box of <label_name>. "
-    "The relative coordinates must be written as (x, y), where x is the relative position in width and y is the relative position in height. "
-    "I understand that the origin of the image space coordinate system is at the lower-left corner of the image. "
-    "</step-1-reasoning> "
-    "<step-1-answer> "
-    "The relative coordinates of the bounding box: (<coor0_w>, <coor0_h>), (<coor1_w>, <coor1_h>). "
-    "</step-1-answer> "
-    "</think> "
-    "<answer> "
-    "<coor0_w>,<coor0_h>,<coor1_w>,<coor1_h>"
-    "</answer>"
+FORMAT_PROMPT_TUMOR_LESION_SIZE = (
+    f"{GENERAL_FORMAT_PROMPT}"
+    "The answer should be two decimal numbers separated by a comma. "
+    "The first is the major axis length, and the second is the minor axis length."
+)
+
+FORMAT_PROMPT_BIOMETRICS = (
+    f"{GENERAL_FORMAT_PROMPT}"
+    "The answer should be a single decimal number."
+)
+
+FORMAT_PROMPT_1_DECIMAL_NUMBER = (
+    f"{GENERAL_FORMAT_PROMPT}"
+    "The answer should be a single decimal number."
 )
 # ======================================================================================================
 

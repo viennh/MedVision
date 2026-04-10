@@ -6,6 +6,7 @@ from io import BytesIO
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
+from accelerate import Accelerator, DistributedType
 from decord import VideoReader, cpu
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
@@ -17,7 +18,6 @@ from tqdm import tqdm
 NUM_SECONDS_TO_SLEEP = 5
 
 from vllm import LLM, SamplingParams
-from vllm.lora.request import LoRARequest
 
 
 @register_model("vllm_qwen25vl")
@@ -42,7 +42,7 @@ class VLLM_Qwen25VL(lmms):
         - VLLM chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
 
     Args:
-        model_hf (str): HuggingFace model identifier or path to the model.
+        model_version (str): HuggingFace model identifier or path to the model.
             Default: "Qwen/Qwen2.5-VL-3B-Instruct"
         tensor_parallel_size (int): Number of GPUs to use for tensor parallelism.
             Default: 1
@@ -73,7 +73,7 @@ class VLLM_Qwen25VL(lmms):
             "--model",
             "vllm",
             "--model_args",
-            "model_hf=meta-llama/Llama-4-Scout-17B-16E-Instruct,"
+            "model_version=meta-llama/Llama-4-Scout-17B-16E-Instruct,"
             "tensor_parallel_size=4,"
             "dtype=bfloat16,"
             "max_model_len=10240,"
@@ -110,7 +110,7 @@ class VLLM_Qwen25VL(lmms):
         "--model",
         "vllm",
         "--model_args",
-        "model_hf=deepseek-ai/deepseek-vl2,"
+        "model_version=deepseek-ai/deepseek-vl2,"
         'hf_overrides={"architectures": ["DeepseekVLV2ForCausalLM"]},' # example of passing model specific arguments, JSON string will be parsed automatically
         f"chat_template={chat_template_file}," # chat template file path
         "tensor_parallel_size=2,"
@@ -137,13 +137,11 @@ class VLLM_Qwen25VL(lmms):
 
     def __init__(
         self,
-        model_hf: str,
-        lora_path: Optional[str] = None,
+        model_version: str = "Qwen/Qwen2.5-VL-3B-Instruct",
         tensor_parallel_size: int = 1,
         gpu_memory_utilization: float = 0.8,
         batch_size: int = 1,
         max_frame_num: int = 32,
-        max_new_tokens: int = 4096,
         threads: int = 16,  # Threads to use for decoding visuals
         trust_remote_code: Optional[bool] = True,
         chat_template: Optional[str] = None,
@@ -153,13 +151,10 @@ class VLLM_Qwen25VL(lmms):
         # Manually set a image token for GPT4V so that we can search for it
         # and split the text and image
         # Here we just use the same token as llava for convenient
-        assert isinstance(model_hf, str) and model_hf != "", "model_hf should be a string representing the HuggingFace model ID or path"
-        self.model_hf = model_hf
+        self.model_version = model_version
         self.max_frame_num = max_frame_num
-        self.max_new_tokens = max_new_tokens
         self.threads = threads
         self.chat_template = chat_template
-        self.lora_path = lora_path
 
         # Convert any string arguments that start with { and end with } to dictionaries
         for key, value in kwargs.items():
@@ -169,33 +164,29 @@ class VLLM_Qwen25VL(lmms):
                 except json.JSONDecodeError:
                     eval_logger.warning(f"Failed to parse JSON-like string for argument '{key}': {value}")
 
-        # Remove MedVision-specific kwargs that should not be forwarded to vLLM
-        kwargs.pop("reshape_image_hw", None)
-
         # Set up vllm client
-        lora_kwargs = {}
-        if self.lora_path is not None:
-            adapter_config_path = os.path.join(self.lora_path, "adapter_config.json")
-            if os.path.isfile(adapter_config_path):
-                with open(adapter_config_path, "r") as f:
-                    adapter_config = json.load(f)
-                lora_rank = adapter_config.get("r", None)
-                if lora_rank is None:
-                    raise ValueError(f"LoRA rank 'r' not found in adapter_config.json at {adapter_config_path}. Please ensure the file contains the necessary configuration for LoRA.")
-            else:
-                raise FileNotFoundError(f"adapter_config.json not found at {self.lora_path}. Please ensure the file exists and contains the necessary configuration for LoRA.")
-            lora_kwargs["enable_lora"] = True
-            lora_kwargs["max_lora_rank"] = lora_rank
-
         self.client = LLM(
-            model=self.model_hf,
+            model=self.model_version,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             trust_remote_code=trust_remote_code,
-            **lora_kwargs,
             **kwargs,
         )
 
+        accelerator = Accelerator()
+        if accelerator.num_processes > 1:
+            assert accelerator.distributed_type in [DistributedType.FSDP, DistributedType.MULTI_GPU, DistributedType.DEEPSPEED], "Unsupported distributed type provided. Only DDP and FSDP are supported."
+            self.accelerator = accelerator
+            if self.accelerator.is_local_main_process:
+                eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
+            self._rank = self.accelerator.local_process_index
+            self._world_size = self.accelerator.num_processes
+        else:
+            self.accelerator = accelerator
+            self._rank = self.accelerator.local_process_index
+            self._world_size = self.accelerator.num_processes
+
+        self.device = self.accelerator.device
         self.batch_size_per_gpu = int(batch_size)
 
     # Function to encode the image
@@ -245,9 +236,7 @@ class VLLM_Qwen25VL(lmms):
 
     def generate_until(self, requests) -> List[str]:
         res = []
-
-        # Always show progress - vLLM runs as single process with internal GPU distribution
-        pbar = tqdm(total=len(requests), desc="Model Responding")
+        pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
 
         batch_size = self.batch_size_per_gpu
         batched_requests = [requests[i : i + batch_size] for i in range(0, len(requests), batch_size)]
@@ -256,7 +245,9 @@ class VLLM_Qwen25VL(lmms):
             for idx in range(len(batch_requests)):
                 contexts, gen_kwargs, doc_to_visual, doc_id, task, split = batch_requests[idx].arguments
                 if "max_new_tokens" not in gen_kwargs:
-                    gen_kwargs["max_new_tokens"] = self.max_new_tokens
+                    gen_kwargs["max_new_tokens"] = 1024
+                if gen_kwargs["max_new_tokens"] > 4096:
+                    gen_kwargs["max_new_tokens"] = 4096
                 if "temperature" not in gen_kwargs:
                     gen_kwargs["temperature"] = 0
                 if "top_p" not in gen_kwargs:
@@ -267,8 +258,7 @@ class VLLM_Qwen25VL(lmms):
                     "max_tokens": gen_kwargs["max_new_tokens"],
                     "top_p": gen_kwargs["top_p"],
                 }
-                # params is collected per-request; after the loop, SamplingParams
-                # is built once from the last request's params for the batch call.
+                sampling_params = SamplingParams(**params)
 
                 visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
                 if None in visuals:
@@ -287,8 +277,8 @@ class VLLM_Qwen25VL(lmms):
                             elif isinstance(visual, Image.Image):
                                 all_tasks.append(executor.submit(self.encode_image, visual))
 
-                        for future in all_tasks:
-                            imgs.append(future.result())
+                        for task in all_tasks:
+                            imgs.append(task.result())
 
                 messages = [{"role": "user", "content": []}]
                 # When there is no image token in the context, append the image to the text
@@ -305,19 +295,15 @@ class VLLM_Qwen25VL(lmms):
             # - vllm chat method: https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat
             # The logic here is similar to the vllm implementation as shown here (https://docs.vllm.ai/en/stable/models/generative_models.html#llmchat)
             # - vllm implementation: https://github.com/vllm-project/vllm/blob/d97841078b6e0dde8da36d5a2b8e8857a2c37944/vllm/entrypoints/chat_utils.py#L829
-            lora_request = None
-            if self.lora_path is not None:
-                lora_request = LoRARequest("adapter", 1, self.lora_path)
-
             if self.chat_template is not None:
                 if os.path.isfile(self.chat_template):
                     with open(self.chat_template, "r") as f:
                         chat_template = f.read()
                 else:
                     chat_template = self.chat_template
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template, lora_request=lora_request)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, chat_template=chat_template)
             else:
-                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages, lora_request=lora_request)
+                response = self.client.chat(sampling_params=sampling_params, messages=batched_messages)
             response_text = [o.outputs[0].text for o in response]
 
             assert len(response_text) == len(batch_requests)

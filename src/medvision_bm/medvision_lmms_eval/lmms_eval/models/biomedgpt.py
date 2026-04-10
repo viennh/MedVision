@@ -5,7 +5,6 @@ from accelerate import Accelerator, DistributedType
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
-from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from loguru import logger as eval_logger
 from PIL import Image
 from torchvision import transforms
@@ -29,13 +28,23 @@ class BiomedGPT(lmms):
     def __init__(
         self,
         pretrained: str = "PanaceaAI/BiomedGPT-Base-Pretrained",
+        device: Optional[str] = "cuda",
+        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
 
-        # Set up accelerator and device assignment using standard practice
+        # Set up accelerator
         accelerator = Accelerator()
-        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(accelerator)
+        if accelerator.num_processes > 1:
+            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
+            self.device_map = f"cuda:{accelerator.local_process_index}"
+        elif accelerator.num_processes == 1 and device_map == "auto":
+            self._device = torch.device(device)
+            self.device_map = device_map
+        else:
+            self._device = torch.device(f"cuda:{accelerator.local_process_index}")
+            self.device_map = f"cuda:{accelerator.local_process_index}"
 
         # Set up model and tokenizer
         self._tokenizer = OFATokenizer.from_pretrained(pretrained)
@@ -55,9 +64,13 @@ class BiomedGPT(lmms):
             self.accelerator = accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {accelerator.num_processes} devices with data parallelism")
+            self._rank = self.accelerator.local_process_index
+            self._world_size = self.accelerator.num_processes
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
+            self._rank = 0
+            self._world_size = 1
 
         # Set up image processor
         mean, std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
@@ -116,15 +129,16 @@ class BiomedGPT(lmms):
             # Text inputs
             text_tokens = self._tokenizer([contexts], return_tensors="pt").input_ids
 
-            # Prepare text and image tensors, move to device
-            text_tokens = text_tokens.to(self.device)
-            patch_img = patch_img.to(self.device)
+            if self.device_map == "auto":
+                text_tokens = text_tokens.to("cuda")
+                patch_img = patch_img.to("cuda")
+            else:
+                text_tokens = text_tokens.to(self.device)
+                patch_img = patch_img.to(self.device)
 
             # Get model outputs
             # https://colab.research.google.com/drive/1AMG-OwmDpnu24a9ZvCNvZi3BZwb3nSfS?usp=sharing#scrollTo=WgLUTdMIuUb_
-            if "max_new_tokens" not in gen_kwargs:
-                gen_kwargs["max_new_tokens"] = 4096
-            gen = self._model.generate(text_tokens, patch_images=patch_img, num_beams=5, no_repeat_ngram_size=3, max_length=gen_kwargs["max_new_tokens"])
+            gen = self._model.generate(text_tokens, patch_images=patch_img, num_beams=5, no_repeat_ngram_size=3, max_length=16)
             response = self._tokenizer.batch_decode(gen, skip_special_tokens=True)[0]
             res.append(response)
             pbar.update(1)

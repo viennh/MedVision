@@ -8,13 +8,10 @@ from lmms_eval.tasks.medvision.medvision_utils import (
     create_doc_to_text_BiometricsFromLandmarks_CoT,
     create_doc_to_text_BiometricsFromLandmarks_CoT_woInstruct,
     create_doc_to_text_BiometricsFromLandmarks_wVisualPrompt,
-    doc_to_text_BiometricsFromLandmarks_wVisualPrompt_woMedImg,
     doc_to_target_BiometricsFromLandmarks,
     doc_to_visual,
     doc_to_visual_wVisualPrompt_distanceTask,
-    doc_to_visual_wVisualPrompt_distanceTask_woMedImg,
     doc_to_visual_wVisualPrompt_angleTask,
-    doc_to_visual_wVisualPrompt_angleTask_woMedImg,
     process_results_BiometricsFromLandmarks,
 )
 from medvision_ds.datasets.Ceph_Biometrics_400 import (

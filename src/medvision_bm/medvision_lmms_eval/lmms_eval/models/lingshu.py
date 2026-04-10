@@ -5,11 +5,9 @@ from io import BytesIO
 from typing import List, Optional, Tuple, Union
 
 import torch
-from accelerate import Accelerator
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
-from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 from lmms_eval.utils import eval_logger
 from PIL import Image
 from qwen_vl_utils import process_vision_info
@@ -23,8 +21,6 @@ class Lingshu(lmms):
     Lingshu Model
 
     - HF: https://huggingface.co/lingshu-medical-mllm/Lingshu-32B
-
-    dtype: BF16 (https://huggingface.co/lingshu-medical-mllm/Lingshu-32B)   
     """
 
     def __init__(
@@ -32,8 +28,10 @@ class Lingshu(lmms):
         model_hf: str = "lingshu-medical-mllm/Lingshu-32B",
         batch_size: Optional[Union[int, str]] = 1,
         use_flash_attention_2: Optional[bool] = False,
-        max_new_tokens: int = 4096,
+        max_new_tokens: int = 300,
         num_workers: int = 8,
+        device: Optional[str] = "cuda",
+        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
@@ -42,8 +40,8 @@ class Lingshu(lmms):
         self.use_flash_attention_2 = use_flash_attention_2
         self.max_new_tokens = max_new_tokens
         self.num_workers = num_workers
-        self.model_dtype = torch.bfloat16 # use model dtype (https://huggingface.co/lingshu-medical-mllm/Lingshu-32B)
-        self.prepare_model()
+        self.model_dtype = torch.float16
+        self.prepare_model(device, device_map)
 
     @property
     def model(self):
@@ -80,19 +78,27 @@ class Lingshu(lmms):
         # Compatible with DP & MP (device_map)
         return next(self._model.parameters()).device
 
-    def prepare_model(self):
-        # Set up accelerator and device assignment using standard practice
-        self.accelerator = Accelerator()
-        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
-
+    def prepare_model(self, device: Optional[str] = "cuda", device_map: Optional[str] = "auto"):
         self._model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             self.model_hf,
             torch_dtype=self.model_dtype,
             attn_implementation="flash_attention_2" if self.use_flash_attention_2 else "eager",
-            device_map=self.device_map,
+            device_map=device_map,
         )
         self._processor = AutoProcessor.from_pretrained(self.model_hf)
         self._processor.tokenizer.padding_side = "left"
+
+        self._device = torch.device(device)
+        self.device_map = device_map
+
+        if device_map == "auto":
+            eval_logger.info("Initialized with model parallelism (device_map='auto').")
+        else:
+            eval_logger.info(f"Using single device: {self._device}")
+            self._model.to(self._device)
+
+        self._rank = 0
+        self._world_size = 1
 
     def __pil_img_to_base64(self, pil_img: Image.Image) -> str:
         base64_image = pil_img.convert("RGB")
@@ -103,8 +109,7 @@ class Lingshu(lmms):
         return base64_string
 
     # Code adapted from https://huggingface.co/lingshu-medical-mllm/Lingshu-32B
-    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]], max_new_tokens: int = None) -> Union[str, List[str]]:
-        _max_new_tokens = max_new_tokens if max_new_tokens is not None else self.max_new_tokens
+    def infer(self, questions: Union[str, List[str]], pil_imgs: Union[Image.Image, List[Image.Image]]) -> Union[str, List[str]]:
         # Normalize inputs to lists
         if isinstance(questions, str):
             questions = [questions]
@@ -178,7 +183,7 @@ class Lingshu(lmms):
             with torch.inference_mode():
                 generated_ids = self._model.generate(
                     **inputs,
-                    max_new_tokens=_max_new_tokens,
+                    max_new_tokens=self.max_new_tokens,
                 )
         except torch.cuda.OutOfMemoryError:
             raise RuntimeError("Out of memory during generation. Try reducing batch size.")
@@ -248,8 +253,7 @@ class Lingshu(lmms):
             batch_contexts, batch_visuals = self.process_batch_parallel(batch_requests)
 
             # Get batch model outputs
-            _gen_kwargs = batch_requests[0].args[1]
-            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals, max_new_tokens=_gen_kwargs.get("max_new_tokens", self.max_new_tokens))
+            batch_responses = self.infer(questions=batch_contexts, pil_imgs=batch_visuals)
 
             # Ensure batch_responses is a list
             if isinstance(batch_responses, str):

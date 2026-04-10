@@ -107,62 +107,6 @@ def load_split_limit_dataset_tr_val_ts(
     tag_ds=None,
     download_mode="reuse_dataset_if_exists",
 ):
-    """
-    Load, split, and limit a MedVision task dataset into train / validation / test splits.
-
-    The function loads the HuggingFace MedVision dataset for all tasks listed in
-    ``tasks_list_json_path``, constructs train/val/test splits, and applies sample
-    limits at two granularities:
-
-    **Per-subset limit** (applied during loading, before any merging):
-        - ``limit_train_sample_per_subset``: max samples loaded from each individual
-          dataset config in the training pool.  Pass ``None`` or ``-1`` for no limit.
-        - ``limit_test_sample_per_subset``: same for the test pool.
-
-    **Per-task (total) limit** (applied after all subsets are merged):
-        - ``limit_train_sample``: max training samples **after** the val split is
-          carved out.  Use ``> 0`` to cap, ``< 0`` for no limit.  Must not be ``0``.
-        - ``limit_val_sample``: exact number of validation samples carved out of the
-          training pool via a group-aware split (3D volumes are kept together to
-          prevent data leakage).  Must be ``> 0``.
-        - ``limit_test_sample``: max test samples after loading.  Use ``> 0`` to cap,
-          ``< 0`` or ``None`` for no limit.
-
-    Split construction order:
-        1. Load all ``{task}_Train`` configs; apply ``limit_train_sample_per_subset``
-           per config.
-        2. Concatenate → group-split on ``image_file`` to produce a val set of
-           exactly ``limit_val_sample`` samples.
-        3. Apply ``limit_train_sample`` to the remaining training pool.
-        4. Load all ``{task}_Test`` configs; apply ``limit_test_sample_per_subset``
-           per config.
-        5. Concatenate → apply ``limit_test_sample`` to the merged test pool.
-
-    Args:
-        tasks_list_json_path (str): Path to a JSON file mapping task config names to
-            their metadata.
-        limit_train_sample (int): Max training samples after val split (``< 0`` = no
-            limit, ``> 0`` = cap).  Must not be ``0``.
-        limit_val_sample (int): Number of validation samples to carve out (must be
-            ``> 0``).
-        limit_test_sample (int): Max test samples (``< 0`` or ``None`` = no limit,
-            ``> 0`` = cap).
-        limit_train_sample_per_subset (int | None): Per-config cap during training
-            loading.  ``None`` / ``-1`` = no limit.
-        limit_test_sample_per_subset (int | None): Per-config cap during test loading.
-            ``None`` / ``-1`` = no limit.
-        num_workers_concat_datasets (int): Worker processes for parallel dataset
-            loading.  Automatically reduced when new (not-yet-cached) datasets are
-            detected.
-        tag_ds (str): Suffix in task config names used to extract the dataset name
-            (e.g., ``"BiometricsFromLandmarks"`` → task ``"Brain_BiometricsFromLandmarks"``
-            yields dataset name ``"Brain"``).  Required.
-        download_mode (str): HuggingFace ``download_mode`` passed to
-            ``load_dataset``.  Default: ``"reuse_dataset_if_exists"``.
-
-    Returns:
-        DatasetDict with keys ``"train"``, ``"validation"``, and ``"test"``.
-    """
     # NOTE:
     # - limit_val_sample must be greater than 0 to ensure validation set is not empty.
     # - limit_train_sample can be <0 (no limit) or >0 (limited training set).

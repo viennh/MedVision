@@ -46,21 +46,6 @@ def extract_last_k_nums(text, k):
     return ",".join(numbers[-k:])
 
 
-def extract_last_k_nums_within_answer_tag(text, k):
-    # Extract content within <answer> </answer> tags
-    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL)
-    if not match:
-        return ""
-
-    # Find all numbers within the answer tag
-    numbers = re.findall(r"-?\d+\.?\d*", match.group(1))
-
-    # Return the last k numbers
-    if len(numbers) < k:
-        return ""
-    return ",".join(numbers[-k:])
-
-
 # Convert NumPy values to native Python types for JSON serialization
 def convert_numpy_to_python(obj):
     if isinstance(obj, np.float32):

@@ -28,38 +28,41 @@ from llava.utils import disable_torch_init
 from lmms_eval.api.instance import Instance
 from lmms_eval.api.model import lmms
 from lmms_eval.api.registry import register_model
-from lmms_eval.models.model_utils.device_utils import setup_device_with_accelerate
 
 
 @register_model("llava_med")
 class LLaVA_Med(lmms):
     """
     LLaVA-Med Model
-
-    dtype: BF16 (https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json) 
     """
 
     def __init__(
         self,
-        model_hf: str = "microsoft/llava-med-v1.5-mistral-7b",
+        model_path: str = "microsoft/llava-med-v1.5-mistral-7b",
         model_base: str = None,
         conv_mode: str = "mistral_instruct",
         temperature: float = 0.2,
         top_p: float = None,
         num_beams: int = 1,
-        max_new_tokens: int = 4096,
+        dtype: str = "FP16",
+        device: Optional[str] = "cuda",
+        device_map: Optional[str] = "auto",
         **kwargs,
     ) -> None:
         super().__init__()
-        self.model_hf = model_hf
+        self.model_path = model_path
         self.model_base = model_base
         self.conv_mode = conv_mode
         self.temperature = temperature
         self.top_p = top_p
         self.num_beams = num_beams
-        self.max_new_tokens = max_new_tokens
-        self.model_dtype = torch.bfloat16 # use model dtype (https://huggingface.co/microsoft/llava-med-v1.5-mistral-7b/blob/main/config.json)
-        self.prepare_model()
+        self.dtype = dtype
+
+        # Disable cuDNN to avoid "GET was unable to find an engine" errors in CLIP's Conv2d
+        # patch embedding with float16 on certain GPU/cuDNN combinations (V100, T4).
+        torch.backends.cudnn.enabled = False
+
+        self.prepare_model(device, device_map)
 
     @property
     def tokenizer(self):
@@ -89,24 +92,36 @@ class LLaVA_Med(lmms):
     def world_size(self):
         return self._world_size
 
-    def prepare_model(self):
-        # Set up accelerator and device assignment using standard practice
+    def prepare_model(self, device, device_map):
+        # Set up accelerator
         self.accelerator = Accelerator()
-        self._device, self.device_map, self._rank, self._world_size = setup_device_with_accelerate(self.accelerator)
+        if self.accelerator.num_processes > 1:
+            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
+            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+        elif self.accelerator.num_processes == 1 and device_map == "auto":
+            self._device = torch.device(device)
+            self.device_map = device_map
+        else:
+            self._device = torch.device(f"cuda:{self.accelerator.local_process_index}")
+            self.device_map = f"cuda:{self.accelerator.local_process_index}"
+
+        model_dtype = torch.float32 if self.dtype == "FP32" else (torch.float16 if self.dtype == "FP16" else torch.bfloat16)
 
         # Add loading progress information
-        eval_logger.info(f"Loading base model from {self.model_hf}...")
+        eval_logger.info(f"Loading base model from {self.model_path}...")
 
         # Load model
         set_seed(0)
         disable_torch_init()
-        model_path = os.path.expanduser(self.model_hf)
+        model_path = os.path.expanduser(self.model_path)
         model_name = get_model_name_from_path(model_path)
         self._tokenizer, self._model, self._image_processor, self.context_len = load_pretrained_model(model_path, self.model_base, model_name)
 
-        # Set up model — device placement is handled by load_pretrained_model;
-        # move to the correct dtype and device explicitly
-        self._model.to(self.model_dtype).to(self.device)
+        # Set up model
+        if self.device_map == "auto":
+            self._model.to(model_dtype).to("cuda")
+        else:
+            self._model.to(model_dtype).to(self.device)
         if self.accelerator.num_processes > 1:
             assert self.accelerator.distributed_type in [
                 DistributedType.FSDP,
@@ -116,11 +131,16 @@ class LLaVA_Med(lmms):
                 self._model = self.accelerator.prepare(self._model)
             else:
                 self._model = self.accelerator.prepare_model(self._model, evaluation_mode=True)
+            self.accelerator = self.accelerator
             if self.accelerator.is_local_main_process:
                 eval_logger.info(f"Using {self.accelerator.num_processes} devices with data parallelism")
+            self._rank = self.accelerator.local_process_index
+            self._world_size = self.accelerator.num_processes
         else:
             eval_logger.info(f"Using single device: {self._device}")
             self._model.to(self._device)
+            self._rank = 0
+            self._world_size = 1
 
     def flatten(self, input):
         new_list = []
@@ -140,7 +160,7 @@ class LLaVA_Med(lmms):
             if len(visuals) == 1 and isinstance(visuals[0], Image.Image):
                 visual = visuals[0]
             else:
-                raise ValueError("The model only supports 1 image input and it should be of Image.Image type.")
+                raise ValueError("i 1 image input and it should be of Image.Image type.")
 
             # Get model outputs
             response = self.eval_model(question=contexts, pil_img=visual)
@@ -170,11 +190,13 @@ class LLaVA_Med(lmms):
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
 
-        input_ids = tokenizer_image_token(prompt, self._tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).to(self.device)
+        input_ids = tokenizer_image_token(prompt, self._tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt").unsqueeze(0).cuda()
 
         image_tensor = process_images([pil_img], self._image_processor, self._model.config)[0]
-        # The model expects images in BF16 on the same device, so convert and move the image tensor accordingly
-        image_tensor = image_tensor.unsqueeze(0).to(torch.bfloat16).to(self.device)
+        if self.dtype == "FP32":
+            image_tensor = image_tensor.unsqueeze(0).cuda()
+        elif self.dtype == "FP16":
+            image_tensor = image_tensor.unsqueeze(0).half().cuda()
 
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]
@@ -188,7 +210,7 @@ class LLaVA_Med(lmms):
                 temperature=self.temperature,
                 top_p=self.top_p,
                 num_beams=self.num_beams,
-                max_new_tokens=self.max_new_tokens,
+                max_new_tokens=1024,
                 use_cache=True,
             )
 

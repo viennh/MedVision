@@ -28,12 +28,6 @@ def parse_arguments():
         required=True,
         help="Model family name, used to identify the model groups that share the same image processor.",
     )
-    parser.add_argument(
-        "--model_hf",
-        type=str,
-        required=True,
-        help="Model Hugging Face identifier, used to load the model's image processor for dataset preparation.",
-    )
     # -- Data folder
     parser.add_argument(
         "--data_dir",
@@ -198,20 +192,15 @@ def build_parquet_dataset(**kwargs):
         "Reusing a dataset prepared with different settings or a different model may lead to incorrect results."
     )
 
-    # NOTE: TODO
-    # The CLI argument --without_cot_instruction is deprecated, as we want to keep the CoT instructions RFT training. 
-    # The main reason is that we adpot the SFT-CoT + RFT training pipeline, where the SFT-CoT stage use the CoT instructions in the prompts and we want to keep the prompts consistent between SFT and RFT training. 
-    # If we remove the CoT instructions in the RFT stage, there will be a distribution shift between the SFT and RFT training data.
-
     # Prepare the output parquet dataset directory
     if kwargs.get("without_cot_instruction"):
         cot_tag = "_wo-CoT-Instruct"
     else:
         cot_tag = ""
     if kwargs.get("new_shape_hw") is not None:
-        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}"
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}_resized-hw-{kwargs.get('new_shape_hw')[0]}x{kwargs.get('new_shape_hw')[1]}{cot_tag}__v2"
     else:
-        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__original"
+        ds_dir = f"ds__AD{train_limit_AD}_D{train_limit_detect}_TL{train_limit_TL}_all{train_limit_total}{cot_tag}__v2"
     parquet_ds_dir = os.path.join(
         data_dir,
         "verl_datasets",
@@ -231,7 +220,6 @@ def build_parquet_dataset(**kwargs):
             limit_val_sample=val_limit_AD,
             mapping_func=format_func,
             model_family_name=model_family_name,
-            model_hf=kwargs.get("model_hf"),
             num_workers_concat_datasets=kwargs.get("num_workers_concat_datasets"),
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
             # MedVision dataset specific, used to extract dataset name from AD task configs
@@ -249,7 +237,6 @@ def build_parquet_dataset(**kwargs):
             limit_val_sample=val_limit_TL,
             mapping_func=format_func,
             model_family_name=model_family_name,
-            model_hf=kwargs.get("model_hf"),
             num_workers_concat_datasets=kwargs.get("num_workers_concat_datasets"),
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
             # MedVision dataset specific, used to extract dataset name from AD task configs
@@ -268,7 +255,6 @@ def build_parquet_dataset(**kwargs):
             limit_val_sample=val_limit_detect,
             mapping_func=format_func,
             model_family_name=model_family_name,
-            model_hf=kwargs.get("model_hf"),
             num_workers_concat_datasets=kwargs.get("num_workers_concat_datasets"),
             num_workers_format_dataset=kwargs.get("num_workers_format_dataset"),
             # MedVision dataset specific, used to extract dataset name from AD task configs
@@ -284,40 +270,24 @@ def build_parquet_dataset(**kwargs):
     dataset["train"] = concatenate_datasets(train_ds_list)
     dataset["validation"] = concatenate_datasets(val_ds_list)
 
-    # Limit the training samples (allow sampling with replacement if limit exceeds dataset size)
+    # Limit the total number of samples if specified
     train_limit = kwargs.get("train_sample_limit")
     if train_limit > 0:
-        train_size = len(dataset["train"])
-        if train_limit > train_size:
-            import numpy as np
-            np.random.seed(SEED)
-            indices = np.random.choice(train_size, size=train_limit, replace=True)
-            dataset["train"] = dataset["train"].select(indices)
-        else:
-            dataset["train"] = (
-                dataset["train"]
-                .shuffle(seed=SEED)
-                .select(range(train_limit))
-            )
+        dataset["train"] = (
+            dataset["train"]
+            .shuffle(seed=SEED)
+            .select(range(min(len(dataset["train"]), train_limit)))
+        )
     else:
         dataset["train"] = dataset["train"].shuffle(seed=SEED)
 
-    # Limit the validation samples (allow sampling with replacement if limit exceeds dataset size)
     val_limit = kwargs.get("val_sample_limit")
     if val_limit > 0:
-        val_size = len(dataset["validation"])
-        if val_limit > val_size:
-            # Allow sampling with replacement if limit exceeds dataset size
-            import numpy as np
-            np.random.seed(SEED)
-            indices = np.random.choice(val_size, size=val_limit, replace=True)
-            dataset["validation"] = dataset["validation"].select(indices)
-        else:
-            dataset["validation"] = (
-                dataset["validation"]
-                .shuffle(seed=SEED)
-                .select(range(val_limit))
-            )
+        dataset["validation"] = (
+            dataset["validation"]
+            .shuffle(seed=SEED)
+            .select(range(min(len(dataset["validation"]), val_limit)))
+        )
     else:
         dataset["validation"] = dataset["validation"].shuffle(seed=SEED)
 

@@ -265,16 +265,6 @@ def parse_eval_args() -> argparse.Namespace:
         help="Sets trust_remote_code to True to execute code to create HF Datasets from the Hub",
     )
     parser.add_argument("--process_with_media", action="store_true", help="Whether you will process you dataset with audio, image. By default set to False" "In case some benchmarks need to be processed with media, set this flag to True.")
-    parser.add_argument(
-        "--sample_indices",
-        type=str,
-        default=None,
-        help=(
-            "JSON-encoded list of integer sample indices for partial inference. "
-            "When set, only the specified dataset indices are evaluated. "
-            "Typically produced by eval__*.py from --sample_indices [start:stop] or [start,stop,step]."
-        ),
-    )
     args = parser.parse_args()
     return args
 
@@ -505,7 +495,6 @@ def cli_evaluate_single(args: Union[argparse.Namespace, None] = None) -> None:
         fewshot_random_seed=args.seed[3],
         cli_args=args,
         datetime_str=datetime_str,
-        sample_indices=args.sample_indices,
         **request_caching_args,
     )
 

@@ -16,7 +16,7 @@ attrs==25.4.0
 av==15.1.0
 backoff==2.2.1
 beautifulsoup4==4.14.2
-bitsandbytes==0.45.2
+bitsandbytes==0.45.2; sys_platform == 'linux'
 black==25.9.0
 Brotli==1.1.0
 build==1.3.0
@@ -29,11 +29,12 @@ charset-normalizer==3.4.4
 click==8.1.8
 colorama==0.4.6
 contourpy==1.3.0
-cryptography==46.0.3
+cryptography==46.0.3; python_version >= '3.10'
+cryptography==43.0.3; python_version < '3.10'
 cycler==0.12.1
 DataProperty==1.1.0
 datasets==3.6.0
-decord==0.6.0
+eva-decord
 deepspeed==0.18.0
 Deprecated==1.2.18
 dill==0.3.8
@@ -46,10 +47,10 @@ eval_type_backport==0.2.2
 evaluate==0.4.6
 exceptiongroup==1.3.0
 filelock==3.19.1
-flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.3/flash_attn-2.7.3+cu12torch2.6cxx11abiFALSE-cp39-cp39-linux_x86_64.whl#sha256=1ef6c7b99c12ef0fbb051e5d28f88a4092afac668e6cc15c1d89ac13eefac852
+flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.7.3/flash_attn-2.7.3+cu12torch2.6cxx11abiFALSE-cp39-cp39-linux_x86_64.whl#sha256=1ef6c7b99c12ef0fbb051e5d28f88a4092afac668e6cc15c1d89ac13eefac852 ; sys_platform == 'linux'
 fonttools==4.60.1
 frozenlist==1.8.0
-fsspec==2025.9.0
+fsspec==2025.3.0
 ftfy==6.3.1
 gdown==5.2.0
 gdrive==0.1.5
@@ -104,20 +105,20 @@ nltk==3.9.2
 nodeenv==1.9.1
 numexpr==2.10.2
 numpy==1.26.4
-nvidia-cublas-cu12==12.4.5.8
-nvidia-cuda-cupti-cu12==12.4.127
-nvidia-cuda-nvrtc-cu12==12.4.127
-nvidia-cuda-runtime-cu12==12.4.127
-nvidia-cudnn-cu12==9.1.0.70
-nvidia-cufft-cu12==11.2.1.3
-nvidia-cufile-cu12==1.13.1.3
-nvidia-curand-cu12==10.3.5.147
-nvidia-cusolver-cu12==11.6.1.9
-nvidia-cusparse-cu12==12.3.1.170
-nvidia-cusparselt-cu12==0.6.2
-nvidia-nccl-cu12==2.21.5
-nvidia-nvjitlink-cu12==12.4.127
-nvidia-nvtx-cu12==12.4.127
+nvidia-cublas-cu12==12.4.5.8; sys_platform == 'linux'
+nvidia-cuda-cupti-cu12==12.4.127; sys_platform == 'linux'
+nvidia-cuda-nvrtc-cu12==12.4.127; sys_platform == 'linux'
+nvidia-cuda-runtime-cu12==12.4.127; sys_platform == 'linux'
+nvidia-cudnn-cu12==9.1.0.70; sys_platform == 'linux'
+nvidia-cufft-cu12==11.2.1.3; sys_platform == 'linux'
+nvidia-cufile-cu12==1.13.1.3; sys_platform == 'linux'
+nvidia-curand-cu12==10.3.5.147; sys_platform == 'linux'
+nvidia-cusolver-cu12==11.6.1.9; sys_platform == 'linux'
+nvidia-cusparse-cu12==12.3.1.170; sys_platform == 'linux'
+nvidia-cusparselt-cu12==0.6.2; sys_platform == 'linux'
+nvidia-nccl-cu12==2.21.5; sys_platform == 'linux'
+nvidia-nvjitlink-cu12==12.4.127; sys_platform == 'linux'
+nvidia-nvtx-cu12==12.4.127; sys_platform == 'linux'
 oauthlib==3.3.1
 openai==2.5.0
 opencv-python==4.11.0.86
@@ -216,7 +217,7 @@ tqdm==4.67.1
 tqdm-multiprocess==0.0.11
 transformers==4.37.2
 transformers-stream-generator==0.0.5
-triton==3.2.0
+triton==3.2.0; sys_platform == 'linux'
 typepy==1.3.4
 typing-inspection==0.4.2
 typing_extensions==4.15.0

@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import argparse
-import json
 import os
 import subprocess
+import sys
 
-from medvision_bm.benchmark.eval_utils import parse_sample_indices
 from medvision_bm.utils import (
     ensure_hf_hub_installed,
     install_medvision_ds,
@@ -15,6 +16,7 @@ from medvision_bm.utils import (
     set_cuda_num_processes,
     setup_env_hf_medvision_ds,
     setup_env_vllm,
+    subprocess_env_with_medvision_data,
     update_task_status,
 )
 
@@ -26,12 +28,12 @@ def run_evaluation_for_task_vllm_proxy(
     batch_size: int,
     sample_limit: int,
     output_path: str,
-    sample_indices: list = None,
+    data_dir: str | None = None,
 ):
     print(f"\nRunning task: {task}\n")
     subprocess.run("conda env list", check=True, shell=True)
     cmd = [
-        "python3",
+        sys.executable,
         "-m",
         "lmms_eval",
         "--model",
@@ -48,9 +50,9 @@ def run_evaluation_for_task_vllm_proxy(
         "--output_path",
         output_path,
     ]
-    if sample_indices is not None:
-        cmd += ["--sample_indices", json.dumps(sample_indices)]
-    cmd_result = subprocess.run(cmd, check=False)
+    cmd_result = subprocess.run(
+        cmd, check=False, env=subprocess_env_with_medvision_data(data_dir)
+    )
     print(f"Command executed with return code: {cmd_result.returncode}")
     return cmd_result.returncode
 
@@ -70,32 +72,13 @@ def parse_args():
         type=str,
         help="Name of the model to evaluate.",
     )
-    parser.add_argument(
-        "--lora_path",
-        default=None,
-        type=str,
-        help="Hugging Face path to LoRA adapter (if using LoRA). If not using LoRA, set to empty string or leave unset.",
-    )
-    parser.add_argument(
-        "--dtype",
-        default="auto",
-        type=str,
-        help="Data type for model weights (e.g., float32, float16, bfloat16). Default is 'auto', which uses the model config or falls back to fp16 in vllm for fp16/32 models.",
-    )
-    parser.add_argument(
-        "--reshape_image_hw",
-        default=None,
-        type=str,
-        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
-    )
-    # set max_new_tokens
-    parser.add_argument(
-        "--max_new_tokens",
-        default=4096,
-        type=int,
-        help="Maximum number of new tokens to generate per sample.",
-    )
     # resource-specific arguments
+    parser.add_argument(
+        "--minimum_gpu",
+        default=2,
+        type=int,
+        help="Minimum number of GPUs to use.",
+    )
     parser.add_argument(
         "--batch_size_per_gpu",
         default=1,
@@ -137,17 +120,6 @@ def parse_args():
         type=int,
         help="Maximum number of samples to evaluate per task.",
     )
-    parser.add_argument(
-        "--sample_indices",
-        default=None,
-        type=str,
-        metavar="[start:stop]|[start,stop,step]",
-        help=(
-            "Select a subset of samples by index for partial inference. "
-            "Accepted formats: [start:stop] (range) or [start,stop,step] (range with step). "
-            "When set, overrides --sample_limit for sample selection."
-        ),
-    )
     # debugging and control arguments
     parser.add_argument(
         "--skip_env_setup",
@@ -173,17 +145,14 @@ def main():
     # Configuration
     model_hf = args.model_hf_id
     model_name = args.model_name
-    lora_path = args.lora_path
-    dtype = args.dtype
     tasks_list_json_path = args.tasks_list_json_path
     result_dir = args.results_dir
     task_status_json_path = args.task_status_json_path
     data_dir = args.data_dir
     gpu_memory_utilization = args.gpu_memory_utilization
     sample_limit = args.sample_limit
-    max_new_tokens = args.max_new_tokens
 
-    num_processes = set_cuda_num_processes()
+    num_processes = set_cuda_num_processes(minimum_gpu=args.minimum_gpu)
 
     # NOTE: DO NOT change the order of these calls
     # ------
@@ -217,33 +186,13 @@ def main():
             continue
 
         batch_size = args.batch_size_per_gpu * num_processes
-
-        # NOTE: adjust max_new_tokens according to your task
         vllm_model_args = (
-            f"model_hf={model_hf},"
-            + (f"lora_path={lora_path}," if lora_path is not None else "")
-            + f"gpu_memory_utilization={gpu_memory_utilization},"
+            f"model_version={model_hf},"
+            f"gpu_memory_utilization={gpu_memory_utilization},"
             f"tensor_parallel_size={num_processes},"
             f"max_num_seqs={batch_size},"  # maximum batch size
-            f"max_new_tokens={max_new_tokens},"
-            f"dtype={dtype}"
+            "dtype=float16"
         )
-
-        # add reshape_image_hw to modle args if specified, with normalization to ensure correct parsing
-        if args.reshape_image_hw is not None:
-            raw = args.reshape_image_hw
-            if isinstance(raw, str):
-                s = raw.strip()
-                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
-                if not (s.startswith("[") or s.startswith("(")) and "," in s:
-                    s = f"[{s}]"
-            else:
-                s = raw
-            vllm_model_args += f",reshape_image_hw={s}"
-
-        parsed_sample_indices = None
-        if args.sample_indices is not None:
-            parsed_sample_indices = parse_sample_indices(args.sample_indices)
 
         rc = run_evaluation_for_task_vllm_proxy(
             lmmseval_module="vllm_llava_onevision",
@@ -252,12 +201,11 @@ def main():
             batch_size=batch_size,
             sample_limit=sample_limit,
             output_path=os.path.join(result_dir, model_name),
-            sample_indices=parsed_sample_indices,
+            data_dir=data_dir,
         )
 
-        if rc == 0:
-            if not args.skip_update_status:
-                update_task_status(task_status_json_path, model_name, task)
+        if rc == 0 and not args.skip_update_status:
+            update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

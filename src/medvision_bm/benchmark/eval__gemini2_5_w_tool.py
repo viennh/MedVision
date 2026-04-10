@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import argparse
-import json
 import os
 import subprocess
+import sys
 
-from medvision_bm.benchmark.eval_utils import parse_sample_indices
 from medvision_bm.utils import (
     ensure_hf_hub_installed,
     install_medvision_ds,
@@ -11,6 +12,7 @@ from medvision_bm.utils import (
     load_tasks,
     load_tasks_status,
     setup_env_hf_medvision_ds,
+    subprocess_env_with_medvision_data,
     update_task_status,
 )
 
@@ -22,12 +24,12 @@ def run_evaluation_for_task_API_models(
     batch_size: int,
     sample_limit: int,
     output_path: str,
-    sample_indices: list = None,
+    data_dir: str | None = None,
 ):
     print(f"\nRunning task: {task}\n")
     subprocess.run("conda env list", check=True, shell=True)
     cmd = [
-        "python3",
+        sys.executable,
         "-m",
         "lmms_eval",
         "--model",
@@ -45,9 +47,9 @@ def run_evaluation_for_task_API_models(
         output_path,
         "--verbosity=DEBUG",
     ]
-    if sample_indices is not None:
-        cmd += ["--sample_indices", json.dumps(sample_indices)]
-    cmd_result = subprocess.run(cmd, check=False)
+    cmd_result = subprocess.run(
+        cmd, check=False, env=subprocess_env_with_medvision_data(data_dir)
+    )
     print(f"Command executed with return code: {cmd_result.returncode}")
     return cmd_result.returncode
 
@@ -66,12 +68,6 @@ def parse_args():
         required=True,
         type=str,
         help="Name of the model to evaluate.",
-    )
-    parser.add_argument(
-        "--reshape_image_hw",
-        default=None,
-        type=str,
-        help="Reshape images to this height and width (format: H,W) before feeding into the model. Default is None.",
     )
     # resource-specific arguments
     parser.add_argument(
@@ -113,17 +109,6 @@ def parse_args():
         type=int,
         help="Maximum number of samples to evaluate per task.",
     )
-    parser.add_argument(
-        "--sample_indices",
-        default=None,
-        type=str,
-        metavar="[start:stop]|[start,stop,step]",
-        help=(
-            "Select a subset of samples by index for partial inference. "
-            "Accepted formats: [start:stop] (range) or [start,stop,step] (range with step). "
-            "When set, overrides --sample_limit for sample selection."
-        ),
-    )
     # debugging and control arguments
     parser.add_argument(
         "--skip_env_setup",
@@ -159,7 +144,7 @@ def main():
     # ------
     setup_env_hf_medvision_ds(data_dir)
     if not args.skip_env_setup:
-        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements
+        # NOTE: Install huggingface-hub, required version may vary for different models, check requirements 
         ensure_hf_hub_installed(hf_hub_version="0.36.0")
         install_vendored_lmms_eval(proj_dependency="gemini")
         install_medvision_ds(data_dir)
@@ -192,22 +177,6 @@ def main():
             "ignore_code=True"
         )
 
-        # add reshape_image_hw to model args if specified, with normalization to ensure correct parsing
-        if args.reshape_image_hw is not None:
-            raw = args.reshape_image_hw
-            if isinstance(raw, str):
-                s = raw.strip()
-                s = ",".join(s.split()) if (" " in s) and ("," not in s) else s
-                if not (s.startswith("[") or s.startswith("(")) and "," in s:
-                    s = f"[{s}]"
-            else:
-                s = raw
-            model_args += f",reshape_image_hw={s}"
-
-        parsed_sample_indices = None
-        if args.sample_indices is not None:
-            parsed_sample_indices = parse_sample_indices(args.sample_indices)
-
         rc = run_evaluation_for_task_API_models(
             lmmseval_module="gemini__2_5",
             model_args=model_args,
@@ -215,11 +184,10 @@ def main():
             batch_size=args.batch_size,
             sample_limit=sample_limit,
             output_path=os.path.join(result_dir, model_name),
-            sample_indices=parsed_sample_indices,
+            data_dir=data_dir,
         )
-        if rc == 0:
-            if not args.skip_update_status:
-                update_task_status(task_status_json_path, model_name, task)
+        if rc == 0 and not args.skip_update_status:
+            update_task_status(task_status_json_path, model_name, task)
         else:
             print(f"Warning: Task {task} failed (return code {rc})")
 

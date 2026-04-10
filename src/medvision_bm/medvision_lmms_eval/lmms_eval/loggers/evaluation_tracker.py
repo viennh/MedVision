@@ -23,6 +23,7 @@ from lmms_eval.utils import (
     handle_non_serializable,
     hash_string,
     sanitize_list,
+    sanitize_model_name,
     sanitize_task_name,
 )
 
@@ -57,6 +58,22 @@ class GeneralConfigTracker:
         """Starts the evaluation timer."""
         self.start_time = time.perf_counter()
 
+    @staticmethod
+    def _get_model_name(model_args: str) -> str:
+        """Extracts the model name from the model arguments."""
+
+        def extract_model_name(model_args: str, key: str) -> str:
+            """Extracts the model name from the model arguments using a key."""
+            args_after_key = model_args.split(key)[1]
+            return args_after_key.split(",")[0]
+
+        # order does matter, e.g. peft and delta are provided together with pretrained
+        prefixes = ["peft=", "delta=", "pretrained=", "model=", "path=", "engine="]
+        for prefix in prefixes:
+            if prefix in model_args:
+                return extract_model_name(model_args, prefix)
+        return ""
+
     def log_experiment_args(
         self,
         model_source: str,
@@ -67,8 +84,8 @@ class GeneralConfigTracker:
     ) -> None:
         """Logs model parameters and job ID."""
         self.model_source = model_source
-        self.model_name = "" # deprecated, kept for API consistency but no longer used for directory creation       
-        self.model_name_sanitized = "" # deprecated, kept for API consistency but no longer used for directory creation
+        self.model_name = GeneralConfigTracker._get_model_name(model_args)
+        self.model_name_sanitized = sanitize_model_name(self.model_name)
         self.system_instruction = system_instruction
         self.system_instruction_sha = hash_string(system_instruction) if system_instruction else None
         self.chat_template = chat_template
@@ -188,6 +205,7 @@ class EvaluationTracker:
                 )
 
                 path = Path(self.output_path if self.output_path else Path.cwd())
+                path = path.joinpath(self.general_config_tracker.model_name_sanitized)
                 path.mkdir(parents=True, exist_ok=True)
 
                 self.date_id = datetime_str.replace(":", "-")
@@ -237,6 +255,7 @@ class EvaluationTracker:
                 eval_logger.info(f"Saving per-sample results for: {task_name}")
 
                 path = Path(self.output_path if self.output_path else Path.cwd())
+                path = path.joinpath(self.general_config_tracker.model_name_sanitized)
                 path.mkdir(parents=True, exist_ok=True)
 
                 file_results_samples = path.joinpath(f"{self.date_id}_samples_{task_name}.jsonl")
@@ -290,9 +309,9 @@ class EvaluationTracker:
                     self.api.upload_folder(
                         repo_id=repo_id,
                         folder_path=str(path),
-                        path_in_repo="",
+                        path_in_repo=self.general_config_tracker.model_name_sanitized,
                         repo_type="dataset",
-                        commit_message=f"Adding samples results for {task_name}",
+                        commit_message=f"Adding samples results for {task_name} to {self.general_config_tracker.model_name}",
                     )
                     eval_logger.info(f"Successfully pushed sample results for task: {task_name} to the Hugging Face Hub. " f"You can find them at: {repo_id}")
 
