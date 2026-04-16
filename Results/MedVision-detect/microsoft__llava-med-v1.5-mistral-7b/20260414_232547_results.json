@@ -1,0 +1,146 @@
+{
+  "results": {
+    "BraTS24_BoxCoordinate_Task01_Axial": {
+      "alias": "BraTS24_BoxCoordinate_Task01_Axial",
+      "avgMAE,none": NaN,
+      "avgMAE_stderr,none": "N/A",
+      "avgMRE,none": NaN,
+      "avgMRE_stderr,none": "N/A",
+      "SuccessRate,none": 0.0,
+      "SuccessRate_stderr,none": "N/A"
+    }
+  },
+  "group_subtasks": {
+    "BraTS24_BoxCoordinate_Task01_Axial": []
+  },
+  "configs": {
+    "BraTS24_BoxCoordinate_Task01_Axial": {
+      "task": "BraTS24_BoxCoordinate_Task01_Axial",
+      "tag": "MedVision-BoxCoordinate,BraTS24",
+      "dataset_path": "YongchengYAO/MedVision",
+      "dataset_name": "BraTS24_BoxSize_Task01_Axial_Test",
+      "dataset_kwargs": {
+        "token": true,
+        "trust_remote_code": true
+      },
+      "test_split": "test",
+      "fewshot_split": "test",
+      "full_docs": false,
+      "process_results_use_image": false,
+      "doc_to_visual": "<function doc_to_visual at 0x149d36e1b520>",
+      "doc_to_text": "<function create_doc_to_text_BoxCoordinate.<locals>.doc_to_text_BoxCoordinate at 0x149d36e1a8c0>",
+      "doc_to_target": "<function doc_to_target_BoxCoordinate at 0x149d1a7112d0>",
+      "process_results": "<function process_results_BoxCoordinate at 0x149d1a711510>",
+      "description": "",
+      "target_delimiter": " ",
+      "fewshot_delimiter": "\n\n",
+      "num_fewshot": 0,
+      "metric_list": [
+        {
+          "metric": "avgMAE",
+          "aggregation": "<function aggregate_results_avgMAE at 0x149d1a711870>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "avgMRE",
+          "aggregation": "<function aggregate_results_avgMRE at 0x149d1a711900>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "SuccessRate",
+          "aggregation": "<function aggregate_results_SuccessRate at 0x149d1a711990>",
+          "higher_is_better": true
+        }
+      ],
+      "output_type": "generate_until",
+      "generation_kwargs": {
+        "until": [
+          "\n\n"
+        ],
+        "do_sample": false
+      },
+      "repeats": 1,
+      "should_decontaminate": false,
+      "metadata": [
+        {
+          "version": "1.0.0"
+        }
+      ],
+      "lmms_eval_specific_kwargs": {
+        "medgemma": null,
+        "biomedgpt": null,
+        "healthgpt": null,
+        "llava_med": null,
+        "meddr": null,
+        "huatuogpt_vision": null,
+        "gemini__2_5": null,
+        "gemini__2_5_woTool": null,
+        "internvl3": null,
+        "llava_onevision": null,
+        "qwen2_5_vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "vllm_qwen25vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "default": {
+          "pre_prompt": "",
+          "post_prompt": ""
+        },
+        "dataset": null
+      }
+    }
+  },
+  "versions": {
+    "BraTS24_BoxCoordinate_Task01_Axial": "Yaml"
+  },
+  "n-shot": {
+    "BraTS24_BoxCoordinate_Task01_Axial": 0
+  },
+  "higher_is_better": {
+    "BraTS24_BoxCoordinate_Task01_Axial": {
+      "avgMAE": false,
+      "avgMRE": false,
+      "SuccessRate": true
+    }
+  },
+  "n-samples": {
+    "BraTS24_BoxCoordinate_Task01_Axial": {
+      "original": 20142,
+      "effective": 100
+    }
+  },
+  "config": {
+    "model": "llava_med",
+    "model_args": "model_path=microsoft/llava-med-v1.5-mistral-7b,conv_mode=mistral_instruct,temperature=0",
+    "batch_size": "50",
+    "batch_sizes": [],
+    "device": null,
+    "use_cache": null,
+    "limit": 100.0,
+    "bootstrap_iters": 100000,
+    "gen_kwargs": "",
+    "random_seed": 0,
+    "numpy_seed": 1234,
+    "torch_seed": 1234,
+    "fewshot_seed": 1234
+  },
+  "git_hash": "v1.0.0-16-gb1ef246",
+  "date": "20260414_232547",
+  "task_hashes": {
+    "BraTS24_BoxCoordinate_Task01_Axial": "44c3063cdcdd8eeb1ec23ea1006dd9436a8babb99ba6f0e369f33e2b0764aa8f"
+  },
+  "model_source": "llava_med",
+  "model_name": "microsoft/llava-med-v1.5-mistral-7b",
+  "model_name_sanitized": "microsoft__llava-med-v1.5-mistral-7b",
+  "system_instruction": null,
+  "system_instruction_sha": null,
+  "fewshot_as_multiturn": false,
+  "chat_template": null,
+  "chat_template_sha": null,
+  "start_time": 327416.696221948,
+  "end_time": 327746.713411104,
+  "total_evaluation_time_seconds": "330.017189155973"
+}

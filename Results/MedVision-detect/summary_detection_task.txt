@@ -1,0 +1,13 @@
+
+================================================================================
+SUMMARY METRICS: Recall, Precision, and F1
+================================================================================
+
+Model: microsoft__llava-med-v1.5-mistral-7b
+-------------------------------------------
+  ANATOMY  (10 regions, 1151 samples): Recall=0.018, Precision=0.002, F1=0.003, IoU=0.002, SuccessRate=0.043, IoU>0.5=0.000, F1>0.5=0.000
+  T/L      ( 7 regions, 1104 samples): Recall=0.037, Precision=0.002, F1=0.003, IoU=0.002, SuccessRate=0.093, IoU>0.5=0.000, F1>0.5=0.000
+
+================================================================================
+Summary metrics saved to: Results/MedVision-detect/summary_metrics_all_models_detect_Task.json
+================================================================================

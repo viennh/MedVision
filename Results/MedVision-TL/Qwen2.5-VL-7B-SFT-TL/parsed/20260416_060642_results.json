@@ -1,0 +1,199 @@
+{
+  "results": {
+    "BraTS24_TumorLesionSize_Task05_Axial": {
+      "alias": "BraTS24_TumorLesionSize_Task05_Axial",
+      "avgMAE,none": "18.24412985990957",
+      "avgMAE_stderr,none": "N/A",
+      "avgMRE,none": "0.6856342435249659",
+      "avgMRE_stderr,none": "N/A",
+      "SuccessRate,none": 0.97,
+      "SuccessRate_stderr,none": "N/A",
+      "avgIoU,none": "nan",
+      "MRE<0.1": 0.12,
+      "MRE<0.2": 0.21,
+      "MRE<0.3": 0.3,
+      "MRE<0.4": 0.33,
+      "MRE<0.5": 0.34,
+      "MRE<0.6": 0.36,
+      "MRE<0.7": 0.38,
+      "MRE<0.8": 0.38,
+      "MRE<0.9": 0.39,
+      "MRE<1.0": 0.96
+    }
+  },
+  "group_subtasks": {
+    "BraTS24_TumorLesionSize_Task05_Axial": []
+  },
+  "configs": {
+    "BraTS24_TumorLesionSize_Task05_Axial": {
+      "task": "BraTS24_TumorLesionSize_Task05_Axial",
+      "tag": "MedVision-TumorLesionSize,BraTS24",
+      "dataset_path": "YongchengYAO/MedVision",
+      "dataset_name": "BraTS24_TumorLesionSize_Task05_Axial_Test",
+      "dataset_kwargs": {
+        "token": true,
+        "trust_remote_code": true
+      },
+      "test_split": "test",
+      "fewshot_split": "test",
+      "full_docs": false,
+      "process_results_use_image": false,
+      "doc_to_visual": "<function doc_to_visual at 0x7fb5d5109b20>",
+      "doc_to_text": "<function create_doc_to_text_TumorLesionSize.<locals>.doc_to_text_TumorLesionSize at 0x7fb7320d0e00>",
+      "doc_to_target": "<function doc_to_target_TumorLesionSize at 0x7fb5d465ab60>",
+      "process_results": "<function process_results_TumorLesionSize at 0x7fb5d465ade0>",
+      "description": "",
+      "target_delimiter": " ",
+      "fewshot_delimiter": "\n\n",
+      "num_fewshot": 0,
+      "metric_list": [
+        {
+          "metric": "avgMAE",
+          "aggregation": "<function aggregate_results_avgMAE at 0x7fb5d465b100>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "avgMRE",
+          "aggregation": "<function aggregate_results_avgMRE at 0x7fb5d465b1a0>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "SuccessRate",
+          "aggregation": "<function aggregate_results_SuccessRate at 0x7fb5d465b240>",
+          "higher_is_better": true
+        }
+      ],
+      "output_type": "generate_until",
+      "generation_kwargs": {
+        "until": [
+          "\n\n"
+        ],
+        "do_sample": false
+      },
+      "repeats": 1,
+      "should_decontaminate": false,
+      "metadata": [
+        {
+          "version": "1.0.0"
+        }
+      ],
+      "lmms_eval_specific_kwargs": {
+        "lingshu": {
+          "model": "lingshu",
+          "sample_model_hf": "lingshu-medical-mllm/Lingshu-32B"
+        },
+        "medgemma": {
+          "model": "medgemma",
+          "sample_model_hf": "google/medgemma-4b-it"
+        },
+        "biomedgpt": null,
+        "healthgpt_l14": {
+          "model": "healthgpt_l14",
+          "base_model_hf": "microsoft/phi-4",
+          "vision_model_hf": "openai/clip-vit-large-patch14-336",
+          "model_dtype": "FP16",
+          "hlora_r": 32,
+          "hlora_alpha": 64,
+          "hlora_dropout": 0,
+          "hlora_nums": 4,
+          "instruct_template": "phi4_instruct"
+        },
+        "llava_med": {
+          "model": "llava_med",
+          "sample_model_hf": "microsoft/llava-med-v1.5-mistral-7b"
+        },
+        "meddr": {
+          "model": "meddr",
+          "sample_model_hf": "Sunanhe/MedDr_0401"
+        },
+        "huatuogpt_vision": {
+          "model": "huatuogpt_vision",
+          "sample_model_hf": "FreedomIntelligence/HuatuoGPT-Vision-34B"
+        },
+        "gemini__2_5": null,
+        "gemini__2_5_woTool": null,
+        "internvl3": null,
+        "llava_onevision": null,
+        "qwen2_5_vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "vllm_gemma3": {
+          "model": "gemma3",
+          "sample_model_hf": "google/gemma-3-27b-it"
+        },
+        "vllm_internvl3": {
+          "model": "internvl3",
+          "sample_model_hf": "OpenGVLab/InternVL3-38B"
+        },
+        "vllm_llama_3_2_vision": {
+          "model": "llama_3_2_vision",
+          "sample_model_hf": "meta-llama/Llama-3.2-11B-Vision-Instruct"
+        },
+        "vllm_llava_onevision": {
+          "model": "llava_onevision",
+          "sample_model_hf": "llava-hf/llava-onevision-qwen2-72b-ov-hf"
+        },
+        "vllm_qwen25vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "default": {
+          "pre_prompt": "",
+          "post_prompt": ""
+        },
+        "dataset": null
+      }
+    }
+  },
+  "versions": {
+    "BraTS24_TumorLesionSize_Task05_Axial": "Yaml"
+  },
+  "n-shot": {
+    "BraTS24_TumorLesionSize_Task05_Axial": 0
+  },
+  "higher_is_better": {
+    "BraTS24_TumorLesionSize_Task05_Axial": {
+      "avgMAE": false,
+      "avgMRE": false,
+      "SuccessRate": true
+    }
+  },
+  "n-samples": {
+    "BraTS24_TumorLesionSize_Task05_Axial": {
+      "original": 205,
+      "effective": 100
+    }
+  },
+  "config": {
+    "model": "vllm_qwen25vl",
+    "model_args": "model_version=YongchengYAO/MedVision__SFT-m__qwen25vl-7b__TL,gpu_memory_utilization=0.9,tensor_parallel_size=1,max_num_seqs=1,max_num_batched_tokens=16384,limit_mm_per_prompt={\"image\":1,\"video\":0},mm_processor_kwargs={\"min_pixels\":784,\"max_pixels\":401408},dtype=float16,max_model_len=4096,enforce_eager=true",
+    "batch_size": "1",
+    "batch_sizes": [],
+    "device": null,
+    "use_cache": null,
+    "limit": 100.0,
+    "bootstrap_iters": 100000,
+    "gen_kwargs": "",
+    "random_seed": 0,
+    "numpy_seed": 1234,
+    "torch_seed": 1234,
+    "fewshot_seed": 1234
+  },
+  "git_hash": null,
+  "date": "20260416_060642",
+  "task_hashes": {
+    "BraTS24_TumorLesionSize_Task05_Axial": "162042e4f683ae1598fc8271418b1f6bbaeeea4b514c961d8d1e8de719de7fda"
+  },
+  "model_source": "vllm_qwen25vl",
+  "model_name": "",
+  "model_name_sanitized": "",
+  "system_instruction": null,
+  "system_instruction_sha": null,
+  "fewshot_as_multiturn": false,
+  "chat_template": null,
+  "chat_template_sha": null,
+  "start_time": 10434.497263008,
+  "end_time": 13588.874368942,
+  "total_evaluation_time_seconds": "3154.3771059340015"
+}

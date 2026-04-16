@@ -1,0 +1,188 @@
+{
+  "results": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": {
+      "alias": "FeTA24_BiometricsFromLandmarks_Task01_Axial",
+      "MAE,none": "[60.401043]",
+      "MAE_stderr,none": "N/A",
+      "MRE,none": "[0.84869105]",
+      "MRE_stderr,none": "N/A",
+      "SuccessRate,none": 0.15,
+      "SuccessRate_stderr,none": "N/A"
+    }
+  },
+  "group_subtasks": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": []
+  },
+  "configs": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": {
+      "task": "FeTA24_BiometricsFromLandmarks_Task01_Axial",
+      "tag": "MedVision-BiometricsFromLandmarks,FeTA24",
+      "dataset_path": "YongchengYAO/MedVision",
+      "dataset_name": "FeTA24_BiometricsFromLandmarks_Task01_Axial_Test",
+      "dataset_kwargs": {
+        "token": true,
+        "trust_remote_code": true
+      },
+      "test_split": "test",
+      "fewshot_split": "test",
+      "full_docs": false,
+      "process_results_use_image": false,
+      "doc_to_visual": "<function doc_to_visual at 0x151ca7d5b5b0>",
+      "doc_to_text": "<function create_doc_to_text_BiometricsFromLandmarks.<locals>.doc_to_text_BiometricsFromLandmarks at 0x151c79e52dd0>",
+      "doc_to_target": "<function doc_to_target_BiometricsFromLandmarks at 0x151c8b64d360>",
+      "process_results": "<function process_results_BiometricsFromLandmarks at 0x151c8b64d5a0>",
+      "description": "",
+      "target_delimiter": " ",
+      "fewshot_delimiter": "\n\n",
+      "num_fewshot": 0,
+      "metric_list": [
+        {
+          "metric": "MAE",
+          "aggregation": "<function aggregate_results_MAE at 0x151c8b64d630>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "MRE",
+          "aggregation": "<function aggregate_results_MRE at 0x151c8b64d6c0>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "SuccessRate",
+          "aggregation": "<function aggregate_results_SuccessRate at 0x151c8b64d870>",
+          "higher_is_better": true
+        }
+      ],
+      "output_type": "generate_until",
+      "generation_kwargs": {
+        "until": [
+          "\n\n"
+        ],
+        "do_sample": false
+      },
+      "repeats": 1,
+      "should_decontaminate": false,
+      "metadata": [
+        {
+          "version": "1.0.0"
+        }
+      ],
+      "lmms_eval_specific_kwargs": {
+        "lingshu": {
+          "model": "lingshu",
+          "sample_model_hf": "lingshu-medical-mllm/Lingshu-32B"
+        },
+        "medgemma": {
+          "model": "medgemma",
+          "sample_model_hf": "google/medgemma-4b-it"
+        },
+        "biomedgpt": null,
+        "healthgpt_l14": {
+          "model": "healthgpt_l14",
+          "base_model_hf": "microsoft/phi-4",
+          "vision_model_hf": "openai/clip-vit-large-patch14-336",
+          "model_dtype": "FP16",
+          "hlora_r": 32,
+          "hlora_alpha": 64,
+          "hlora_dropout": 0,
+          "hlora_nums": 4,
+          "instruct_template": "phi4_instruct"
+        },
+        "llava_med": {
+          "model": "llava_med",
+          "sample_model_hf": "microsoft/llava-med-v1.5-mistral-7b"
+        },
+        "meddr": {
+          "model": "meddr",
+          "sample_model_hf": "Sunanhe/MedDr_0401"
+        },
+        "huatuogpt_vision": {
+          "model": "huatuogpt_vision",
+          "sample_model_hf": "FreedomIntelligence/HuatuoGPT-Vision-34B"
+        },
+        "gemini__2_5": null,
+        "gemini__2_5_woTool": null,
+        "internvl3": null,
+        "llava_onevision": null,
+        "qwen2_5_vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "vllm_gemma3": {
+          "model": "gemma3",
+          "sample_model_hf": "google/gemma-3-27b-it"
+        },
+        "vllm_internvl3": {
+          "model": "internvl3",
+          "sample_model_hf": "OpenGVLab/InternVL3-38B"
+        },
+        "vllm_llama_3_2_vision": {
+          "model": "llama_3_2_vision",
+          "sample_model_hf": "meta-llama/Llama-3.2-11B-Vision-Instruct"
+        },
+        "vllm_llava_onevision": {
+          "model": "llava_onevision",
+          "sample_model_hf": "llava-hf/llava-onevision-qwen2-72b-ov-hf"
+        },
+        "vllm_qwen25vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "default": {
+          "pre_prompt": "",
+          "post_prompt": ""
+        },
+        "dataset": null
+      }
+    }
+  },
+  "versions": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": "Yaml"
+  },
+  "n-shot": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": 0
+  },
+  "higher_is_better": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": {
+      "MAE": false,
+      "MRE": false,
+      "SuccessRate": true
+    }
+  },
+  "n-samples": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": {
+      "original": 40,
+      "effective": 40
+    }
+  },
+  "config": {
+    "model": "llava_med",
+    "model_args": "model_path=microsoft/llava-med-v1.5-mistral-7b,conv_mode=mistral_instruct,temperature=0",
+    "batch_size": "50",
+    "batch_sizes": [],
+    "device": null,
+    "use_cache": null,
+    "limit": 100.0,
+    "bootstrap_iters": 100000,
+    "gen_kwargs": "",
+    "random_seed": 0,
+    "numpy_seed": 1234,
+    "torch_seed": 1234,
+    "fewshot_seed": 1234
+  },
+  "git_hash": "v1.0.0-16-gb1ef246",
+  "date": "20260413_235834",
+  "task_hashes": {
+    "FeTA24_BiometricsFromLandmarks_Task01_Axial": "ed6a072d581d1a04ace6988fcb2cf1cf3b9b0d35ca7e5cb376e21b009152987a"
+  },
+  "model_source": "llava_med",
+  "model_name": "microsoft/llava-med-v1.5-mistral-7b",
+  "model_name_sanitized": "microsoft__llava-med-v1.5-mistral-7b",
+  "system_instruction": null,
+  "system_instruction_sha": null,
+  "fewshot_as_multiturn": false,
+  "chat_template": null,
+  "chat_template_sha": null,
+  "start_time": 242982.277561208,
+  "end_time": 243140.255289886,
+  "total_evaluation_time_seconds": "157.97772867800086"
+}

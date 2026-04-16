@@ -1,0 +1,157 @@
+{
+  "results": {
+    "MSD_BoxCoordinate_Task10_Axial": {
+      "alias": "MSD_BoxCoordinate_Task10_Axial",
+      "avgMAE,none": "0.2221354121963183",
+      "avgMAE_stderr,none": "N/A",
+      "avgMRE,none": "nan",
+      "avgMRE_stderr,none": "N/A",
+      "SuccessRate,none": 0.03,
+      "SuccessRate_stderr,none": "N/A",
+      "avgIoU,none": "0.0",
+      "MRE<0.1": "N/A",
+      "MRE<0.2": "N/A",
+      "MRE<0.3": "N/A",
+      "MRE<0.4": "N/A",
+      "MRE<0.5": "N/A",
+      "MRE<0.6": "N/A",
+      "MRE<0.7": "N/A",
+      "MRE<0.8": "N/A",
+      "MRE<0.9": "N/A",
+      "MRE<1.0": "N/A"
+    }
+  },
+  "group_subtasks": {
+    "MSD_BoxCoordinate_Task10_Axial": []
+  },
+  "configs": {
+    "MSD_BoxCoordinate_Task10_Axial": {
+      "task": "MSD_BoxCoordinate_Task10_Axial",
+      "tag": "MedVision-BoxCoordinate,MSD",
+      "dataset_path": "YongchengYAO/MedVision",
+      "dataset_name": "MSD_BoxSize_Task10_Axial_Test",
+      "dataset_kwargs": {
+        "token": true,
+        "trust_remote_code": true
+      },
+      "test_split": "test",
+      "fewshot_split": "test",
+      "full_docs": false,
+      "process_results_use_image": false,
+      "doc_to_visual": "<function doc_to_visual at 0x14ec7b71b520>",
+      "doc_to_text": "<function create_doc_to_text_BoxCoordinate.<locals>.doc_to_text_BoxCoordinate at 0x14ec7b71a8c0>",
+      "doc_to_target": "<function doc_to_target_BoxCoordinate at 0x14ec5f0112d0>",
+      "process_results": "<function process_results_BoxCoordinate at 0x14ec5f011510>",
+      "description": "",
+      "target_delimiter": " ",
+      "fewshot_delimiter": "\n\n",
+      "num_fewshot": 0,
+      "metric_list": [
+        {
+          "metric": "avgMAE",
+          "aggregation": "<function aggregate_results_avgMAE at 0x14ec5f011870>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "avgMRE",
+          "aggregation": "<function aggregate_results_avgMRE at 0x14ec5f011900>",
+          "higher_is_better": false
+        },
+        {
+          "metric": "SuccessRate",
+          "aggregation": "<function aggregate_results_SuccessRate at 0x14ec5f011990>",
+          "higher_is_better": true
+        }
+      ],
+      "output_type": "generate_until",
+      "generation_kwargs": {
+        "until": [
+          "\n\n"
+        ],
+        "do_sample": false
+      },
+      "repeats": 1,
+      "should_decontaminate": false,
+      "metadata": [
+        {
+          "version": "1.0.0"
+        }
+      ],
+      "lmms_eval_specific_kwargs": {
+        "medgemma": null,
+        "biomedgpt": null,
+        "healthgpt": null,
+        "llava_med": null,
+        "meddr": null,
+        "huatuogpt_vision": null,
+        "gemini__2_5": null,
+        "gemini__2_5_woTool": null,
+        "internvl3": null,
+        "llava_onevision": null,
+        "qwen2_5_vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "vllm_qwen25vl": {
+          "model": "qwen2_5_vl",
+          "sample_model_hf": "Qwen/Qwen2.5-VL-32B-Instruct"
+        },
+        "default": {
+          "pre_prompt": "",
+          "post_prompt": ""
+        },
+        "dataset": null
+      }
+    }
+  },
+  "versions": {
+    "MSD_BoxCoordinate_Task10_Axial": "Yaml"
+  },
+  "n-shot": {
+    "MSD_BoxCoordinate_Task10_Axial": 0
+  },
+  "higher_is_better": {
+    "MSD_BoxCoordinate_Task10_Axial": {
+      "avgMAE": false,
+      "avgMRE": false,
+      "SuccessRate": true
+    }
+  },
+  "n-samples": {
+    "MSD_BoxCoordinate_Task10_Axial": {
+      "original": 362,
+      "effective": 100
+    }
+  },
+  "config": {
+    "model": "llava_med",
+    "model_args": "model_path=microsoft/llava-med-v1.5-mistral-7b,conv_mode=mistral_instruct,temperature=0",
+    "batch_size": "50",
+    "batch_sizes": [],
+    "device": null,
+    "use_cache": null,
+    "limit": 100.0,
+    "bootstrap_iters": 100000,
+    "gen_kwargs": "",
+    "random_seed": 0,
+    "numpy_seed": 1234,
+    "torch_seed": 1234,
+    "fewshot_seed": 1234
+  },
+  "git_hash": "v1.0.0-16-gb1ef246",
+  "date": "20260415_005438",
+  "task_hashes": {
+    "MSD_BoxCoordinate_Task10_Axial": "1ac464031c8ead3d6fa9bb4a5b8b0418f9840ca614da04f79865b7c7e98c51fb"
+  },
+  "model_source": "llava_med",
+  "model_name": "microsoft/llava-med-v1.5-mistral-7b",
+  "model_name_sanitized": "microsoft__llava-med-v1.5-mistral-7b",
+  "system_instruction": null,
+  "system_instruction_sha": null,
+  "fewshot_as_multiturn": false,
+  "chat_template": null,
+  "chat_template_sha": null,
+  "start_time": 332747.748902836,
+  "end_time": 333382.005490642,
+  "total_evaluation_time_seconds": "634.2565878059831"
+}

@@ -1,0 +1,2102 @@
+[
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "1.6318359375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "70.0625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "71.6875",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "58.59375",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "89.375",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "1.0712890625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "1.8740234375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "51.71875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "5.85546875",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "78.5625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "84.4375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "83.6875",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "86.625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "2.337890625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "12.2734375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "26.296875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "3.28515625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "79.6875",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "82.9375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "72.4375",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "84.1875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "1.1171875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "5.75390625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "30.640625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "5.83203125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "79.5625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "85.375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "41.34375",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "81.5",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "6.23828125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "9.53125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "25.703125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "3.82421875",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "80.375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "84.25",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "62.90625",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "89.5",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "0.78857421875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "7.05078125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "40.53125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "4.55078125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "72.5625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "77.125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "70.75",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "79.875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "0.06622314453125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "8.0078125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "41.8125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "6.51953125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "72.4375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "78.9375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "69.6875",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "76.8125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "2.435546875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "9.7734375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "42.78125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "2.833984375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "80.4375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "83.25",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "71.4375",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "87.5",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "3.3203125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "8.5390625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "30.953125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "0.46484375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "82.4375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "82.9375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "71.75",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "88.625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "5.12890625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "1.388671875",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "23.46875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "10.8515625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "73.5625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "84.375",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "78.0625",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "80.1875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "1.1953125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "16.0",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "40.46875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "1.384765625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "73.125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "74.5",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "71.25",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "85.8125",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "2.248046875",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "4.34765625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "34.5625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "6.1953125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "82.5",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "88.75",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "77.75",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_2_7",
+    "targets": "83.25",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_3_4-L_17_18",
+    "targets": "0.47509765625",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_7-L_5_6",
+    "targets": "9.6015625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_9_10",
+    "targets": "26.59375",
+    "responses": [
+      "120"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_2_5-L_2_6",
+    "targets": "5.7265625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_6",
+    "targets": "78.8125",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_1_2-L_2_5",
+    "targets": "84.5625",
+    "responses": [
+      "2"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_angle_A-L_5_6-L_8_10",
+    "targets": "73.1875",
+    "responses": [
+      "100"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "27.5",
+    "responses": [
+      "11.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "22.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "28.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "33.375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "34.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "20.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "45.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "25.3125",
+    "responses": [
+      "1.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "23.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "28.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "19.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "26.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "42.65625",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "29.96875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "45.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "44.6875",
+    "responses": [
+      "11.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "29.453125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "28.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "16.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-9-10",
+    "targets": "25.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "51.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "57.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "48.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "53.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "54.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "64.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "61.25",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "71.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "65.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "74.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "43.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "47.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "78.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "83.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "64.25",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "73.125",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "58.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "69.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "58.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "63.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "43.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "48.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "55.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "61.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "77.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "83.8125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "56.875",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "68.0625",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "76.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "85.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "77.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "80.75",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "54.84375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "66.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "55.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "64.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "52.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "55.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-5-6",
+    "targets": "53.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-7-8",
+    "targets": "62.5",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "26.578125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "13.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "20.59375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "8.25",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "28.75",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "12.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "28.921875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "15.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "37.96875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "16.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "22.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "12.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "37.96875",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "20.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "32.46875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "10.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "24.0",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "9.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "28.046875",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "15.5078125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "19.421875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "9.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "35.03125",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "11.5078125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "40.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "17.265625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "35.375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "14.7265625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "39.21875",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "17.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "38.5625",
+    "responses": [
+      ""
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "18.78125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "33.625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "13.2109375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "28.859375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "13.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "28.046875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "9.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-1-2",
+    "targets": "25.078125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "FeTA24_distance_L-3-4",
+    "targets": "9.5546875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "54.5625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "48.8125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "55.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "89.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "97.625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "101.25",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "64.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "33.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "60.34375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "62.53125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "39.59375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "61.40625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "76.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "60.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "89.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "99.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "108.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "73.25",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "29.671875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "64.4375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "68.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "45.53125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "65.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "79.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "57.78125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "92.0625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "109.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "116.4375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "70.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "34.53125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "65.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "67.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "43.71875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "64.75",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "77.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "54.28125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "88.5",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "106.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "113.5625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "74.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "34.96875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "75.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "77.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "47.78125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "56.96875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "64.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "58.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "89.8125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "103.625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "109.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "61.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "32.15625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "64.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "66.5625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "42.6875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "60.96875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "71.6875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "61.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "94.625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "110.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "115.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "67.4375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "33.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "54.96875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "57.53125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "40.5625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "65.1875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "67.4375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "57.46875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "98.6875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "110.75",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "118.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "73.375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "42.09375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "64.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "65.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "45.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "58.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "71.4375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "60.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "87.25",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "102.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "110.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "67.9375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "27.15625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "71.625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "74.25",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "42.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "60.125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-10",
+    "targets": "81.5625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-5",
+    "targets": "53.21875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-6",
+    "targets": "93.875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-7",
+    "targets": "102.8125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-2-8",
+    "targets": "110.4375",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-3-4",
+    "targets": "74.0625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-5-6",
+    "targets": "40.65625",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-8-10",
+    "targets": "65.3125",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-9-10",
+    "targets": "68.0",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-17-18",
+    "targets": "44.6875",
+    "responses": [
+      "10.5"
+    ]
+  },
+  {
+    "label": "Ceph-Biometrics-400_distance_L-1-2",
+    "targets": "54.46875",
+    "responses": [
+      "10.5"
+    ]
+  }
+]
