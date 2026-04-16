@@ -7,7 +7,6 @@ conda config --set solver classic
 # conda install conda=26.1.1
 
 # Only create the env if it doesn't already exist
-source activate base
 eval "$(conda shell.bash hook)"
 if [ -d "$(conda info --base)/envs/${ENV_NAME}" ]; then
     echo "Conda env '${ENV_NAME}' already exists. Skipping creation."

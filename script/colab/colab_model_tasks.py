@@ -59,6 +59,11 @@ class ModelSpec:
     vendored_extra: str | None
     third_party_path_env: list[str]
     gpu_memory_utilization: float | None
+    # If set, ``model_hf_id`` / ``model_name`` are ignored; use the row matching ``--suite``.
+    suite_model_overrides: tuple[tuple[str, str, str], ...] | None = None
+    # Passed to ``eval__qwen2_5_vl`` only (KV / memory).
+    max_model_len: int | None = None
+    enforce_eager: bool = False
 
 
 MODELS: dict[str, ModelSpec] = {
@@ -67,7 +72,7 @@ MODELS: dict[str, ModelSpec] = {
         eval_module="medvision_bm.benchmark.eval__medgemma",
         model_hf_id="google/medgemma-4b-it",
         model_name="medgemma-4b-it",
-        batch_size_default=10,
+        batch_size_default=1,
         requirements_txt="requirements/requirements_eval_medgemma.txt",
         skip_env_after_manual_install=True,
         install_aiohttp_lt_311=False,
@@ -75,6 +80,9 @@ MODELS: dict[str, ModelSpec] = {
         vendored_extra=None,
         third_party_path_env=[],
         gpu_memory_utilization=None,
+        suite_model_overrides=None,
+        max_model_len=None,
+        enforce_eager=False,
     ),
     "llava_med": ModelSpec(
         key="llava_med",
@@ -89,6 +97,9 @@ MODELS: dict[str, ModelSpec] = {
         vendored_extra=None,
         third_party_path_env=[],
         gpu_memory_utilization=None,
+        suite_model_overrides=None,
+        max_model_len=None,
+        enforce_eager=False,
     ),
     "meddr": ModelSpec(
         key="meddr",
@@ -103,6 +114,9 @@ MODELS: dict[str, ModelSpec] = {
         vendored_extra="meddr",
         third_party_path_env=["third_party/MedDr"],
         gpu_memory_utilization=None,
+        suite_model_overrides=None,
+        max_model_len=None,
+        enforce_eager=False,
     ),
     "qwen25vl": ModelSpec(
         key="qwen25vl",
@@ -117,6 +131,42 @@ MODELS: dict[str, ModelSpec] = {
         vendored_extra="qwen2_5_vl",
         third_party_path_env=[],
         gpu_memory_utilization=0.99,
+        suite_model_overrides=None,
+        max_model_len=None,
+        enforce_eager=False,
+    ),
+    "qwen25vl_sft": ModelSpec(
+        key="qwen25vl_sft",
+        eval_module="medvision_bm.benchmark.eval__qwen2_5_vl",
+        model_hf_id=None,
+        model_name="",
+        batch_size_default=1,
+        requirements_txt=None,
+        skip_env_after_manual_install=False,
+        install_aiohttp_lt_311=False,
+        install_vendored_lmms_eval=False,
+        vendored_extra="qwen2_5_vl",
+        third_party_path_env=[],
+        gpu_memory_utilization=0.90,
+        suite_model_overrides=(
+            (
+                "AD",
+                "YongchengYAO/MedVision__SFT-m__qwen25vl-7b__AD",
+                "Qwen2.5-VL-7B-SFT-AD",
+            ),
+            (
+                "TL",
+                "YongchengYAO/MedVision__SFT-m__qwen25vl-7b__TL",
+                "Qwen2.5-VL-7B-SFT-TL",
+            ),
+            (
+                "detect",
+                "YongchengYAO/MedVision__SFT-m__qwen25vl-7b__detect",
+                "Qwen2.5-VL-7B-SFT-detect",
+            ),
+        ),
+        max_model_len=4096,
+        enforce_eager=True,
     ),
     "llama3_vision": ModelSpec(
         key="llama3_vision",
@@ -131,6 +181,9 @@ MODELS: dict[str, ModelSpec] = {
         vendored_extra=None,
         third_party_path_env=[],
         gpu_memory_utilization=0.99,
+        suite_model_overrides=None,
+        max_model_len=None,
+        enforce_eager=False,
     ),
     "healthgpt": ModelSpec(
         key="healthgpt",
@@ -145,6 +198,9 @@ MODELS: dict[str, ModelSpec] = {
         vendored_extra=None,
         third_party_path_env=["third_party/HealthGPT"],
         gpu_memory_utilization=None,
+        suite_model_overrides=None,
+        max_model_len=None,
+        enforce_eager=False,
     ),
 }
 

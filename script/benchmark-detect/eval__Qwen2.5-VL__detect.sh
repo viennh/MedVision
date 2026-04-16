@@ -1,7 +1,6 @@
 ENV_NAME="eval-qwen25vl"
 
 # Only create the env if it doesn't already exist
-source activate base
 eval "$(conda shell.bash hook)"
 if [ -d "$(conda info --base)/envs/${ENV_NAME}" ]; then
     echo "Conda env '${ENV_NAME}' already exists. Skipping creation."
@@ -11,7 +10,7 @@ fi
 conda activate "${ENV_NAME}"
 
 # Set paths and configs
-benchmark_dir="/root/Documents/MedVision"
+benchmark_dir="/Volumes/VincentX10/UCF/MedVision"
 data_dir="${benchmark_dir}/Data"
 model_hf_id="Qwen/Qwen2.5-VL-7B-Instruct"
 model_name="Qwen2.5-VL-7B-Instruct"
@@ -23,7 +22,7 @@ task_tag="MedVision-detect"
 result_dir="${benchmark_dir}/Results/${task_tag}"
 tasks_list_json_path="${benchmark_dir}/tasks_list/tasks_MedVision-detect.json"
 task_status_json_path="${benchmark_dir}/completed_tasks/completed_tasks_${task_tag}.json"
-sample_limit=1000
+sample_limit=100
 
 # Install medvision_bm (locked shared build)
 set -euo pipefail

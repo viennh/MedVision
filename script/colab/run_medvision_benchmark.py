@@ -5,15 +5,35 @@ Run MedVision benchmark evaluations from a Google Drive checkout (or any path).
 Designed for Google Colab: mount Drive, set ``--medvision-home`` to your repo root
 (containing ``Data/``, ``src/``, ``requirements/``), then run one model and task suite.
 
+This script prepends ``<medvision-home>/src`` to ``PYTHONPATH`` so the **checkout on
+Disk/Drive** is imported before any older ``medvision_bm`` installed in
+``site-packages`` (avoids stale CLIs such as missing ``--max_model_len``). It still
+runs ``pip install <repo>`` so dependencies resolve; refresh the install after a
+large git pull if you disable that path.
+
+**Hugging Face Hub cache:** Large sharded models (e.g. Qwen SFT checkpoints) should not
+live only on Google Drive—downloads often truncate. When ``--medvision-home`` looks
+like a Drive path and ``/content`` exists (Colab), the runner sets
+``MEDVISION_HF_HOME`` to ``/content/.cache/medvision_hf_hub`` unless you pass
+``--hf-hub-cache`` or pre-set ``MEDVISION_HF_HOME``. If you still see
+``FileNotFoundError`` for ``model-XXXXX-of-YYYYY.safetensors``, delete the
+incomplete snapshot under the old ``Data/.cache/huggingface/hub/`` folder on Drive
+and re-run so the full model re-downloads to local disk.
+
 Benchmark code expects ``conda`` on PATH for a no-op ``conda env list`` call; when
 conda is missing (typical Colab), this script prepends a tiny shim to PATH.
 
 Examples::
 
+    # Default: Qwen2.5-VL SFT checkpoints, 100 samples per task, suite AD
+    python script/colab/run_medvision_benchmark.py \\
+        --medvision-home /content/drive/MyDrive/UCF/MedVision \\
+        --mount-google-drive
+
     python script/colab/run_medvision_benchmark.py \\
         --medvision-home /content/drive/MyDrive/UCF/MedVision \\
         --model medgemma \\
-        --suite AD
+        --suite all
 
     python script/colab/run_medvision_benchmark.py \\
         --medvision-home /content/drive/MyDrive/UCF/MedVision \\
@@ -65,6 +85,32 @@ def _prepend_pythonpath(medvision_home: Path, *relative_segments: str) -> None:
     os.environ["PYTHONPATH"] = f"{extra}:{cur}" if cur else extra
 
 
+def _configure_hf_hub_cache(medvision_home: Path, hf_hub_cache: Path | None) -> None:
+    """
+    Put Hugging Face *Hub model* weights on fast local disk when the repo is on
+    Google Drive, so multi-file safetensors downloads are not corrupted or truncated.
+    """
+    if os.environ.get("MEDVISION_HF_HOME"):
+        return
+    if hf_hub_cache is not None:
+        p = hf_hub_cache.expanduser().resolve()
+        p.mkdir(parents=True, exist_ok=True)
+        os.environ["MEDVISION_HF_HOME"] = str(p)
+        print(f"Using HF Hub model cache (MEDVISION_HF_HOME): {p}", flush=True)
+        return
+    home_s = str(medvision_home.resolve())
+    looks_like_gdrive = "MyDrive" in home_s or "/drive/" in home_s.replace("\\", "/")
+    if looks_like_gdrive and Path("/content").is_dir():
+        p = Path("/content/.cache/medvision_hf_hub")
+        p.mkdir(parents=True, exist_ok=True)
+        os.environ["MEDVISION_HF_HOME"] = str(p)
+        print(
+            "MedVision home appears to be on Google Drive; using local Hub cache at "
+            f"{p}. (Sharded models on Drive often fail with missing .safetensors shards.)",
+            flush=True,
+        )
+
+
 def _prepend_data_src(medvision_home: Path) -> None:
     ds = medvision_home / "Data" / "src"
     if ds.is_dir():
@@ -109,6 +155,8 @@ def _pip_install_requirements(medvision_home: Path, rel_req: str) -> None:
 
 def prepare_environment(medvision_home: Path, spec: ModelSpec, suite_key: str) -> None:
     _ensure_conda_shim()
+    # Import medvision_bm from this repo (not an older pip install without new CLI flags).
+    _prepend_pythonpath(medvision_home, "src")
     _prepend_data_src(medvision_home)
     for rel in spec.third_party_path_env:
         _prepend_pythonpath(medvision_home, rel)
@@ -124,6 +172,36 @@ def prepare_environment(medvision_home: Path, spec: ModelSpec, suite_key: str) -
                 "pip",
                 "install",
                 "datasets>=3.6.0,<4.0.0",
+            ]
+        )
+
+    if spec.key in ("qwen25vl", "qwen25vl_sft"):
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "datasets>=3.6.0,<4.0.0",
+            ]
+        )
+        # datasets often pulls huggingface-hub 1.x; medvision_ds requires 0.36.x
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "huggingface_hub[cli]==0.36.0",
+            ]
+        )
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "fsspec[http]>=2023.1.0,<=2025.3.0",
             ]
         )
 
@@ -143,6 +221,7 @@ def prepare_environment(medvision_home: Path, spec: ModelSpec, suite_key: str) -
 def build_eval_command(
     medvision_home: Path,
     spec: ModelSpec,
+    suite_key: str,
     result_dir: str,
     tasks_list: str,
     task_status: str,
@@ -151,6 +230,23 @@ def build_eval_command(
     sample_limit: int,
     gpu_memory_utilization: float | None,
 ) -> list[str]:
+    if spec.suite_model_overrides:
+        model_hf_id: str | None = None
+        model_name_resolved = ""
+        for sk, hid, mname in spec.suite_model_overrides:
+            if sk == suite_key:
+                model_hf_id = hid
+                model_name_resolved = mname
+                break
+        if model_hf_id is None:
+            raise ValueError(
+                f"Model {spec.key!r} has no Hugging Face checkpoint for suite {suite_key!r}. "
+                f"Defined suites: {[t[0] for t in spec.suite_model_overrides]}"
+            )
+    else:
+        model_hf_id = spec.model_hf_id
+        model_name_resolved = spec.model_name
+
     cmd: list[str] = [
         sys.executable,
         "-m",
@@ -168,9 +264,9 @@ def build_eval_command(
         "--sample_limit",
         str(sample_limit),
     ]
-    if spec.model_hf_id:
-        cmd.extend(["--model_hf_id", spec.model_hf_id])
-    cmd.extend(["--model_name", spec.model_name])
+    if model_hf_id:
+        cmd.extend(["--model_hf_id", model_hf_id])
+    cmd.extend(["--model_name", model_name_resolved])
 
     if spec.eval_module.endswith("eval__llava_med") or spec.eval_module.endswith("eval__meddr"):
         cmd.extend(["--dir_third_party", str(medvision_home / "third_party")])
@@ -183,6 +279,12 @@ def build_eval_command(
 
     if gpu_memory_utilization is not None:
         cmd.extend(["--gpu_memory_utilization", str(gpu_memory_utilization)])
+
+    if spec.eval_module.endswith("eval__qwen2_5_vl"):
+        if spec.max_model_len is not None:
+            cmd.extend(["--max_model_len", str(spec.max_model_len)])
+        if spec.enforce_eager:
+            cmd.append("--enforce_eager")
 
     return cmd
 
@@ -204,6 +306,8 @@ def run_one(
     data_dir = str(medvision_home / "Data")
     os.environ.setdefault("MEDVISION_HOME", str(medvision_home))
     os.environ.setdefault("MedVision_DATA_DIR", data_dir)
+    # Always reuse cached/raw data under data_dir; do not honor a prior Colab/session True.
+    os.environ["MedVision_FORCE_DOWNLOAD_DATA"] = "false"
     bs = batch_size if batch_size is not None else spec.batch_size_default
     gmu = gpu_memory_utilization if gpu_memory_utilization is not None else spec.gpu_memory_utilization
 
@@ -215,6 +319,7 @@ def run_one(
     eval_cmd = build_eval_command(
         medvision_home,
         spec,
+        suite_key,
         result_dir,
         tasks_list,
         task_status,
@@ -229,7 +334,9 @@ def run_one(
         _prepend_pythonpath(medvision_home, rel)
     os.chdir(medvision_home)
     print("+", " ".join(eval_cmd), flush=True)
-    subprocess.run(eval_cmd, check=False)
+    eval_env = os.environ.copy()
+    eval_env["MedVision_FORCE_DOWNLOAD_DATA"] = "false"
+    subprocess.run(eval_cmd, check=False, env=eval_env)
 
 
 def parse_args() -> argparse.Namespace:
@@ -248,7 +355,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--model",
         type=str,
-        default="medgemma",
+        default="qwen25vl_sft",
         help=f"Model key or 'all'. Choices: {MODEL_CHOICES + ('all',)}",
     )
     p.add_argument(
@@ -258,12 +365,27 @@ def parse_args() -> argparse.Namespace:
         help="Task suite: AD, detect, TL, or all.",
     )
     p.add_argument("--batch-size", type=int, default=None)
-    p.add_argument("--sample-limit", type=int, default=1000)
+    p.add_argument(
+        "--sample-limit",
+        type=int,
+        default=100,
+        help="Per-task sample cap (lmms-eval --limit). Default 100 for quick Colab runs.",
+    )
     p.add_argument("--gpu-memory-utilization", type=float, default=None)
     p.add_argument(
         "--install-only",
         action="store_true",
         help="Only install dependencies (pip / vendored lmms-eval); do not run evaluation.",
+    )
+    p.add_argument(
+        "--hf-hub-cache",
+        type=Path,
+        default=None,
+        help=(
+            "Directory for Hugging Face Hub model downloads (sets MEDVISION_HF_HOME). "
+            "Use fast local disk on Colab (default when repo is under Drive: "
+            "/content/.cache/medvision_hf_hub). Overrides auto-detection."
+        ),
     )
     return p.parse_args()
 
@@ -291,6 +413,8 @@ def main() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+    _configure_hf_hub_cache(medvision_home, args.hf_hub_cache)
 
     models = list(MODELS.keys()) if args.model == "all" else [args.model]
     suites = list(TASK_SUITES.keys()) if args.suite == "all" else [args.suite]

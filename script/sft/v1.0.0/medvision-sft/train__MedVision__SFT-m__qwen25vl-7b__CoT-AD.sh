@@ -2,7 +2,6 @@ ENV_NAME="sft-qwen25vl"
 
 
 # Only create the env if it doesn't already exist
-source activate base
 eval "$(conda shell.bash hook)"
 if [ -d "$(conda info --base)/envs/${ENV_NAME}" ]; then
     echo "Conda env '${ENV_NAME}' already exists. Skipping creation."

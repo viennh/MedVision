@@ -2,7 +2,6 @@ ENV_NAME="sft-qwen25vl"
 
 
 # Only create the env if it doesn't already exist
-source activate base
 eval "$(conda shell.bash hook)"
 if [ -d "$(conda info --base)/envs/${ENV_NAME}" ]; then
     echo "Conda env '${ENV_NAME}' already exists. Skipping creation."
@@ -53,7 +52,7 @@ dataloader_num_workers=8
 # NOTE: If the sample limit is larger than the dataset size, the full dataset will be used.
 # ----------------------------------------------------------------------------------
 # [Required] Sample limits in total
-train_sample_limit=1000000
+train_sample_limit=100000
 val_sample_limit=200
 
 # # [Option 1] For approximately balanced sampling across 3 tasks
