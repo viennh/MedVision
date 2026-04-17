@@ -8,9 +8,9 @@ For full upstream documentation (Docker, SLURM, SFT, etc.), see [`README-MedVisi
 
 ## 1) Fork from MedVision
 
-1. On GitHub, open [YongchengYAO/MedVision](https://github.com/YongchengYAO/MedVision) and use **Fork** to create your copy under your account (or your course organization).
+1. On GitHub, open [YongchengYAO/MedVision](https://github.com/YongchengYAO/MedVision) and use **Fork** to create our copy.
 
-2. Clone **your** fork locally:
+2. Clone **our** fork locally:
 
    ```bash
    git clone https://github.com/viennh/MedVision.git
@@ -137,7 +137,7 @@ Model definitions, requirements files, and flags such as `--skip_env_setup` afte
 
 ## Citation
 
-If you use MedVision in coursework or publications, cite the upstream work (see [README-MedVision.md](README-MedVision.md) for the BibTeX entry).
+See [README-MedVision.md](README-MedVision.md) for the BibTeX entry.
 
 ---
 
